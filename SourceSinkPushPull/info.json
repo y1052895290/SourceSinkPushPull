@@ -1,0 +1,13 @@
+{
+    "name": "SourceSinkPushPull",
+    "version": "0.0.1",
+    "title": "SSPP Train System",
+    "author": "jagoly",
+    "factorio_version": "2.0",
+    "description": "Source-Sink-Push-Pull, or SSPP, is a simple algorithm for dispatching trains.",
+    "dependencies": [
+        "base",
+        "flib >= 0.16.0",
+        "? pypostprocessing"
+    ]
+}
