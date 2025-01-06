@@ -320,7 +320,7 @@ function gui.update_station_after_change(player_id, from_nothing)
 		end
 	end
 
-	local parts = assert(get_station_parts(player_state.entity))
+	local parts = assert(player_state.parts)
 
 	local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
 	local network = storage.networks[player_state.network]
@@ -511,14 +511,14 @@ function gui.station_open(player_id, entity)
 	local elements, window ---@type {[string]: LuaGuiElement}, LuaGuiElement
 	if parts then
 		elements, window = add_gui_complete(player, parts.provide_io, parts.request_io)
+		storage.player_states[player_id] = { network = network_name, parts = parts, elements = elements }
 	else
 		elements, window = add_gui_incomplete(player)
+		storage.player_states[player_id] = { network = network_name, entity = entity, elements = elements }
 	end
 
 	window.titlebar.drag_target = window
 	window.force_auto_center()
-
-	storage.player_states[player_id] = { network = network_name, entity = entity, elements = elements }
 
 	if parts then
 		local network = storage.networks[network_name]
@@ -547,8 +547,8 @@ function gui.station_closed(player_id, window)
 	assert(window.name == "sspp-station")
 	window.destroy()
 
-	local entity = storage.player_states[player_id].entity --[[@as LuaEntity]]
-	if entity.name ~= "entity-ghost" then
+	local parts = storage.player_states[player_id].parts
+	if parts and not parts.ghost then
 		player.play_sound({ path = "entity-close/sspp-stop" })
 	end
 

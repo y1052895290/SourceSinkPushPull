@@ -330,7 +330,7 @@ end
 --------------------------------------------------------------------------------
 
 ---@param entity LuaEntity
----@return { stop: LuaEntity, general_io: LuaEntity, provide_io: LuaEntity?, request_io: LuaEntity?, ghost: true? }?
+---@return StationParts?
 function get_station_parts(entity)
 	local name, ghost = entity.name, nil ---@type string, true?
 	if name == "entity-ghost" then name, ghost = entity.ghost_name, true end

@@ -140,6 +140,13 @@ end
 
 ---@param stop LuaEntity
 local function try_destroy_station(stop)
+	for player_id, player_state in pairs(storage.player_states) do
+		local parts = player_state.parts
+		if parts and parts.stop.unit_number == stop.unit_number then
+			gui.station_closed(player_id, player_state.elements["sspp-station"])
+		end
+	end
+
 	if stop.name == "entity-ghost" then return end
 
 	local station_id = stop.unit_number ---@type StationId
@@ -169,6 +176,55 @@ local function try_destroy_station(stop)
 	end
 
 	stop.backer_name = "[img=virtual-signal.signal-ghost]"
+end
+
+--------------------------------------------------------------------------------
+
+---@param hauler_id HaulerId
+local function on_hauler_disabled_or_destroyed(hauler_id)
+	local hauler = assert(storage.haulers[hauler_id])
+	local network_name = hauler.network
+	local network = assert(storage.networks[network_name])
+
+	local to_provide = hauler.to_provide
+	if to_provide then
+		local station = assert(storage.stations[to_provide.station])
+		local item_key = to_provide.item
+		storage.disabled_items[network_name .. ":" .. item_key] = true
+		if station.hauler == hauler_id then
+			clear_arithmetic_control_behavior(station.provide_io)
+			station.hauler = nil
+		end
+		list_remove_value_or_destroy(network.provide_haulers, item_key, hauler_id)
+		list_remove_value_or_destroy(station.provide_deliveries, item_key, hauler_id)
+		station.total_deliveries = station.total_deliveries - 1
+	end
+
+	local to_request = hauler.to_request
+	if to_request then
+		local station = assert(storage.stations[to_request.station])
+		local item_key = to_request.item
+		storage.disabled_items[hauler.network .. ":" .. item_key] = true
+		if station.hauler == hauler_id then
+			clear_arithmetic_control_behavior(station.request_io)
+			station.hauler = nil
+		end
+		list_remove_value_or_destroy(network.request_haulers, item_key, hauler_id)
+		list_remove_value_or_destroy(station.request_deliveries, item_key, hauler_id)
+		station.total_deliveries = station.total_deliveries - 1
+	end
+
+	if hauler.to_fuel then
+		list_remove_value_or_destroy(network.fuel_haulers, hauler.class, hauler_id)
+	end
+
+	if hauler.to_depot then
+		list_remove_value_or_destroy(network.depot_haulers, hauler.class, hauler_id)
+	end
+
+	if hauler.to_liquidate then
+		list_remove_value_or_destroy(network.liquidate_haulers, hauler.to_liquidate, hauler_id)
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -293,12 +349,12 @@ local function on_entity_broken(event)
 		on_stop_broken(entity)
 	elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
 		on_comb_broken(entity)
-	elseif entity.train then
-		-- local train_id = entity.train.id
-		-- local train = storage.trains[train_id]
-		-- if train then
-		-- 	on_train_broken(train_id, train)
-		-- end
+	else
+		local hauler_id = assert(entity.train).id
+		if storage.haulers[hauler_id] then
+			on_hauler_disabled_or_destroyed(hauler_id)
+			storage.haulers[hauler_id] = nil
+		end
 	end
 end
 
@@ -347,53 +403,6 @@ local function on_surface_renamed(event)
 end
 
 --------------------------------------------------------------------------------
-
----@param hauler_id HaulerId
-local function on_hauler_disabled_or_destroyed(hauler_id)
-	local hauler = assert(storage.haulers[hauler_id])
-	local network_name = hauler.network
-	local network = assert(storage.networks[network_name])
-
-	local to_provide = hauler.to_provide
-	if to_provide then
-		local station = assert(storage.stations[to_provide.station])
-		local item_key = to_provide.item
-		storage.disabled_items[network_name .. ":" .. item_key] = true
-		if station.hauler == hauler_id then
-			clear_arithmetic_control_behavior(station.provide_io)
-			station.hauler = nil
-		end
-		list_remove_value_or_destroy(network.provide_haulers, item_key, hauler_id)
-		list_remove_value_or_destroy(station.provide_deliveries, item_key, hauler_id)
-		station.total_deliveries = station.total_deliveries - 1
-	end
-
-	local to_request = hauler.to_request
-	if to_request then
-		local station = assert(storage.stations[to_request.station])
-		local item_key = to_request.item
-		storage.disabled_items[hauler.network .. ":" .. item_key] = true
-		if station.hauler == hauler_id then
-			clear_arithmetic_control_behavior(station.request_io)
-			station.hauler = nil
-		end
-		list_remove_value_or_destroy(network.request_haulers, item_key, hauler_id)
-		list_remove_value_or_destroy(station.request_deliveries, item_key, hauler_id)
-		station.total_deliveries = station.total_deliveries - 1
-	end
-
-	if hauler.to_fuel then
-		list_remove_value_or_destroy(network.fuel_haulers, hauler.class, hauler_id)
-	end
-
-	if hauler.to_depot then
-		list_remove_value_or_destroy(network.depot_haulers, hauler.class, hauler_id)
-	end
-
-	if hauler.to_liquidate then
-		list_remove_value_or_destroy(network.liquidate_haulers, hauler.to_liquidate, hauler_id)
-	end
-end
 
 ---@param hauler Hauler
 local function on_hauler_set_to_manual(hauler)
@@ -641,6 +650,7 @@ local filter_broken = {
 	{ filter = "ghost_name", name = "sspp-general-io" },
 	{ filter = "ghost_name", name = "sspp-provide-io" },
 	{ filter = "ghost_name", name = "sspp-request-io" },
+	{ filter = "rolling-stock" },
 }
 local filter_ghost_broken = {
 	{ filter = "name", name = "sspp-stop" },

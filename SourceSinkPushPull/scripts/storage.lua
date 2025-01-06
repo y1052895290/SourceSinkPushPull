@@ -113,8 +113,16 @@
 
 --------------------------------------------------------------------------------
 
+---@class (exact) StationParts
+---@field public stop LuaEntity
+---@field public general_io LuaEntity
+---@field public provide_io LuaEntity?
+---@field public request_io LuaEntity?
+---@field public ghost true?
+
 ---@class (exact) PlayerState
 ---@field public network NetworkName
+---@field public parts StationParts?
 ---@field public entity LuaEntity?
 ---@field public train LuaTrain?
 ---@field public elements {[string]: LuaGuiElement}
