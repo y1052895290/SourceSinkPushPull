@@ -126,7 +126,7 @@ styles.sspp_compact_slot_button = { ---@type data.ButtonStyleSpecification
 styles.sspp_station_item_property_flow = { ---@type data.HorizontalFlowStyleSpecification
     type = "horizontal_flow_style",
     parent = "horizontal_flow",
-	width = 200,
+    width = 200,
     height = 30,
     horizontal_spacing = 0,
     vertical_align = "center",
@@ -135,21 +135,21 @@ styles.sspp_station_item_property_flow = { ---@type data.HorizontalFlowStyleSpec
 styles.sspp_station_item_key = { ---@type data.LabelStyleSpecification
     type = "label_style",
     parent = "bold_label",
-	width = 100,
+    width = 100,
     horizontal_align = "left",
 }
 
 styles.sspp_station_item_value = { ---@type data.LabelStyleSpecification
     type = "label_style",
     parent = "label",
-	width = 100,
+    width = 100,
     horizontal_align = "right",
 }
 
 styles.sspp_station_item_textbox = { ---@type data.TextBoxStyleSpecification
     type = "textbox_style",
     parent = "textbox",
-	width = 100,
+    width = 100,
     horizontal_align = "right",
 }
 
@@ -182,5 +182,5 @@ styles.sspp_hauler_frame = { ---@type data.FrameStyleSpecification
 styles.sspp_hauler_textbox = { ---@type data.TextBoxStyleSpecification
     type = "textbox_style",
     parent = "textbox",
-	width = 184,
+    width = 184,
 }

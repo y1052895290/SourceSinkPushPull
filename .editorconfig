@@ -2,24 +2,19 @@
 
 [*.lua]
 
-indent_style = space
-indent_size = 4
-continuation_indent = 4
 quote_style = double
 max_line_length = unset
-end_of_line = unset
-table_separator_style = comma
+end_of_line = lf
 trailing_table_separator = smart
-insert_final_newline = true
+detect_end_of_line = false
 
-space_around_table_append_operator=true
+space_inside_function_call_parentheses = unset
+space_around_table_append_operator = true
 
-align_call_args = false
 align_function_params = false
-align_continuous_assign_statement = false
-align_continuous_rect_table_field = false
-align_if_branch = false
-align_array_table = false
+align_continuous_assign_statement = none
+align_continuous_rect_table_field = none
+align_array_table = none
 
 line_space_after_if_statement = max(2)
 line_space_after_do_statement = max(2)
@@ -31,4 +26,4 @@ line_space_after_function_statement = max(2)
 line_space_after_expression_statement = max(2)
 line_space_after_comment = max(2)
 
-end_statement_with_semicolon = replace_with_newline
+break_table_list = never

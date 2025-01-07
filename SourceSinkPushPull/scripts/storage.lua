@@ -138,53 +138,53 @@ mod_settings = {}
 --------------------------------------------------------------------------------
 
 function init_storage()
-	storage.tick_state = "INITIAL"
-	storage.stop_combs = {}
-	storage.comb_stops = {}
-	storage.networks = {}
-	storage.stations = {}
-	storage.haulers = {}
-	storage.player_states = {}
-	storage.all_stations = {}
-	storage.all_dispatch_items = {}
-	storage.all_provide_done_items = {}
-	storage.all_request_done_items = {}
-	storage.disabled_items = {}
+    storage.tick_state = "INITIAL"
+    storage.stop_combs = {}
+    storage.comb_stops = {}
+    storage.networks = {}
+    storage.stations = {}
+    storage.haulers = {}
+    storage.player_states = {}
+    storage.all_stations = {}
+    storage.all_dispatch_items = {}
+    storage.all_provide_done_items = {}
+    storage.all_request_done_items = {}
+    storage.disabled_items = {}
 end
 
 ---@param surface LuaSurface
 function init_network(surface)
-	storage.networks[surface.name] = {
-		surface = surface,
-		classes = {},
-		items = {},
-		provide_haulers = {},
-		request_haulers = {},
-		fuel_haulers = {},
-		depot_haulers = {},
-		liquidate_haulers = {},
-		economy = {
-			push_stations = {},
-			provide_stations = {},
-			pull_stations = {},
-			request_stations = {},
-			provide_done_stations = {},
-			request_done_stations = {},
-		},
-	}
+    storage.networks[surface.name] = {
+        surface = surface,
+        classes = {},
+        items = {},
+        provide_haulers = {},
+        request_haulers = {},
+        fuel_haulers = {},
+        depot_haulers = {},
+        liquidate_haulers = {},
+        economy = {
+            push_stations = {},
+            provide_stations = {},
+            pull_stations = {},
+            request_stations = {},
+            provide_done_stations = {},
+            request_done_stations = {},
+        },
+    }
 
-	-- storage.networks[surface.name].classes = {
-	-- 	["20 slots"] = { list_index = 1, name = "20 slots", item_slot_capacity = 20, depot_name = "Depot", fueler_name = "Fuel" },
-	-- 	["25k units"] = { list_index = 2, name = "25k units", fluid_capacity = 25000, depot_name = "Depot", fueler_name = "Fuel" },
-	-- }
-	-- storage.networks[surface.name].items = {
-	-- 	["iron-plate:normal"] = { list_index = 1, name = "iron-plate", quality = "normal", delivery_size = 2000, delivery_time = 60, class = "20 slots" },
-	-- 	["coal:normal"] = { list_index = 2, name = "coal", quality = "normal", delivery_size = 1000, delivery_time = 60, class = "20 slots" },
-	-- 	["stone:normal"] = { list_index = 3, name = "stone", quality = "normal", delivery_size = 1000, delivery_time = 80, class = "20 slots" },
-	-- 	["water"] = { list_index = 4, name = "water", delivery_size = 25000, delivery_time = 60, class = "25k units" },
-	-- }
+    -- storage.networks[surface.name].classes = {
+    --     ["20 slots"] = { list_index = 1, name = "20 slots", item_slot_capacity = 20, depot_name = "Depot", fueler_name = "Fuel" },
+    --     ["25k units"] = { list_index = 2, name = "25k units", fluid_capacity = 25000, depot_name = "Depot", fueler_name = "Fuel" },
+    -- }
+    -- storage.networks[surface.name].items = {
+    --     ["iron-plate:normal"] = { list_index = 1, name = "iron-plate", quality = "normal", delivery_size = 2000, delivery_time = 60, class = "20 slots" },
+    --     ["coal:normal"] = { list_index = 2, name = "coal", quality = "normal", delivery_size = 1000, delivery_time = 60, class = "20 slots" },
+    --     ["stone:normal"] = { list_index = 3, name = "stone", quality = "normal", delivery_size = 1000, delivery_time = 80, class = "20 slots" },
+    --     ["water"] = { list_index = 4, name = "water", delivery_size = 25000, delivery_time = 60, class = "25k units" },
+    -- }
 end
 
 function populate_mod_settings()
-	mod_settings.stations_per_tick = settings.global["sspp-stations-per-tick"].value --[[@as boolean]]
+    mod_settings.stations_per_tick = settings.global["sspp-stations-per-tick"].value --[[@as boolean]]
 end

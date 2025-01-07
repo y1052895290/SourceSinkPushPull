@@ -28,28 +28,28 @@ request_io_item.order = order .. "-sspp-c"
 
 stop_recipe = flib.copy_prototype(data.raw["recipe"]["train-stop"], "sspp-stop") ---@type data.RecipePrototype
 stop_recipe.ingredients = {
-	{ type = "item", name = "train-stop", amount = 1 },
-	{ type = "item", name = "electronic-circuit", amount = 1 },
+    { type = "item", name = "train-stop", amount = 1 },
+    { type = "item", name = "electronic-circuit", amount = 1 },
 }
 stop_recipe.enabled = false
 
 general_io_recipe = flib.copy_prototype(data.raw["recipe"]["arithmetic-combinator"], "sspp-general-io") ---@type data.RecipePrototype
 general_io_recipe.ingredients = {
-	{ type = "item", name = "arithmetic-combinator", amount = 1 },
-	{ type = "item", name = "decider-combinator", amount = 1 },
+    { type = "item", name = "arithmetic-combinator", amount = 1 },
+    { type = "item", name = "decider-combinator", amount = 1 },
 }
 general_io_recipe.enabled = false
 
 provide_io_recipe = flib.copy_prototype(data.raw["recipe"]["decider-combinator"], "sspp-provide-io") ---@type data.RecipePrototype
 provide_io_recipe.ingredients = {
-	{ type = "item", name = "arithmetic-combinator", amount = 1 },
-	{ type = "item", name = "decider-combinator", amount = 1 },
+    { type = "item", name = "arithmetic-combinator", amount = 1 },
+    { type = "item", name = "decider-combinator", amount = 1 },
 }
 provide_io_recipe.enabled = false
 
 request_io_recipe = flib.copy_prototype(data.raw["recipe"]["decider-combinator"], "sspp-request-io") ---@type data.RecipePrototype
 request_io_recipe.ingredients = {
-	{ type = "item", name = "arithmetic-combinator", amount = 1 },
-	{ type = "item", name = "decider-combinator", amount = 1 },
+    { type = "item", name = "arithmetic-combinator", amount = 1 },
+    { type = "item", name = "decider-combinator", amount = 1 },
 }
 request_io_recipe.enabled = false
