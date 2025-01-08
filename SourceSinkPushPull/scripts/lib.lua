@@ -155,6 +155,26 @@ end
 
 --------------------------------------------------------------------------------
 
+---@generic A, B, C, D, E, F
+---@param inner fun(a: A, b: B, c: C, d: D, e: E, f: F)
+---@param a A
+---@return fun(b: B, c: C, d: D, e: E, f: F)
+function bind_1_of_6(inner, a)
+    return function(b, c, d, e, f) inner(a, b, c, d, e, f) end
+end
+
+--------------------------------------------------------------------------------
+
+---@param item_key string
+---@return string name, string? quality
+function split_item_key(item_key)
+    local name, quality = string.match(item_key, "(.-):(.+)")
+    if name then
+        return name, quality
+    end
+    return item_key, nil
+end
+
 ---@param network_item NetworkItem
 ---@param station_item ProvideItem|RequestItem
 ---@return integer
@@ -176,9 +196,6 @@ end
 ---@return integer
 function compute_load_target(network_item, provide_item)
     local granularity = provide_item.granularity
-    if network_item.quality then
-        granularity = math.min(prototypes.item[network_item.name].stack_size, granularity)
-    end
     return math.floor(network_item.delivery_size / granularity) * granularity
 end
 
@@ -189,10 +206,11 @@ function compute_stop_name(provide_items, request_items)
     if provide_items and next(provide_items) then
         provide_icons = {}
         for item_key, item in pairs(provide_items) do
-            if item.quality then
-                provide_icons[item.list_index] = "[img=item." .. item.name .. "]"
+            local name, quality = split_item_key(item_key)
+            if quality then
+                provide_icons[item.list_index] = "[item=" .. name .. ",quality=" .. quality .. "]"
             else
-                provide_icons[item.list_index] = "[img=fluid." .. item.name .. "]"
+                provide_icons[item.list_index] = "[fluid=" .. name .. "]"
             end
         end
         assert(#provide_icons == table_size(provide_items))
@@ -202,46 +220,37 @@ function compute_stop_name(provide_items, request_items)
     if request_items and next(request_items) then
         request_icons = {}
         for item_key, item in pairs(request_items) do
-            if item.quality then
-                request_icons[item.list_index] = "[img=item." .. item.name .. "]"
+            local name, quality = split_item_key(item_key)
+            if quality then
+                request_icons[item.list_index] = "[item=" .. name .. ",quality=" .. quality .. "]"
             else
-                request_icons[item.list_index] = "[img=fluid." .. item.name .. "]"
+                request_icons[item.list_index] = "[fluid=" .. name .. "]"
             end
         end
         assert(#request_icons == table_size(request_items))
     end
 
     if provide_icons and request_icons then
-        return "[img=virtual-signal.up-arrow]" .. table.concat(provide_icons) .. " / " .. "[img=virtual-signal.down-arrow]" .. table.concat(request_icons)
+        return "[virtual-signal=up-arrow]" .. table.concat(provide_icons) .. " / " .. "[virtual-signal=down-arrow]" .. table.concat(request_icons)
     elseif provide_icons then
-        return "[img=virtual-signal.up-arrow]" .. table.concat(provide_icons)
+        return "[virtual-signal=up-arrow]" .. table.concat(provide_icons)
     elseif request_icons then
-        return "[img=virtual-signal.down-arrow]" .. table.concat(request_icons)
+        return "[virtual-signal=down-arrow]" .. table.concat(request_icons)
     end
 
-    return "[img=virtual-signal.signal-ghost]"
+    return "[virtual-signal=signal-ghost]"
 end
 
 --------------------------------------------------------------------------------
 
----@param item NetworkItem|ProvideItem|RequestItem
----@return SignalID
-function make_item_signal(item)
-    local name, quality = item.name, item.quality
-    if quality then
-        return { name = name, quality = quality, type = "item" }
-    end
-    return { name = name, type = "fluid" }
-end
-
 ---@param comb LuaEntity
 ---@param constant integer
 ---@param operation "-"|"+"
----@param item ProvideItem|RequestItem
-function set_arithmetic_control_behavior(comb, constant, operation, item)
+---@param input SignalID
+---@param output SignalID?
+function set_arithmetic_control_behavior(comb, constant, operation, input, output)
     local cb = comb.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
-    local signal = make_item_signal(item)
-    cb.parameters = { first_constant = constant, operation = operation, second_signal = signal, output_signal = signal }
+    cb.parameters = { first_constant = constant, operation = operation, second_signal = input, output_signal = output or input }
 end
 
 ---@param comb LuaEntity
@@ -251,6 +260,22 @@ function clear_arithmetic_control_behavior(comb)
 end
 
 --------------------------------------------------------------------------------
+
+---@param hauler Hauler
+---@param message LocalisedString
+---@param item ItemKey?
+---@param stop LuaEntity?
+function set_hauler_status(hauler, message, item, stop)
+    hauler.status = message
+    hauler.status_item = item
+    hauler.status_stop = stop
+    for _, player_state in pairs(storage.player_states) do
+        local train = player_state.train
+        if train and train.id == hauler.train.id then
+            gui.hauler_status_changed(player_state)
+        end
+    end
+end
 
 ---@param train LuaTrain
 ---@param message LocalisedString
@@ -263,6 +288,21 @@ function send_alert_for_train(train, message)
     for _, player in pairs(entity.force.players) do
         player.add_custom_alert(entity, icon, message, true)
         player.play_sound(sound)
+    end
+end
+
+---@param hauler_ids HaulerId[]?
+---@param message LocalisedString
+---@param item ItemKey?
+---@param stop LuaEntity?
+function set_haulers_to_manual(hauler_ids, message, item, stop)
+    if hauler_ids then
+        for i = #hauler_ids, 1, -1 do
+            local hauler = storage.haulers[hauler_ids[i]]
+            set_hauler_status(hauler, message, item, stop)
+            send_alert_for_train(hauler.train, message)
+            hauler.train.manual_mode = true
+        end
     end
 end
 
@@ -279,7 +319,8 @@ function send_hauler_to_station(hauler, station)
 
     local state = train.state
     if state == defines.train_state.no_path then
-        send_alert_for_train(train, { "sspp-alert.no-path-to-station", stop.unit_number })
+        set_hauler_status(hauler, { "sspp-alert.no-path-to-station" }, hauler.status_item, stop)
+        send_alert_for_train(train, hauler.status)
         train.manual_mode = true
     end
 end
@@ -294,7 +335,8 @@ function send_hauler_to_named_stop(hauler, stop_name)
 
     local state = train.state
     if state == defines.train_state.no_path or state == defines.train_state.destination_full then
-        send_alert_for_train(train, { "sspp-alert.no-path-to-named-stop", stop_name })
+        set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", stop_name }, hauler.status_item)
+        send_alert_for_train(train, hauler.status)
         train.manual_mode = true
     end
 end
@@ -332,8 +374,8 @@ end
 ---@param entity LuaEntity
 ---@return StationParts?
 function get_station_parts(entity)
-    local name, ghost = entity.name, nil ---@type string, true?
-    if name == "entity-ghost" then name, ghost = entity.ghost_name, true end
+    local name = entity.name
+    if name == "entity-ghost" then name = entity.ghost_name end
 
     local stop ---@type LuaEntity
     if name == "sspp-stop" then
@@ -350,7 +392,7 @@ function get_station_parts(entity)
     local combs = {} ---@type {[string]: LuaEntity?}
     for _, comb in pairs(combs_list) do
         name = comb.name
-        if name == "entity-ghost" then name, ghost = comb.ghost_name, true end
+        if name == "entity-ghost" then name = comb.ghost_name end
         if combs[name] then return nil end
 
         if #storage.comb_stops[comb.unit_number] ~= 1 then return nil end
@@ -365,5 +407,5 @@ function get_station_parts(entity)
     local request_io = combs["sspp-request-io"]
     if not (provide_io or request_io) then return nil end
 
-    return { stop = stop, general_io = general_io, provide_io = provide_io, request_io = request_io, ghost = ghost }
+    return { stop = stop, general_io = general_io, provide_io = provide_io, request_io = request_io }
 end

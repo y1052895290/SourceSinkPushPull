@@ -83,12 +83,12 @@ local function add_new_provide_row(provide_table, elem_type)
                 handler = { [defines.events.on_gui_switch_state_changed] = handle_mode_changed },
             }),
             make_property_flow("sspp-gui.throughput", "sspp-gui.provide-throughput-tooltip", {
-                type = "textfield", style = "sspp_station_item_textbox", numeric = true,
+                type = "textfield", style = "sspp_number_textbox", numeric = true,
                 text = "0",
                 handler = { [defines.events.on_gui_text_changed] = handle_throughput_changed },
             }),
             make_property_flow("sspp-gui.granularity", "sspp-gui.provide-granularity-tooltip", {
-                type = "textfield", style = "sspp_station_item_textbox", numeric = true,
+                type = "textfield", style = "sspp_number_textbox", numeric = true,
                 text = "1",
                 handler = { [defines.events.on_gui_text_changed] = handle_granularity_changed },
             }),
@@ -130,7 +130,7 @@ local function add_new_request_row(request_table, elem_type)
                 handler = { [defines.events.on_gui_switch_state_changed] = handle_mode_changed },
             }),
             make_property_flow("sspp-gui.throughput", "sspp-gui.request-throughput-tooltip", {
-                type = "textfield", style = "sspp_station_item_textbox", numeric = true,
+                type = "textfield", style = "sspp_number_textbox", numeric = true,
                 text = "0",
                 handler = { [defines.events.on_gui_text_changed] = handle_throughput_changed },
             }),
@@ -145,20 +145,21 @@ end
 
 --------------------------------------------------------------------------------
 
----@param from_nothing boolean
 ---@param network Network
+---@param from_nothing boolean
 ---@param provide_table LuaGuiElement
+---@param provide_items {[ItemKey]: ProvideItem}
 ---@param item_key ItemKey
----@param item ProvideItem
 ---@param i integer
-local function populate_row_from_provide_item(from_nothing, network, provide_table, item_key, item, i)
-    local is_fluid = not item.quality
+local function populate_row_from_provide_item(network, from_nothing, provide_table, provide_items, item_key, i)
+    local item = provide_items[item_key]
+    local name, quality = split_item_key(item_key)
 
     if from_nothing then
-        add_new_provide_row(provide_table, is_fluid and "fluid" or "item-with-quality")
+        add_new_provide_row(provide_table, quality and "item-with-quality" or "fluid")
         local table_children = provide_table.children
 
-        table_children[i + 1].elem_value = is_fluid and item.name or { name = item.name, quality = item.quality }
+        table_children[i + 1].elem_value = quality and { name = name, quality = quality } or name
 
         local station_children = table_children[i + 3].children
         station_children[1].children[2].switch_state = item.push and "right" or "left"
@@ -170,9 +171,9 @@ local function populate_row_from_provide_item(from_nothing, network, provide_tab
     if network_item then
         local table_children = provide_table.children
 
-        local fmt_delivery_size = is_fluid and "sspp-gui.fmt-units" or "sspp-gui.fmt-items"
-        local fmt_storage_needed = is_fluid and "sspp-gui.fmt-units" or "sspp-gui.fmt-slots"
-        local stack_size = is_fluid and 1 or prototypes.item[item.name].stack_size
+        local fmt_delivery_size = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+        local fmt_storage_needed = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
+        local stack_size = quality and prototypes.item[name].stack_size or 1
 
         local network_children = table_children[i + 2].children
         network_children[1].children[2].caption = network_item.class
@@ -184,20 +185,21 @@ local function populate_row_from_provide_item(from_nothing, network, provide_tab
     end
 end
 
----@param from_nothing boolean
 ---@param network Network
+---@param from_nothing boolean
 ---@param request_table LuaGuiElement
+---@param request_items {[ItemKey]: RequestItem}
 ---@param item_key ItemKey
----@param item RequestItem
 ---@param i integer
-local function populate_row_from_request_item(from_nothing, network, request_table, item_key, item, i)
-    local is_fluid = not item.quality
+local function populate_row_from_request_item(network, from_nothing, request_table, request_items, item_key, i)
+    local item = request_items[item_key]
+    local name, quality = split_item_key(item_key)
 
     if from_nothing then
-        add_new_request_row(request_table, is_fluid and "fluid" or "item-with-quality")
+        add_new_request_row(request_table, quality and "item-with-quality" or "fluid")
         local table_children = request_table.children
 
-        table_children[i + 1].elem_value = is_fluid and item.name or { name = item.name, quality = item.quality }
+        table_children[i + 1].elem_value = quality and { name = name, quality = quality } or name
 
         local station_children = table_children[i + 3].children
         station_children[1].children[2].switch_state = item.pull and "right" or "left"
@@ -208,9 +210,9 @@ local function populate_row_from_request_item(from_nothing, network, request_tab
     if network_item then
         local table_children = request_table.children
 
-        local fmt_delivery_size = is_fluid and "sspp-gui.fmt-units" or "sspp-gui.fmt-items"
-        local fmt_storage_needed = is_fluid and "sspp-gui.fmt-units" or "sspp-gui.fmt-slots"
-        local stack_size = is_fluid and 1 or prototypes.item[item.name].stack_size
+        local fmt_delivery_size = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+        local fmt_storage_needed = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
+        local stack_size = quality and prototypes.item[name].stack_size or 1
 
         local network_children = table_children[i + 2].children
         network_children[1].children[2].caption = network_item.class
@@ -224,79 +226,41 @@ end
 
 --------------------------------------------------------------------------------
 
----@param provide_table LuaGuiElement
----@return {[ItemKey]: ProvideItem} provide_items
-local function generate_items_from_provide_table(provide_table)
-    local items = {} ---@type {[ItemKey]: ProvideItem}
+---@param table_children LuaGuiElement[]
+---@param list_index integer
+---@param i integer
+---@return ItemKey?, ProvideItem?
+local function generate_provide_item_from_row(table_children, list_index, i)
+    local elem_value = table_children[i + 1].elem_value ---@type (table|string)?
+    if elem_value == nil then return end
 
-    local table_children = provide_table.children
-    local list_index = 0
+    local station_children = table_children[i + 3].children
 
-    for i = 4, #table_children - 1, 4 do
-        local resource_value = table_children[i + 1].elem_value --[[@as (table|string)?]]
-        if resource_value then
-            list_index = list_index + 1
-
-            local name, quality, item_key ---@type string, string?, ItemKey
-            if type(resource_value) == "table" then
-                name = resource_value.name
-                quality = resource_value.quality or "normal"
-                item_key = name .. ":" .. quality
-            else
-                name = resource_value --[[@as string]]
-                item_key = name
-            end
-
-            local station_children = table_children[i + 3].children
-            items[item_key] = {
-                list_index = list_index,
-                name = name,
-                quality = quality,
-                push = station_children[1].children[2].switch_state == "right",
-                throughput = tonumber(station_children[2].children[2].text) or 0.0,
-                granularity = tonumber(station_children[3].children[2].text) or 1,
-            }
-        end
-    end
-
-    return items
+    local _, _, item_key = gui.extract_elem_value_fields(elem_value)
+    return item_key, {
+        list_index = list_index,
+        push = station_children[1].children[2].switch_state == "right",
+        throughput = tonumber(station_children[2].children[2].text) or 0.0,
+        granularity = tonumber(station_children[3].children[2].text) or 1,
+    } --[[@as ProvideItem]]
 end
 
----@param request_table LuaGuiElement
----@return {[ItemKey]: RequestItem} request_items
-local function generate_items_from_request_table(request_table)
-    local items = {} ---@type {[ItemKey]: RequestItem}
+---@param table_children LuaGuiElement[]
+---@param list_index integer
+---@param i integer
+---@return ItemKey?, RequestItem?
+local function generate_request_item_from_row(table_children, list_index, i)
+    local elem_value = table_children[i + 1].elem_value ---@type (table|string)?
+    if elem_value == nil then return end
 
-    local table_children = request_table.children
-    local list_index = 0
+    local station_children = table_children[i + 3].children
 
-    for i = 4, #table_children - 1, 4 do
-        local resource_value = table_children[i + 1].elem_value --[[@as (table|string)?]]
-        if resource_value then
-            list_index = list_index + 1
-
-            local name, quality, item_key ---@type string, string?, ItemKey
-            if type(resource_value) == "table" then
-                name = resource_value.name
-                quality = resource_value.quality or "normal"
-                item_key = name .. ":" .. quality
-            else
-                name = resource_value --[[@as string]]
-                item_key = name
-            end
-
-            local station_children = table_children[i + 3].children
-            items[item_key] = {
-                list_index = list_index,
-                name = name,
-                quality = quality,
-                pull = station_children[1].children[2].switch_state == "right",
-                throughput = tonumber(station_children[2].children[2].text) or 0.0,
-            }
-        end
-    end
-
-    return items
+    local _, _, item_key = gui.extract_elem_value_fields(elem_value)
+    return item_key, {
+        list_index = list_index,
+        pull = station_children[1].children[2].switch_state == "right",
+        throughput = tonumber(station_children[2].children[2].text) or 0.0,
+    } --[[@as RequestItem]]
 end
 
 --------------------------------------------------------------------------------
@@ -306,71 +270,64 @@ end
 function gui.update_station_after_change(player_id, from_nothing)
     local player_state = storage.player_states[player_id]
 
-    ---@param old_items {[ItemKey]: any}
-    ---@param new_items {[ItemKey]: any}
-    ---@param deliveries {[ItemKey]: HaulerId[]}
-    local function disable_haulers_for_removed_items(old_items, new_items, deliveries)
-        for item_key, _ in pairs(old_items) do
-            if not new_items[item_key] then
-                local hauler_ids = deliveries[item_key]
-                if hauler_ids then
-                    for i = #hauler_ids, 1, -1 do
-                        local hauler = storage.haulers[hauler_ids[i]]
-                        send_alert_for_train(hauler.train, { "sspp-alert.item-removed-from-station" })
-                        hauler.train.manual_mode = true
-                    end
-                end
-            end
-        end
-    end
-
     local parts = assert(player_state.parts)
 
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
     local network = storage.networks[player_state.network]
 
-    local provide_items, request_items ---@type {[ItemKey]: ProvideItem}?, {[ItemKey]: RequestItem}?
-
     if parts.provide_io then
         local provide_table = player_state.elements.provide_table
-        provide_items = generate_items_from_provide_table(provide_table)
+        local provide_items = gui.generate_dict_from_table(provide_table, generate_provide_item_from_row)
 
         local properties = helpers.json_to_table(parts.provide_io.combinator_description) --[[@as table]]
         properties.provide_items = provide_items
         parts.provide_io.combinator_description = helpers.table_to_json(properties)
 
         if station then
-            disable_haulers_for_removed_items(station.provide_items, provide_items, station.provide_deliveries)
+            for item_key, _ in pairs(station.provide_items) do
+                if not provide_items[item_key] then
+                    set_haulers_to_manual(station.provide_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+                end
+            end
             station.provide_items = provide_items
         end
 
-        gui.populate_table_from_dict(from_nothing, network, provide_table, provide_items, populate_row_from_provide_item)
+        gui.populate_table_from_dict(from_nothing, provide_table, provide_items, bind_1_of_6(populate_row_from_provide_item, network))
     end
 
     if parts.request_io then
         local request_table = player_state.elements.request_table
-        request_items = generate_items_from_request_table(request_table)
+        local request_items = gui.generate_dict_from_table(request_table, generate_request_item_from_row)
 
         local properties = helpers.json_to_table(parts.request_io.combinator_description) --[[@as table]]
         properties.request_items = request_items
         parts.request_io.combinator_description = helpers.table_to_json(properties)
 
         if station then
-            disable_haulers_for_removed_items(station.request_items, request_items, station.request_deliveries)
+            for item_key, _ in pairs(station.request_items) do
+                if not request_items[item_key] then
+                    set_haulers_to_manual(station.request_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+                end
+            end
             station.request_items = request_items
         end
 
-        gui.populate_table_from_dict(from_nothing, network, request_table, request_items, populate_row_from_request_item)
+        gui.populate_table_from_dict(from_nothing, request_table, request_items, bind_1_of_6(populate_row_from_request_item, network))
     end
 
-    if from_nothing and not parts.ghost then
-        local new_stop_name = compute_stop_name(provide_items, request_items)
-        if parts.stop.backer_name ~= new_stop_name then
-            --- note that we don't need to update schedules, the game will do that for us
-            parts.stop.backer_name = new_stop_name
-            player_state.elements.stop_name.caption = new_stop_name
-        end
+    if from_nothing and station then
+        --- note that we don't need to update schedules, the game will do that for us
+        local new_stop_name = compute_stop_name(station.provide_items, station.request_items)
+        station.stop.backer_name = new_stop_name
+        player_state.elements.stop_name.caption = new_stop_name
     end
+end
+
+--------------------------------------------------------------------------------
+
+---@param player_state PlayerState
+function gui.station_poll_finished(player_state)
+    -- TODO
 end
 
 --------------------------------------------------------------------------------
@@ -488,12 +445,12 @@ local function add_gui_incomplete(player)
     return flib_gui.add(player.gui.screen, {
         { type = "frame", style = "frame", direction = "vertical", name = "sspp-station", children = {
             { type = "flow", name = "titlebar", style = "frame_header_flow", children = {
-                { type = "label", style = "frame_title", caption = { "sspp-gui.invalid-station" }, ignored_by_interaction = true },
+                { type = "label", style = "frame_title", caption = { "sspp-gui.incomplete-station" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close },
             } },
-            { type = "label", style = "label", caption = "sspp-gui.invalid-station-message" },
+            { type = "label", style = "label", caption = "sspp-gui.incomplete-station-message" },
         } },
     })
 end
@@ -512,7 +469,7 @@ function gui.station_open(player_id, entity)
     local elements, window ---@type {[string]: LuaGuiElement}, LuaGuiElement
     if parts then
         elements, window = add_gui_complete(player, parts.provide_io, parts.request_io)
-        storage.player_states[player_id] = { network = network_name, parts = parts, elements = elements }
+        storage.player_states[player_id] = { network = network_name, entity = entity, parts = parts, elements = elements }
     else
         elements, window = add_gui_incomplete(player)
         storage.player_states[player_id] = { network = network_name, entity = entity, elements = elements }
@@ -526,12 +483,12 @@ function gui.station_open(player_id, entity)
 
         if parts.provide_io then
             local properties = helpers.json_to_table(parts.provide_io.combinator_description) --[[@as table]]
-            gui.populate_table_from_dict(true, network, elements.provide_table, properties.provide_items, populate_row_from_provide_item)
+            gui.populate_table_from_dict(true, elements.provide_table, properties.provide_items, bind_1_of_6(populate_row_from_provide_item, network))
         end
 
         if parts.request_io then
             local properties = helpers.json_to_table(parts.request_io.combinator_description) --[[@as table]]
-            gui.populate_table_from_dict(true, network, elements.request_table, properties.request_items, populate_row_from_request_item)
+            gui.populate_table_from_dict(true, elements.request_table, properties.request_items, bind_1_of_6(populate_row_from_request_item, network))
         end
 
         elements.stop_name.caption = parts.stop.backer_name
@@ -548,8 +505,7 @@ function gui.station_closed(player_id, window)
     assert(window.name == "sspp-station")
     window.destroy()
 
-    local parts = storage.player_states[player_id].parts
-    if parts and not parts.ghost then
+    if storage.player_states[player_id].entity.name ~= "entity-ghost" then
         player.play_sound({ path = "entity-close/sspp-stop" })
     end
 

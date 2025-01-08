@@ -40,10 +40,20 @@ local function on_gui_closed(event)
     end
 end
 
+function gui.on_poll_finished()
+    for _, player_state in pairs(storage.player_states) do
+        if player_state.elements["sspp-network"] then
+            gui.network_poll_finished(player_state)
+        elseif player_state.elements["sspp-station"] then
+            gui.station_poll_finished(player_state)
+        end
+    end
+end
+
 --------------------------------------------------------------------------------
 
 ---@param elem_value table|string
----@return string name, string? quality, string item_key
+---@return string name, string? quality, ItemKey item_key
 function gui.extract_elem_value_fields(elem_value)
     local name, quality, item_key ---@type string, string?, ItemKey
     if type(elem_value) == "table" then
@@ -57,12 +67,11 @@ function gui.extract_elem_value_fields(elem_value)
     return name, quality, item_key
 end
 
----@generic Entry
 ---@param from_nothing boolean
 ---@param table LuaGuiElement
----@param dict {[string]: `Entry`}
----@param inner fun(from_nothing: boolean, network: Network, table: LuaGuiElement, key: string, entry: Entry, i: integer)
-function gui.populate_table_from_dict(from_nothing, network, table, dict, inner)
+---@param dict {[string]: any}
+---@param inner fun(from_nothing: boolean, table: LuaGuiElement, dict: {[string]: any}, key: string, i: integer)
+function gui.populate_table_from_dict(from_nothing, table, dict, inner)
     local keys = {}
     for key, entry in pairs(dict) do keys[entry.list_index] = key end
     assert(#keys == table_size(dict))
@@ -76,18 +85,15 @@ function gui.populate_table_from_dict(from_nothing, network, table, dict, inner)
 
     for list_index = 1, #keys do
         local i = list_index * columns
-
         local key = keys[list_index]
-        local entry = dict[key]
 
-        inner(from_nothing, network, table, key, entry, i)
+        inner(from_nothing, table, dict, key, i)
     end
 end
 
----@generic Entry
 ---@param table LuaGuiElement
----@param inner fun(table_children: LuaGuiElement[], list_index: integer, i: integer): key: string?, entry: `Entry`?
----@return {[string]: Entry} dict
+---@param inner fun(table_children: LuaGuiElement[], list_index: integer, i: integer): key: string, value: any
+---@return {[string]: any}
 function gui.generate_dict_from_table(table, inner)
     local columns = table.column_count
     local table_children = table.children
@@ -96,10 +102,10 @@ function gui.generate_dict_from_table(table, inner)
     local list_index = 0
 
     for i = columns, #table_children - 1, columns do
-        local key, entry = inner(table_children, list_index + 1, i)
+        local key, value = inner(table_children, list_index + 1, i)
         if key then
             list_index = list_index + 1
-            dict[key] = entry
+            dict[key] = value
         end
     end
 

@@ -77,7 +77,10 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
         { column = 2, width = 100 },
         { column = 3, width = 100 },
         { column = 4, width = 100 },
-        { column = 5, width = 264 },
+        { column = 5, width = 50 },
+        { column = 6, width = 50 },
+        { column = 7, width = 50 },
+        { column = 8, width = 90 },
     },
     odd_row_graphical_set = {
         filename = "__core__/graphics/gui-new.png",
@@ -146,7 +149,14 @@ styles.sspp_station_item_value = { ---@type data.LabelStyleSpecification
     horizontal_align = "right",
 }
 
-styles.sspp_station_item_textbox = { ---@type data.TextBoxStyleSpecification
+styles.sspp_name_textbox = { ---@type data.TextBoxStyleSpecification
+    type = "textbox_style",
+    parent = "textbox",
+    width = 100,
+    horizontal_align = "left",
+}
+
+styles.sspp_number_textbox = { ---@type data.TextBoxStyleSpecification
     type = "textbox_style",
     parent = "textbox",
     width = 100,
@@ -174,13 +184,7 @@ styles.sspp_frame_tool_button = { ---@type data.ButtonStyleSpecification
 styles.sspp_hauler_frame = { ---@type data.FrameStyleSpecification
     type = "frame_style",
     parent = "frame",
-    width = 200,
-    height = 76,
+    width = 224,
+    height = 108,
     padding = 4,
-}
-
-styles.sspp_hauler_textbox = { ---@type data.TextBoxStyleSpecification
-    type = "textbox_style",
-    parent = "textbox",
-    width = 184,
 }

@@ -44,7 +44,6 @@
 
 ---@class (exact) Class
 ---@field public list_index integer
----@field public name ClassName
 ---@field public item_slot_capacity integer?
 ---@field public fluid_capacity integer?
 ---@field public depot_name string
@@ -82,16 +81,12 @@
 
 ---@class (exact) ProvideItem
 ---@field public list_index integer
----@field public name string
----@field public quality string?
 ---@field public throughput number
 ---@field public push boolean
 ---@field public granularity integer
 
 ---@class (exact) RequestItem
 ---@field public list_index integer
----@field public name string
----@field public quality string?
 ---@field public throughput number
 ---@field public pull boolean
 
@@ -106,6 +101,9 @@
 ---@field public to_fuel true?
 ---@field public to_depot true?
 ---@field public to_liquidate ItemKey?
+---@field public status LocalisedString
+---@field public status_item ItemKey?
+---@field public status_stop LuaEntity?
 
 ---@class (exact) HaulerToStation
 ---@field public item ItemKey
@@ -118,12 +116,11 @@
 ---@field public general_io LuaEntity
 ---@field public provide_io LuaEntity?
 ---@field public request_io LuaEntity?
----@field public ghost true?
 
 ---@class (exact) PlayerState
 ---@field public network NetworkName
----@field public parts StationParts?
 ---@field public entity LuaEntity?
+---@field public parts StationParts?
 ---@field public train LuaTrain?
 ---@field public elements {[string]: LuaGuiElement}
 

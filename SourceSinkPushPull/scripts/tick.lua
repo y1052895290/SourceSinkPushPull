@@ -276,6 +276,7 @@ function tick_liquidate()
     hauler.to_request = { item = item_key, station = request_station_id }
     request_station.total_deliveries = request_station.total_deliveries + 1
 
+    set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
     send_hauler_to_station(hauler, request_station)
 
     return false
@@ -361,6 +362,7 @@ local function tick_dispatch()
     hauler.to_provide = { item = item_key, station = provide_station_id }
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
+    set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
     send_hauler_to_station(hauler, provide_station)
 
     return false
@@ -437,6 +439,7 @@ function tick_provide_done()
     hauler.to_request = { item = item_key, station = request_station_id }
     request_station.total_deliveries = request_station.total_deliveries + 1
 
+    set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
     send_hauler_to_station(hauler, request_station)
 
     return false
@@ -497,16 +500,19 @@ local function tick_request_done()
     local class = network.classes[hauler.class]
     if class then
         if check_if_hauler_needs_fuel(hauler, class) then
-            list_append_or_create(network.fuel_haulers, class.name, hauler_id)
+            list_append_or_create(network.fuel_haulers, hauler.class, hauler_id)
             hauler.to_fuel = true
+            set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
             send_hauler_to_named_stop(hauler, class.fueler_name)
         else
-            list_append_or_create(network.depot_haulers, class.name, hauler_id)
+            list_append_or_create(network.depot_haulers, hauler.class, hauler_id)
             hauler.to_depot = true
+            set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
             send_hauler_to_named_stop(hauler, class.depot_name)
         end
     else
-        send_alert_for_train(hauler.train, { "sspp-alert.class-not-in-network", hauler.class })
+        set_hauler_status(hauler, { "sspp-alert.class-not-in-network" })
+        send_alert_for_train(hauler.train, hauler.status)
         hauler.train.manual_mode = true
     end
 
@@ -543,6 +549,7 @@ function on_tick()
     if tick_state == "POLL" then
         for _ = 1, mod_settings.stations_per_tick do
             if tick_poll() then
+                gui.on_poll_finished()
                 prepare_for_tick_liquidate()
                 break
             end

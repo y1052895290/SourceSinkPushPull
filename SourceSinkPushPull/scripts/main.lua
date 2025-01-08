@@ -152,26 +152,8 @@ local function try_destroy_station(stop)
     local station_id = stop.unit_number ---@type StationId
     local station = storage.stations[station_id]
     if station then
-        local provide_deliveries = station.provide_deliveries
-        if provide_deliveries then
-            for _, hauler_ids in pairs(provide_deliveries) do
-                for i = #hauler_ids, 1, -1 do
-                    local hauler = storage.haulers[hauler_ids[i]]
-                    send_alert_for_train(hauler.train, { "sspp-alert.destroyed-station" })
-                    hauler.train.manual_mode = true
-                end
-            end
-        end
-        local request_deliveries = station.request_deliveries
-        if request_deliveries then
-            for _, hauler_ids in pairs(request_deliveries) do
-                for i = #hauler_ids, 1, -1 do
-                    local hauler = storage.haulers[hauler_ids[i]]
-                    send_alert_for_train(hauler.train, { "sspp-alert.destroyed-station" })
-                    hauler.train.manual_mode = true
-                end
-            end
-        end
+        set_haulers_to_manual(station.provide_deliveries, { "sspp-alert.station-broken" })
+        set_haulers_to_manual(station.request_deliveries, { "sspp-alert.station-broken" })
         storage.stations[station_id] = nil
     end
 
@@ -183,14 +165,12 @@ end
 ---@param hauler_id HaulerId
 local function on_hauler_disabled_or_destroyed(hauler_id)
     local hauler = assert(storage.haulers[hauler_id])
-    local network_name = hauler.network
-    local network = assert(storage.networks[network_name])
+    local network = assert(storage.networks[hauler.network])
 
-    local to_provide = hauler.to_provide
-    if to_provide then
-        local station = assert(storage.stations[to_provide.station])
-        local item_key = to_provide.item
-        storage.disabled_items[network_name .. ":" .. item_key] = true
+    if hauler.to_provide then
+        local station = assert(storage.stations[hauler.to_provide.station])
+        local item_key = hauler.to_provide.item
+        storage.disabled_items[hauler.network .. ":" .. item_key] = true
         if station.hauler == hauler_id then
             clear_arithmetic_control_behavior(station.provide_io)
             station.hauler = nil
@@ -200,10 +180,9 @@ local function on_hauler_disabled_or_destroyed(hauler_id)
         station.total_deliveries = station.total_deliveries - 1
     end
 
-    local to_request = hauler.to_request
-    if to_request then
-        local station = assert(storage.stations[to_request.station])
-        local item_key = to_request.item
+    if hauler.to_request then
+        local station = assert(storage.stations[hauler.to_request.station])
+        local item_key = hauler.to_request.item
         storage.disabled_items[hauler.network .. ":" .. item_key] = true
         if station.hauler == hauler_id then
             clear_arithmetic_control_behavior(station.request_io)
@@ -223,6 +202,7 @@ local function on_hauler_disabled_or_destroyed(hauler_id)
     end
 
     if hauler.to_liquidate then
+        storage.disabled_items[hauler.network .. ":" .. hauler.to_liquidate] = true
         list_remove_value_or_destroy(network.liquidate_haulers, hauler.to_liquidate, hauler_id)
     end
 end
@@ -424,98 +404,116 @@ local function on_hauler_set_to_automatic(hauler)
 
     local class = network.classes[hauler.class]
     if not class then
-        send_alert_for_train(train, { "sspp-alert.class-not-in-network", hauler.class })
+        set_hauler_status(hauler, { "sspp-alert.class-not-in-network" })
+        send_alert_for_train(train, hauler.status)
         train.manual_mode = true
         return
     end
 
     if check_if_hauler_needs_fuel(hauler, class) then
-        list_append_or_create(network.fuel_haulers, class.name, train.id)
+        list_append_or_create(network.fuel_haulers, hauler.class, train.id)
         hauler.to_fuel = true
+        set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
         send_hauler_to_named_stop(hauler, class.fueler_name)
         return
     end
 
-    local train_items = train.get_contents()
-    local train_fluids = train.get_fluid_contents()
+    local train_items, train_fluids = train.get_contents(), train.get_fluid_contents()
+    local train_item, train_fluid = train_items[1], next(train_fluids)
 
-    if #train_items + table_size(train_fluids) > 1 then
-        send_alert_for_train(train, { "sspp-alert.multiple-items-or-fluids" })
+    if train_items[2] or next(train_fluids, train_fluid) or (train_item and train_fluid) then
+        set_hauler_status(hauler, { "sspp-alert.multiple-items-or-fluids" })
+        send_alert_for_train(train, hauler.status)
         train.manual_mode = true
         return
     end
 
-    local train_item = train_items[1]
-    if train_item then
-        local item_name, item_quality = train_item.name, train_item.quality or "normal"
-        local item_key = item_name .. ":" .. item_quality
+    local item_key = train_fluid or train_item and (train_item.name .. ":" .. (train_item.quality or "normal"))
+    if item_key then
         if network.items[item_key] then
             list_append_or_create(network.liquidate_haulers, item_key, train.id)
             hauler.to_liquidate = item_key
+            set_hauler_status(hauler, { "sspp-alert.holding-cargo" }, item_key)
             send_hauler_to_named_stop(hauler, class.depot_name)
         else
-            send_alert_for_train(train, { "sspp-alert.item-not-in-network", item_name, item_quality })
+            set_hauler_status(hauler, { "sspp-alert.cargo-not-in-network" }, item_key)
+            send_alert_for_train(train, hauler.status)
             train.manual_mode = true
         end
         return
     end
 
-    local train_fluid = next(train_fluids)
-    if train_fluid then
-        if network.items[train_fluid] then
-            list_append_or_create(network.liquidate_haulers, train_fluid, train.id)
-            hauler.to_liquidate = train_fluid
-            send_hauler_to_named_stop(hauler, class.depot_name)
-        else
-            send_alert_for_train(train, { "sspp-alert.fluid-not-in-network", train_fluid })
-            train.manual_mode = true
-        end
-        return
-    end
-
-    list_append_or_create(network.depot_haulers, class.name, train.id)
+    list_append_or_create(network.depot_haulers, hauler.class, train.id)
     hauler.to_depot = true
+    set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
     send_hauler_to_named_stop(hauler, class.depot_name)
 end
 
 ---@param hauler Hauler
 local function on_hauler_arrived_at_provide_station(hauler)
     local train = hauler.train
-    local to_provide = hauler.to_provide ---@type HaulerToStation
+    local station = storage.stations[hauler.to_provide.station]
 
-    local station = storage.stations[to_provide.station]
-    if station.stop ~= train.station then
-        send_alert_for_train(train, { "sspp-alert.arrived-at-wrong-provide-stop" })
-        hauler.train.manual_mode = true
+    if train.station ~= station.stop then
+        set_hauler_status(hauler, { "sspp-alert.arrived-at-wrong-stop" }, hauler.status_item, station.stop)
+        send_alert_for_train(train, hauler.status)
+        train.manual_mode = true
         return
     end
 
-    local item_key = to_provide.item
-    local provide_item = station.provide_items[item_key]
-
+    local item_key = hauler.to_provide.item
     local network_item = storage.networks[hauler.network].items[item_key]
-    local constant = compute_load_target(network_item, provide_item)
+    local name, quality = network_item.name, network_item.quality
 
-    set_arithmetic_control_behavior(station.provide_io, constant, "-", provide_item)
+    local signal = { name = name, quality = quality, type = quality and "item" or "fluid" }
+
+    -- local signal ---@type SignalID
+    -- if quality then
+    --     signal = { name = name, quality = quality, type = "item" }
+    --     for i, spoil_result in enumerate_spoil_results(prototypes.item[name]) do
+    --         local spoil_signal = { name = spoil_result.name, quality = quality, type = "item" }
+    --         set_arithmetic_control_behavior(station.provide_hidden_combs[i], 0, "-", spoil_signal, signal)
+    --     end
+    -- else
+    --     signal = { name = name, type = "fluid" }
+    -- end
+
+    local constant = compute_load_target(network_item, station.provide_items[item_key])
+    set_arithmetic_control_behavior(station.provide_io, constant, "-", signal)
     station.hauler = train.id
 end
 
 ---@param hauler Hauler
 local function on_hauler_arrived_at_request_station(hauler)
     local train = hauler.train
-    local to_request = hauler.to_request ---@type HaulerToStation
+    local station = storage.stations[hauler.to_request.station]
 
-    local station = storage.stations[to_request.station]
-    if station.stop ~= train.station then
-        send_alert_for_train(train, { "sspp-alert.arrived-at-wrong-request-stop" })
-        hauler.train.manual_mode = true
+    if train.station ~= station.stop then
+        set_hauler_status(hauler, { "sspp-alert.arrived-at-wrong-stop" }, hauler.status_item, station.stop)
+        send_alert_for_train(train, hauler.status)
+        train.manual_mode = true
         return
     end
 
-    local item_key = to_request.item
-    local request_item = station.request_items[item_key]
+    local item_key = hauler.to_request.item
+    local network_item = storage.networks[hauler.network].items[item_key]
+    local name, quality = network_item.name, network_item.quality
 
-    set_arithmetic_control_behavior(station.request_io, 0, "+", request_item)
+    local signal = { name = name, quality = quality, type = quality and "item" or "fluid" }
+
+    -- local signal ---@type SignalID
+    -- if quality then
+    --     signal = { name = name, quality = quality, type = "item" }
+    --     for i, spoil_result in enumerate_spoil_results(prototypes.item[name]) do
+    --         local spoil_signal = { name = spoil_result.name, quality = quality, type = "item" }
+    --         set_arithmetic_control_behavior(station.request_hidden_combs[i], 0, "+", spoil_signal)
+    --     end
+    -- else
+    --     signal = { name = name, type = "fluid" }
+    -- end
+
+    local constant = 0
+    set_arithmetic_control_behavior(station.request_io, constant, "+", signal)
     station.hauler = train.id
 end
 
@@ -565,7 +563,8 @@ local function on_train_changed_state(event)
     end
 
     if new_state == defines.train_state.no_path or new_state == defines.train_state.destination_full then
-        send_alert_for_train(train, { "sspp-alert.path-broken" })
+        set_hauler_status(hauler, { "sspp-alert.path-broken" })
+        send_alert_for_train(train, hauler.status)
         train.manual_mode = true
         return
     end

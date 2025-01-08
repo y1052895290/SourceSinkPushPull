@@ -1,10 +1,10 @@
 -- SSPP by jagoly
 
-flib = require('__flib__.data-util')
+flib = require("__flib__.data-util")
 
-require('prototypes.entity')
-require('prototypes.item')
-require('prototypes.technology')
+require("prototypes.entity")
+require("prototypes.item")
+require("prototypes.technology")
 
 data:extend({
     stop_entity,
@@ -22,4 +22,4 @@ data:extend({
     technology,
 })
 
-require('prototypes.style')
+require("prototypes.style")
