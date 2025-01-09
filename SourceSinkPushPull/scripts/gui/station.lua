@@ -290,6 +290,7 @@ function gui.update_station_after_change(player_id, from_nothing)
                 end
             end
             station.provide_items = provide_items
+            ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, provide_items)
         end
 
         gui.populate_table_from_dict(from_nothing, provide_table, provide_items, bind_1_of_6(populate_row_from_provide_item, network))
@@ -310,6 +311,7 @@ function gui.update_station_after_change(player_id, from_nothing)
                 end
             end
             station.request_items = request_items
+            ensure_hidden_combs(station.request_io, station.request_hidden_combs, request_items)
         end
 
         gui.populate_table_from_dict(from_nothing, request_table, request_items, bind_1_of_6(populate_row_from_request_item, network))
@@ -505,7 +507,9 @@ function gui.station_closed(player_id, window)
     assert(window.name == "sspp-station")
     window.destroy()
 
-    if storage.player_states[player_id].entity.name ~= "entity-ghost" then
+    local entity = storage.player_states[player_id].entity --[[@as LuaEntity]]
+
+    if entity.valid and entity.name ~= "entity-ghost" then
         player.play_sound({ path = "entity-close/sspp-stop" })
     end
 

@@ -11,7 +11,6 @@ local function reboot_command()
         network.liquidate_haulers = {}
     end
 
-    local invalid_haulers = {}
     for hauler_id, hauler in pairs(storage.haulers) do
         local train = hauler.train
         if train.valid then
@@ -22,23 +21,30 @@ local function reboot_command()
             hauler.to_liquidate = nil
             train.manual_mode = true
         else
-            invalid_haulers[#invalid_haulers+1] = hauler_id
+            storage.haulers[hauler_id] = nil
         end
     end
-    for _, hauler_id in pairs(invalid_haulers) do
-        storage.haulers[hauler_id] = nil
-    end
 
+    for _, station in pairs(storage.stations) do
+        destroy_hidden_combs(station.provide_hidden_combs)
+        destroy_hidden_combs(station.request_hidden_combs)
+    end
     storage.stations = {}
-    storage.stop_combs = {}
-    storage.comb_stops = {}
+
+    storage.stop_comb_ids = {}
+    storage.comb_stop_ids = {}
+    storage.entities = {}
 
     for _, surface in pairs(game.surfaces) do
-        for _, stop in pairs(surface.find_entities_filtered({ ghost_name = "sspp-stop" })) do
-            on_stop_built(stop)
-        end
-        for _, stop in pairs(surface.find_entities_filtered({ name = "sspp-stop" })) do
-            on_stop_built(stop)
+        for _, entity in pairs(surface.find_entities()) do
+            local name = entity.name
+            if name == "entity-ghost" then name = entity.ghost_name end
+
+            if name == "sspp-stop" then
+                on_stop_built(entity, nil)
+            elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
+                on_comb_built(entity, nil)
+            end
         end
     end
 

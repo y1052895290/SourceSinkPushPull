@@ -42,6 +42,7 @@ end
 ---@param event EventData.on_gui_elem_changed
 local function handle_item_resource_changed(event)
     local clear = event.element.elem_value == nil
+    -- TODO: check for recursive spoilage
     gui.update_network_after_change(event.player_index, clear)
 end
 
@@ -278,10 +279,10 @@ function gui.network_poll_finished(player_state)
     local provide_haulers = network.provide_haulers
     local request_haulers = network.request_haulers
 
-    local push_stations = network.economy.push_stations
-    local provide_stations = network.economy.provide_stations
-    local pull_stations = network.economy.pull_stations
-    local request_stations = network.economy.request_stations
+    local push_tickets = network.push_tickets
+    local provide_tickets = network.provide_tickets
+    local pull_tickets = network.pull_tickets
+    local request_tickets = network.request_tickets
 
     local item_table = player_state.elements.item_table
 
@@ -297,8 +298,8 @@ function gui.network_poll_finished(player_state)
             local provide_current = len_or_zero(provide_haulers[item_key])
             local request_current = len_or_zero(request_haulers[item_key])
 
-            local provide_maximum = len_or_zero(push_stations[item_key]) + len_or_zero(provide_stations[item_key])
-            local request_maximum = len_or_zero(pull_stations[item_key]) + len_or_zero(request_stations[item_key])
+            local provide_maximum = len_or_zero(push_tickets[item_key]) + len_or_zero(provide_tickets[item_key])
+            local request_maximum = len_or_zero(pull_tickets[item_key]) + len_or_zero(request_tickets[item_key])
 
             table_children[i + 5].caption = tostring(liquidate_current)
             table_children[i + 6].caption = tostring(provide_current) .. " / " .. tostring(provide_maximum)

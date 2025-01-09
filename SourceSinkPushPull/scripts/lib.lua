@@ -381,31 +381,112 @@ function get_station_parts(entity)
     if name == "sspp-stop" then
         stop = entity
     else
-        local stops_list = storage.comb_stops[entity.unit_number]
-        if stops_list == nil or #stops_list ~= 1 then return nil end
-        stop = stops_list[1]
+        local stop_ids = storage.comb_stop_ids[entity.unit_number]
+        if #stop_ids ~= 1 then return nil end
+        stop = stop_ids[1]
     end
 
-    local combs_list = storage.stop_combs[stop.unit_number]
-    if combs_list == nil then return nil end
+    local comb_ids = storage.stop_comb_ids[stop.unit_number]
 
-    local combs = {} ---@type {[string]: LuaEntity?}
-    for _, comb in pairs(combs_list) do
+    local combs_by_name = {} ---@type {[string]: LuaEntity?}
+
+    for _, comb_id in pairs(comb_ids) do
+        if #storage.comb_stop_ids[comb_id] ~= 1 then return nil end
+
+        local comb = storage.entities[comb_id]
         name = comb.name
         if name == "entity-ghost" then name = comb.ghost_name end
-        if combs[name] then return nil end
+        if combs_by_name[name] then return nil end
 
-        if #storage.comb_stops[comb.unit_number] ~= 1 then return nil end
-
-        combs[name] = comb
+        combs_by_name[name] = comb
     end
 
-    local general_io = combs["sspp-general-io"]
+    local general_io = combs_by_name["sspp-general-io"]
     if not general_io then return nil end
 
-    local provide_io = combs["sspp-provide-io"]
-    local request_io = combs["sspp-request-io"]
+    local provide_io = combs_by_name["sspp-provide-io"]
+    local request_io = combs_by_name["sspp-request-io"]
     if not (provide_io or request_io) then return nil end
 
-    return { stop = stop, general_io = general_io, provide_io = provide_io, request_io = request_io }
+    local ids = {}
+
+    ids[stop.unit_number] = true
+    ids[general_io.unit_number] = true
+    if provide_io then ids[provide_io.unit_number] = true end
+    if request_io then ids[request_io.unit_number] = true end
+
+    return { ids = ids, stop = stop, general_io = general_io, provide_io = provide_io, request_io = request_io }
+end
+
+---@param comb LuaEntity
+---@param hidden_comb LuaEntity
+---@param wire defines.wire_connector_id
+local function connect_hidden_comb_wire(comb, hidden_comb, wire)
+    local connector = comb.get_wire_connector(wire, true)
+    local hidden_connector = hidden_comb.get_wire_connector(wire, true)
+    connector.connect_to(hidden_connector, false, defines.wire_origin.script)
+end
+
+---@param comb LuaEntity
+---@param hidden_combs LuaEntity[]
+---@param items {[ItemKey]: ProvideItem|RequestItem}
+function ensure_hidden_combs(comb, hidden_combs, items)
+    local old_spoil_depth = #hidden_combs
+	local new_spoil_depth = 0
+	for item_key, _ in pairs(items) do
+        local name, quality = split_item_key(item_key)
+		if quality then
+			local spoil_depth = 0
+			for _ in next_spoil_result, prototypes.item[name] do
+				spoil_depth = spoil_depth + 1
+			end
+			if spoil_depth > new_spoil_depth then
+				new_spoil_depth = spoil_depth
+			end
+		end
+	end
+	if old_spoil_depth < new_spoil_depth then
+		for i = old_spoil_depth + 1, new_spoil_depth do
+			local hidden_comb = assert(comb.surface.create_entity({ name = "sspp-hidden-io", position = comb.position, force = comb.force }))
+            connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_input_red)
+            connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_input_green)
+            connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_output_red)
+            connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_output_green)
+			hidden_combs[i] = hidden_comb
+		end
+    elseif old_spoil_depth > new_spoil_depth then
+        for i = old_spoil_depth, new_spoil_depth + 1, -1 do
+            hidden_combs[i].destroy({})
+            hidden_combs[i] = nil
+        end
+    end
+end
+
+---@param hidden_combs LuaEntity[]?
+function destroy_hidden_combs(hidden_combs)
+    if hidden_combs then
+        for _, hidden_comb in pairs(hidden_combs) do
+            hidden_comb.destroy({})
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+
+---@param proto LuaItemPrototype
+function next_spoil_result(proto)
+	return proto.spoil_result
+end
+
+---@param proto LuaItemPrototype
+function enumerate_spoil_results(proto)
+	local i = 0
+	return function()
+		proto = proto.spoil_result
+		if proto then
+			i = i + 1
+			return i, proto
+		end
+		return nil, nil
+	end
 end

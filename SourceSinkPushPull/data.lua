@@ -11,6 +11,7 @@ data:extend({
     general_io_entity,
     provide_io_entity,
     request_io_entity,
+    hidden_io_entity,
     stop_item,
     general_io_item,
     provide_io_item,

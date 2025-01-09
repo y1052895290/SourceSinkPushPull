@@ -129,3 +129,33 @@ stop_entity.allow_copy_paste = false
 general_io_entity = generate_io_entity("decider-combinator", "general") --[[@as data.DeciderCombinatorPrototype]]
 provide_io_entity = generate_io_entity("arithmetic-combinator", "provide") --[[@as data.ArithmeticCombinatorPrototype]]
 request_io_entity = generate_io_entity("arithmetic-combinator", "request") --[[@as data.ArithmeticCombinatorPrototype]]
+
+---@type data.ArithmeticCombinatorPrototype
+hidden_io_entity = {
+    sprites = { filename = "__SourceSinkPushPull__/graphics/invisible.png", width = 1, height = 1 },
+    activity_led_sprites = { filename = "__SourceSinkPushPull__/graphics/invisible.png", width = 1, height = 1 },
+
+    input_connection_points = {
+        { wire = { 0, 0 }, shadow = { 0, 0 } },
+        { wire = { 0, 0 }, shadow = { 0, 0 } },
+        { wire = { 0, 0 }, shadow = { 0, 0 } },
+        { wire = { 0, 0 }, shadow = { 0, 0 } },
+    },
+    output_connection_points = {
+        { wire = { 0, 0 }, shadow = { 0, 0 } },
+        { wire = { 0, 0 }, shadow = { 0, 0 } },
+        { wire = { 0, 0 }, shadow = { 0, 0 } },
+        { wire = { 0, 0 }, shadow = { 0, 0 } },
+    },
+
+    type = "arithmetic-combinator",
+    name = "sspp-hidden-io",
+    flags = { "placeable-off-grid" },
+    collision_mask = { layers = {} },
+    energy_source = { type = "void" },
+    active_energy_usage = "1W",
+    activity_led_light_offsets = { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } },
+    screen_light_offsets = { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } },
+    input_connection_bounding_box = { { 0, 0 }, { 0, 0 } },
+    output_connection_bounding_box = { { 0, 0 }, { 0, 0 } },
+}

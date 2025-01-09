@@ -3,134 +3,135 @@
 --------------------------------------------------------------------------------
 
 ---@param stop LuaEntity
----@return LuaEntity[]
-local function refresh_nearby_combs(stop)
-    local x, y, combs = stop.position.x, stop.position.y, {}
+---@return uint[], LuaEntity[]
+local function find_nearby_combs(stop)
+    local entities, x, y = storage.entities, stop.position.x, stop.position.y
+    local i, comb_ids, combs = 0, {}, {}
     for _, entity in pairs(stop.surface.find_entities({ { x - 2.6, y - 2.6 }, { x + 2.6, y + 2.6 } })) do
-        local name = entity.name
-        if name == "entity-ghost" then
-            name = entity.ghost_name
-        end
-        if name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-            combs[#combs+1] = entity
+        local unit_number = entity.unit_number
+        if entities[unit_number] then
+            local name = entity.name
+            if name == "entity-ghost" then name = entity.ghost_name end
+            if name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
+                i = i + 1
+                comb_ids[i], combs[i] = unit_number, entity
+            end
         end
     end
-    storage.stop_combs[stop.unit_number] = combs
-    return combs
+    return comb_ids, combs
 end
 
 ---@param comb LuaEntity
----@return LuaEntity[]
-local function refresh_nearby_stops(comb)
-    local x, y, stops = comb.position.x, comb.position.y, {}
+---@return uint[], LuaEntity[]
+local function find_nearby_stops(comb)
+    local entities, x, y = storage.entities, comb.position.x, comb.position.y
+    local i, stop_ids, stops = 0, {}, {}
     for _, entity in pairs(comb.surface.find_entities({ { x - 2.1, y - 2.1 }, { x + 2.1, y + 2.1 } })) do
-        local name = entity.name
-        if name == "entity-ghost" then
-            name = entity.ghost_name
-        end
-        if name == "sspp-stop" then
-            stops[#stops+1] = entity
+        local unit_number = entity.unit_number
+        if entities[unit_number] then
+            local name = entity.name
+            if name == "entity-ghost" then name = entity.ghost_name end
+            if name == "sspp-stop" then
+                i = i + 1
+                stop_ids[i], stops[i] = unit_number, entity
+            end
         end
     end
-    storage.comb_stops[comb.unit_number] = stops
-    return stops
+    return stop_ids, stops
 end
 
----@param comb LuaEntity
----@param stop LuaEntity
----@return LuaEntity[]
-local function remove_from_nearby_stops(comb, stop)
-    local stops = storage.comb_stops[comb.unit_number]
-    for i = 1, #stops do
-        if stops[i] == stop then
-            table.remove(stops, i)
+---@param comb_id uint
+---@param stop_id uint
+---@return uint[]
+local function remove_from_nearby_stops(comb_id, stop_id)
+    local stop_ids = storage.comb_stop_ids[comb_id]
+    for i = 1, #stop_ids do
+        if stop_ids[i] == stop_id then
+            table.remove(stop_ids, i)
             break
         end
     end
-    return stops
+    return stop_ids
 end
 
----@param stop LuaEntity
----@param comb LuaEntity
----@return LuaEntity[]
-local function remove_from_nearby_combs(stop, comb)
-    local combs = storage.stop_combs[stop.unit_number]
-    for i = 1, #combs do
-        if combs[i] == comb then
-            table.remove(combs, i)
+---@param stop_id uint
+---@param comb_id uint
+---@return uint[]
+local function remove_from_nearby_combs(stop_id, comb_id)
+    local comb_ids = storage.stop_comb_ids[stop_id]
+    for i = 1, #comb_ids do
+        if comb_ids[i] == comb_id then
+            table.remove(comb_ids, i)
             break
         end
     end
-    return combs
-end
-
----@param comb LuaEntity
----@return LuaEntity[]
-local function get_nearby_stops(comb)
-    return storage.comb_stops[comb.unit_number] or {}
-end
-
----@param stop LuaEntity
----@return LuaEntity[]
-local function get_nearby_combs(stop)
-    return storage.stop_combs[stop.unit_number] or {}
+    return comb_ids
 end
 
 --------------------------------------------------------------------------------
 
+---@param entity_id uint
+local function try_close_entity_guis(entity_id)
+    for player_id, player_state in pairs(storage.player_states) do
+        local parts = player_state.parts
+        if parts and parts.ids[entity_id] then
+            gui.station_closed(player_id, player_state.elements["sspp-station"])
+        end
+    end
+end
+
 ---@param stop LuaEntity
----@param combs_list LuaEntity[]
-local function try_create_station(stop, combs_list)
+---@param combs LuaEntity[]
+local function try_create_station(stop, combs)
     if stop.name == "entity-ghost" then return end
 
-    local station_id = stop.unit_number --[[@as StationId]]
+    local station_id = stop.unit_number ---@type StationId
     assert(storage.stations[station_id] == nil)
 
-    local combs = {} ---@type {[string]: LuaEntity?}
+    local combs_by_name = {} ---@type {[string]: LuaEntity?}
 
-    for _, comb in pairs(combs_list) do
+    for _, comb in pairs(combs) do
+        if #storage.comb_stop_ids[comb.unit_number] ~= 1 then return end
+
         local name = comb.name
-        if name == "entity-ghost" then return end
-        if combs[name] then return end
+        if name == "entity-ghost" or combs_by_name[name] then return end
 
-        local comb_id = comb.unit_number ---@type uint
-        if #storage.comb_stops[comb_id] ~= 1 then return end
-
-        combs[name] = comb
+        combs_by_name[name] = comb
     end
 
-    local general_io = combs["sspp-general-io"]
+    local general_io = combs_by_name["sspp-general-io"]
     if not general_io then return end
 
-    local provide_io = combs["sspp-provide-io"]
-    local request_io = combs["sspp-request-io"]
+    local provide_io = combs_by_name["sspp-provide-io"]
+    local request_io = combs_by_name["sspp-request-io"]
     if not (provide_io or request_io) then return end
-
-    if provide_io then
-        local connector_a = stop.get_wire_connector(defines.wire_connector_id.circuit_red, true)
-        local connector_b = provide_io.get_wire_connector(defines.wire_connector_id.combinator_input_red, true)
-        connector_a.connect_to(connector_b)
-    end
-    if request_io then
-        local connector_a = stop.get_wire_connector(defines.wire_connector_id.circuit_green, true)
-        local connector_b = request_io.get_wire_connector(defines.wire_connector_id.combinator_input_green, true)
-        connector_a.connect_to(connector_b)
-    end
 
     local station = { stop = stop, general_io = general_io, total_deliveries = 0 } ---@type Station
 
     if provide_io then
+        local stop_connector = stop.get_wire_connector(defines.wire_connector_id.circuit_red, true)
+        local io_connector = provide_io.get_wire_connector(defines.wire_connector_id.combinator_input_red, true)
+        stop_connector.connect_to(io_connector, true)
+
         local properties = helpers.json_to_table(provide_io.combinator_description) --[[@as table]]
         station.provide_io = provide_io
         station.provide_items = properties.provide_items or {}
         station.provide_deliveries = {}
+        station.provide_hidden_combs = {}
+        ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, station.provide_items)
     end
 
     if request_io then
+        local stop_connector = stop.get_wire_connector(defines.wire_connector_id.circuit_green, true)
+        local io_connector = request_io.get_wire_connector(defines.wire_connector_id.combinator_input_green, true)
+        stop_connector.connect_to(io_connector, true)
+
         local properties = helpers.json_to_table(request_io.combinator_description) --[[@as table]]
         station.request_io = request_io
         station.request_items = properties.request_items or {}
         station.request_deliveries = {}
+        station.request_hidden_combs = {}
+        ensure_hidden_combs(station.request_io, station.request_hidden_combs, station.request_items)
     end
 
     stop.backer_name = compute_stop_name(station.provide_items, station.request_items)
@@ -140,13 +141,6 @@ end
 
 ---@param stop LuaEntity
 local function try_destroy_station(stop)
-    for player_id, player_state in pairs(storage.player_states) do
-        local parts = player_state.parts
-        if parts and parts.stop.unit_number == stop.unit_number then
-            gui.station_closed(player_id, player_state.elements["sspp-station"])
-        end
-    end
-
     if stop.name == "entity-ghost" then return end
 
     local station_id = stop.unit_number ---@type StationId
@@ -154,10 +148,14 @@ local function try_destroy_station(stop)
     if station then
         set_haulers_to_manual(station.provide_deliveries, { "sspp-alert.station-broken" })
         set_haulers_to_manual(station.request_deliveries, { "sspp-alert.station-broken" })
+
+        destroy_hidden_combs(station.provide_hidden_combs)
+        destroy_hidden_combs(station.request_hidden_combs)
+
         storage.stations[station_id] = nil
     end
 
-    stop.backer_name = "[img=virtual-signal.signal-ghost]"
+    stop.backer_name = "[virtual-signal=signal-ghost]"
 end
 
 --------------------------------------------------------------------------------
@@ -210,32 +208,41 @@ end
 --------------------------------------------------------------------------------
 
 ---@param stop LuaEntity
-function on_stop_built(stop)
-    assert(stop.valid)
+---@param ghost_unit_number uint?
+function on_stop_built(stop, ghost_unit_number)
+    if ghost_unit_number then
+        on_stop_broken(ghost_unit_number, nil)
+    end
 
     local stop_cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     stop_cb.read_from_train = true
     stop.trains_limit = 0
-    stop.backer_name = "[img=virtual-signal.signal-ghost]"
+    stop.backer_name = "[virtual-signal=signal-ghost]"
 
-    local combs_list = refresh_nearby_combs(stop)
+    storage.entities[stop.unit_number] = stop
 
-    for _, comb in pairs(combs_list) do
-        local stops_list = get_nearby_stops(comb)
+    local comb_ids, combs = find_nearby_combs(stop)
+    storage.stop_comb_ids[stop.unit_number] = comb_ids
 
-        for _, other_stop in pairs(stops_list) do
+    for _, comb in pairs(combs) do
+        local stop_ids, stops = find_nearby_stops(comb)
+        storage.comb_stop_ids[comb.unit_number] = stop_ids
+
+        for _, other_stop in pairs(stops) do
+            try_close_entity_guis(other_stop.unit_number)
             try_destroy_station(other_stop)
         end
-
-        refresh_nearby_stops(comb)
     end
 
-    try_create_station(stop, combs_list)
+    try_create_station(stop, combs)
 end
 
 ---@param comb LuaEntity
-function on_comb_built(comb)
-    assert(comb.valid)
+---@param ghost_unit_number uint?
+function on_comb_built(comb, ghost_unit_number)
+    if ghost_unit_number then
+        on_comb_broken(ghost_unit_number, nil)
+    end
 
     if comb.combinator_description == "" then
         local properties = {}
@@ -249,86 +256,97 @@ function on_comb_built(comb)
         comb.combinator_description = helpers.table_to_json(properties)
     end
 
-    local stops_list = refresh_nearby_stops(comb)
+    storage.entities[comb.unit_number] = comb
 
-    for _, stop in pairs(stops_list) do
+    local stop_ids, stops = find_nearby_stops(comb)
+    storage.comb_stop_ids[comb.unit_number] = stop_ids
+
+    for _, stop in pairs(stops) do
+        try_close_entity_guis(stop.unit_number)
         try_destroy_station(stop)
 
-        local combs_list = refresh_nearby_combs(stop)
+        local comb_ids, combs = find_nearby_combs(stop)
+        storage.stop_comb_ids[stop.unit_number] = comb_ids
 
-        if #stops_list == 1 then
-            try_create_station(stop, combs_list)
-        end
+        try_create_station(stop, combs)
     end
 end
 
 local function on_entity_built(event)
     local entity = event.entity or event.created_entity
-    assert(entity.valid)
 
-    local name = entity.name
-    if name == "entity-ghost" then name = entity.ghost_name end
+    local name, ghost_unit_number = entity.name, nil
+    if name == "entity-ghost" then
+        local tags = entity.tags or {}
+        tags.ghost_unit_number = entity.unit_number
+        entity.tags = tags
+        name = entity.ghost_name
+    else
+        ghost_unit_number = event.tags and event.tags.ghost_unit_number
+    end
 
     if name == "sspp-stop" then
-        on_stop_built(entity)
+        on_stop_built(entity, ghost_unit_number)
     elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-        on_comb_built(entity)
+        on_comb_built(entity, ghost_unit_number)
     end
 end
 
 --------------------------------------------------------------------------------
 
----@paramstop LuaEntity
-function on_stop_broken(stop)
-    assert(stop.valid)
+---@param stop_id uint
+---@param stop LuaEntity?
+function on_stop_broken(stop_id, stop)
+    local comb_ids = storage.stop_comb_ids[stop_id]
 
-    try_destroy_station(stop)
+    if stop then
+        try_destroy_station(stop)
+    end
 
-    local combs_list = get_nearby_combs(stop)
+    storage.entities[stop_id] = nil
 
-    for _, comb in pairs(combs_list) do
-        local stops_list = remove_from_nearby_stops(comb, stop)
-
-        for _, other_stop in pairs(stops_list) do
-            local other_combs_list = get_nearby_combs(other_stop)
-
-            try_create_station(other_stop, other_combs_list)
+    for _, comb_id in pairs(comb_ids) do
+        local stop_ids = remove_from_nearby_stops(comb_id, stop_id)
+        for _, other_stop_id in pairs(stop_ids) do
+            local other_comb_ids = storage.stop_comb_ids[other_stop_id]
+            try_create_station(storage.entities[other_stop_id], other_comb_ids)
         end
     end
 
-    storage.stop_combs[stop.unit_number] = nil
+    storage.stop_comb_ids[stop_id] = nil
 end
 
----@param comb LuaEntity
-function on_comb_broken(comb)
-    assert(comb.valid)
+---@param comb_id uint
+---@param comb LuaEntity?
+function on_comb_broken(comb_id, comb)
+    local stop_ids = storage.comb_stop_ids[comb_id]
 
-    local stops_list = get_nearby_stops(comb)
-
-    if #stops_list == 1 then
-        try_destroy_station(stops_list[1])
+    if comb then
+        for _, stop_id in pairs(stop_ids) do
+            try_destroy_station(storage.entities[stop_id])
+        end
     end
 
-    for _, stop in pairs(stops_list) do
-        local combs_list = remove_from_nearby_combs(stop, comb)
+    storage.entities[comb_id] = nil
 
-        try_create_station(stop, combs_list)
+    for _, stop_id in pairs(stop_ids) do
+        local comb_ids = remove_from_nearby_combs(stop_id, comb_id)
+        try_create_station(storage.entities[stop_id], comb_ids)
     end
 
-    storage.comb_stops[comb.unit_number] = nil
+    storage.comb_stop_ids[comb_id] = nil
 end
 
 local function on_entity_broken(event)
     local entity = event.entity or event.ghost ---@type LuaEntity
-    assert(entity.valid)
 
     local name = entity.name
     if name == "entity-ghost" then name = entity.ghost_name end
 
     if name == "sspp-stop" then
-        on_stop_broken(entity)
+        on_stop_broken(entity.unit_number, entity)
     elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-        on_comb_broken(entity)
+        on_comb_broken(entity.unit_number, entity)
     else
         local hauler_id = assert(entity.train).id
         if storage.haulers[hauler_id] then
@@ -343,7 +361,6 @@ end
 ---@param event EventData.on_player_rotated_entity
 local function on_entity_rotated(event)
     local entity = event.entity
-    assert(entity.valid)
 
     local name = entity.name
     if name == "entity-ghost" then name = entity.ghost_name end
@@ -364,13 +381,16 @@ end
 
 ---@param event EventData.on_pre_surface_cleared|EventData.on_pre_surface_deleted
 local function on_surface_cleared(event)
-    local surface = game.surfaces[event.surface_index]
-    assert(surface)
+    local surface = assert(game.get_surface(event.surface_index))
 
-    local entities = surface.find_entities_filtered({ name = "sspp-stop" })
-    for _, entity in pairs(entities) do
-        if entity.valid then
-            on_stop_broken(entity)
+    for _, entity in pairs(surface.find_entities()) do
+        local name = entity.name
+        if name == "entity-ghost" then name = entity.ghost_name end
+
+        if name == "sspp-stop" then
+            on_stop_broken(entity.unit_number, entity)
+        elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
+            on_comb_broken(entity.unit_number, entity)
         end
     end
 
@@ -534,7 +554,6 @@ end
 ---@param event EventData.on_train_changed_state
 local function on_train_changed_state(event)
     local train = event.train
-    assert(train.valid)
 
     local new_state, old_state = train.state, event.old_state
     local is_manual = new_state == defines.train_state.manual_control or new_state == defines.train_state.manual_control_stop

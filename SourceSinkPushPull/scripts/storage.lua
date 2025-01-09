@@ -13,17 +13,18 @@
 
 ---@class (exact) SourceSinkPushPull.Storage
 ---@field public tick_state TickState
----@field public stop_combs {[uint]: LuaEntity[]}
----@field public comb_stops {[uint]: LuaEntity[]}
+---@field public entities {[uint]: LuaEntity}
+---@field public stop_comb_ids {[uint]: uint[]}
+---@field public comb_stop_ids {[uint]: uint[]}
 ---@field public networks {[NetworkName]: Network}
 ---@field public stations {[StationId]: Station}
 ---@field public haulers {[HaulerId]: Hauler}
 ---@field public player_states {[PlayerId]: PlayerState}
----@field public all_stations StationId[]
----@field public all_liquidate_items NetworkItemKey[]
----@field public all_dispatch_items NetworkItemKey[]
----@field public all_provide_done_items NetworkItemKey[]
----@field public all_request_done_items NetworkItemKey[]
+---@field public poll_stations StationId[]
+---@field public liquidate_items NetworkItemKey[]
+---@field public dispatch_items NetworkItemKey[]
+---@field public provide_done_items NetworkItemKey[]
+---@field public request_done_items NetworkItemKey[]
 ---@field public disabled_items {[NetworkItemKey]: true?}
 
 ---@class (exact) SourceSinkPushPull.ModSettings
@@ -40,7 +41,12 @@
 ---@field public fuel_haulers {[ClassName]: HaulerId[]}
 ---@field public depot_haulers {[ClassName]: HaulerId[]}
 ---@field public liquidate_haulers {[ItemKey]: HaulerId[]}
----@field public economy Economy
+---@field public push_tickets {[ItemKey]: StationId[]}
+---@field public provide_tickets {[ItemKey]: StationId[]}
+---@field public pull_tickets {[ItemKey]: StationId[]}
+---@field public request_tickets {[ItemKey]: StationId[]}
+---@field public provide_done_tickets {[ItemKey]: StationId[]}
+---@field public request_done_tickets {[ItemKey]: StationId[]}
 
 ---@class (exact) Class
 ---@field public list_index integer
@@ -57,14 +63,6 @@
 ---@field public delivery_size integer
 ---@field public delivery_time number
 
----@class (exact) Economy
----@field public push_stations {[ItemKey]: StationId[]}
----@field public provide_stations {[ItemKey]: StationId[]}
----@field public pull_stations {[ItemKey]: StationId[]}
----@field public request_stations {[ItemKey]: StationId[]}
----@field public provide_done_stations {[ItemKey]: StationId[]}
----@field public request_done_stations {[ItemKey]: StationId[]}
-
 --------------------------------------------------------------------------------
 
 ---@class (exact) Station
@@ -76,6 +74,8 @@
 ---@field public request_items {[ItemKey]: RequestItem}?
 ---@field public provide_deliveries {[ItemKey]: HaulerId[]}?
 ---@field public request_deliveries {[ItemKey]: HaulerId[]}?
+---@field public provide_hidden_combs LuaEntity[]?
+---@field public request_hidden_combs LuaEntity[]?
 ---@field public total_deliveries integer
 ---@field public hauler HaulerId?
 
@@ -112,6 +112,7 @@
 --------------------------------------------------------------------------------
 
 ---@class (exact) StationParts
+---@field public ids {[uint]: true?}
 ---@field public stop LuaEntity
 ---@field public general_io LuaEntity
 ---@field public provide_io LuaEntity?
@@ -136,16 +137,18 @@ mod_settings = {}
 
 function init_storage()
     storage.tick_state = "INITIAL"
-    storage.stop_combs = {}
-    storage.comb_stops = {}
+    storage.entities = {}
+    storage.stop_comb_ids = {}
+    storage.comb_stop_ids = {}
     storage.networks = {}
     storage.stations = {}
     storage.haulers = {}
     storage.player_states = {}
-    storage.all_stations = {}
-    storage.all_dispatch_items = {}
-    storage.all_provide_done_items = {}
-    storage.all_request_done_items = {}
+    storage.poll_stations = {}
+    storage.liquidate_items = {}
+    storage.dispatch_items = {}
+    storage.provide_done_items = {}
+    storage.request_done_items = {}
     storage.disabled_items = {}
 end
 
@@ -160,14 +163,12 @@ function init_network(surface)
         fuel_haulers = {},
         depot_haulers = {},
         liquidate_haulers = {},
-        economy = {
-            push_stations = {},
-            provide_stations = {},
-            pull_stations = {},
-            request_stations = {},
-            provide_done_stations = {},
-            request_done_stations = {},
-        },
+        push_tickets = {},
+        provide_tickets = {},
+        pull_tickets = {},
+        request_tickets = {},
+        provide_done_tickets = {},
+        request_done_tickets = {},
     }
 
     -- storage.networks[surface.name].classes = {
