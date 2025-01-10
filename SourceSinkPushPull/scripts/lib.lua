@@ -346,7 +346,7 @@ end
 ---@return boolean
 function check_if_hauler_needs_fuel(hauler, class)
     assert(class)
-    local maximum_delivery_time = 120.0       -- TODO: calculate properly
+    local maximum_delivery_time = 120.0 -- TODO: calculate properly
     local energy_per_second = 5000000.0 / 3.0 -- TODO: calculate properly
 
     -- TODO: could be less, this assumes constant burning
@@ -432,28 +432,28 @@ end
 ---@param items {[ItemKey]: ProvideItem|RequestItem}
 function ensure_hidden_combs(comb, hidden_combs, items)
     local old_spoil_depth = #hidden_combs
-	local new_spoil_depth = 0
-	for item_key, _ in pairs(items) do
+    local new_spoil_depth = 0
+    for item_key, _ in pairs(items) do
         local name, quality = split_item_key(item_key)
-		if quality then
-			local spoil_depth = 0
-			for _ in next_spoil_result, prototypes.item[name] do
-				spoil_depth = spoil_depth + 1
-			end
-			if spoil_depth > new_spoil_depth then
-				new_spoil_depth = spoil_depth
-			end
-		end
-	end
-	if old_spoil_depth < new_spoil_depth then
-		for i = old_spoil_depth + 1, new_spoil_depth do
-			local hidden_comb = assert(comb.surface.create_entity({ name = "sspp-hidden-io", position = comb.position, force = comb.force }))
+        if quality then
+            local spoil_depth = 0
+            for _ in next_spoil_result, prototypes.item[name] do
+                spoil_depth = spoil_depth + 1
+            end
+            if spoil_depth > new_spoil_depth then
+                new_spoil_depth = spoil_depth
+            end
+        end
+    end
+    if old_spoil_depth < new_spoil_depth then
+        for i = old_spoil_depth + 1, new_spoil_depth do
+            local hidden_comb = assert(comb.surface.create_entity({ name = "sspp-hidden-io", position = comb.position, force = comb.force }))
             connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_input_red)
             connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_input_green)
             connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_output_red)
             connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_output_green)
-			hidden_combs[i] = hidden_comb
-		end
+            hidden_combs[i] = hidden_comb
+        end
     elseif old_spoil_depth > new_spoil_depth then
         for i = old_spoil_depth, new_spoil_depth + 1, -1 do
             hidden_combs[i].destroy({})
@@ -475,18 +475,18 @@ end
 
 ---@param proto LuaItemPrototype
 function next_spoil_result(proto)
-	return proto.spoil_result
+    return proto.spoil_result
 end
 
 ---@param proto LuaItemPrototype
 function enumerate_spoil_results(proto)
-	local i = 0
-	return function()
-		proto = proto.spoil_result
-		if proto then
-			i = i + 1
-			return i, proto
-		end
-		return nil, nil
-	end
+    local i = 0
+    return function()
+        proto = proto.spoil_result
+        if proto then
+            i = i + 1
+            return i, proto
+        end
+        return nil, nil
+    end
 end
