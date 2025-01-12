@@ -452,7 +452,7 @@ function gui.network_add_flib_handlers()
         ["network_item_expand"] = handle_item_expand,
         ["network_add_class"] = handle_add_class,
         ["network_add_item"] = handle_add_item,
-        ["network_add_fluid"] = handle_add_item,
+        ["network_add_fluid"] = handle_add_fluid,
         ["network_close"] = handle_close,
     })
 end

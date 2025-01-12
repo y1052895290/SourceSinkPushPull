@@ -15,6 +15,7 @@ align_function_params = false
 align_continuous_assign_statement = none
 align_continuous_rect_table_field = none
 align_array_table = none
+align_continuous_inline_comment = false
 
 line_space_after_if_statement = max(2)
 line_space_after_do_statement = max(2)

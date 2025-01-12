@@ -81,14 +81,16 @@
 
 ---@class (exact) ProvideItem
 ---@field public list_index integer
----@field public throughput number
 ---@field public push boolean
+---@field public throughput number
+---@field public latency number
 ---@field public granularity integer
 
 ---@class (exact) RequestItem
 ---@field public list_index integer
----@field public throughput number
 ---@field public pull boolean
+---@field public throughput number
+---@field public latency number
 
 --------------------------------------------------------------------------------
 

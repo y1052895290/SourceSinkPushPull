@@ -48,14 +48,12 @@ end
 function list_extend_or_create(object, key, value, copies)
     local list = object[key]
     if not list then
-        list = { value } -- assume copies > 0
+        list = {}
         object[key] = list
     end
-    if copies > 1 then
-        local length = #list
-        for i = length + 2, length + copies do
-            list[i] = value
-        end
+    local length = #list
+    for i = length + 1, length + copies do
+        list[i] = value
     end
 end
 
@@ -179,16 +177,28 @@ end
 ---@param station_item ProvideItem|RequestItem
 ---@return integer
 function compute_storage_needed(network_item, station_item)
-    local rounding = 100.0 -- for fluids
-    if network_item.quality then
-        rounding = prototypes.item[network_item.name].stack_size
-    end
-    local delivery_size = network_item.delivery_size
-    local buffer = delivery_size
-    if not (station_item.push or station_item.pull) then
-        buffer = math.ceil(buffer * 0.5)
-    end
-    return math.ceil(math.max(station_item.throughput * network_item.delivery_time, delivery_size) / rounding) * rounding + buffer
+    local delivery_size, delivery_time = network_item.delivery_size, network_item.delivery_time
+    local throughput, latency = station_item.throughput, station_item.latency
+    local round = 100.0 -- for fluids
+    if network_item.quality then round = prototypes.item[network_item.name].stack_size end
+    local result = math.max(delivery_size, throughput * delivery_time)
+    local buffer = math.max(round, throughput * latency)
+    result = math.ceil(result / round) * round
+    buffer = math.ceil(buffer / round) * round
+    if station_item.push or station_item.pull then buffer = buffer + buffer end
+    return result + buffer
+end
+
+---@param network_item NetworkItem
+---@param station_item ProvideItem|RequestItem
+---@return integer
+function compute_buffer(network_item, station_item)
+    local throughput, latency = station_item.throughput, station_item.latency
+    local round = 100.0 -- for fluids
+    if network_item.quality then round = prototypes.item[network_item.name].stack_size end
+    local buffer = math.max(round, throughput * latency)
+    buffer = math.ceil(buffer / round) * round
+    return buffer
 end
 
 ---@param network_item NetworkItem
@@ -259,6 +269,107 @@ function clear_arithmetic_control_behavior(comb)
     cb.parameters = nil
 end
 
+---@param provide_io LuaEntity
+---@return {[ItemKey]: ProvideItem}
+function combinator_description_to_provide_items(provide_io)
+    local json_string = provide_io.combinator_description
+    if json_string == "" then return {} end
+
+    local json = helpers.json_to_table(json_string) --[[@as table]]
+
+    local items = {} ---@type {[ItemKey]: ProvideItem}
+    local indices = {} ---@type {[integer]: true?}
+
+    for item_key, json_item in pairs(json.provide_items or json) do
+        local name, quality = split_item_key(item_key)
+        if quality then
+            if not prototypes.item[name] then goto continue end
+        else
+            if not prototypes.fluid[name] then goto continue end
+        end
+
+        local list_index = json_item.list_index
+        if type(list_index) ~= "number" then list_index = 0 end
+
+        local push = json_item.push
+        if type(push) ~= "boolean" then push = false end
+
+        local throughput = json_item.throughput
+        if type(throughput) ~= "number" then throughput = 0.0 end
+
+        local latency = json_item.latency
+        if type(latency) ~= "number" then latency = 30 end
+
+        local granularity = json_item.granularity
+        if type(granularity) ~= "number" then granularity = 1 end
+
+        items[item_key] = { list_index = list_index, push = push, throughput = throughput, latency = latency, granularity = granularity }
+        indices[list_index] = true
+
+        ::continue::
+    end
+
+    local indices_length = #indices
+    if table_size(items) ~= indices_length or table_size(indices) ~= indices_length then
+        local index = 0
+        for _, item in pairs(items) do
+            index = index + 1
+            item.list_index = index
+        end
+    end
+
+    return items
+end
+
+---@param request_io LuaEntity
+---@return {[ItemKey]: RequestItem}
+function combinator_description_to_request_items(request_io)
+    local json_string = request_io.combinator_description
+    if json_string == "" then return {} end
+
+    local json = helpers.json_to_table(json_string) --[[@as table]]
+
+    local items = {} ---@type {[ItemKey]: RequestItem}
+    local indices = {} ---@type {[integer]: true?}
+
+    for item_key, json_item in pairs(json.request_items or json) do
+        local name, quality = split_item_key(item_key)
+        if quality then
+            if not prototypes.item[name] then goto continue end
+        else
+            if not prototypes.fluid[name] then goto continue end
+        end
+
+        local list_index = json_item.list_index
+        if type(list_index) ~= "number" then list_index = 0 end
+
+        local pull = json_item.pull
+        if type(pull) ~= "boolean" then pull = false end
+
+        local throughput = json_item.throughput
+        if type(throughput) ~= "number" then throughput = 0.0 end
+
+        local latency = json_item.latency
+        if type(latency) ~= "number" then latency = 30 end
+
+        items[item_key] = { list_index = list_index, pull = pull, throughput = throughput, latency = latency }
+        indices[list_index] = true
+
+        ::continue::
+    end
+
+    local indices_length = #indices
+    if table_size(items) ~= indices_length or table_size(indices) ~= indices_length then
+        local index = 0
+        for _, item in pairs(items) do
+            index = index + 1
+            item.list_index = index
+        end
+    end
+
+    return items
+end
+
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
@@ -326,16 +437,32 @@ function send_hauler_to_station(hauler, station)
 end
 
 ---@param hauler Hauler
----@param stop_name string
-function send_hauler_to_named_stop(hauler, stop_name)
+---@param class Class
+function send_hauler_to_depot(hauler, class)
     local train = hauler.train
 
-    train.schedule = { current = 1, records = { { station = stop_name } } }
+    train.schedule = { current = 1, records = { { station = class.depot_name } } }
     train.recalculate_path()
 
     local state = train.state
     if state == defines.train_state.no_path or state == defines.train_state.destination_full then
-        set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", stop_name }, hauler.status_item)
+        set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", class.depot_name }, hauler.status_item)
+        send_alert_for_train(train, hauler.status)
+        train.manual_mode = true
+    end
+end
+
+---@param hauler Hauler
+---@param class Class
+function send_hauler_to_fueler(hauler, class)
+    local train = hauler.train
+
+    train.schedule = { current = 1, records = { { station = class.fueler_name, wait_conditions = { { type = "fuel_full" } } }, { station = class.depot_name } } }
+    train.recalculate_path()
+
+    local state = train.state
+    if state == defines.train_state.no_path or state == defines.train_state.destination_full then
+        set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", class.fueler_name }, hauler.status_item)
         send_alert_for_train(train, hauler.status)
         train.manual_mode = true
     end

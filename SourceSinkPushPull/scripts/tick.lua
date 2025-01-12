@@ -171,7 +171,7 @@ local function tick_poll()
                 local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
                 if want_deliveries > 0 then
                     if provide_item.push then
-                        local push_count = count - network_item.delivery_size * 0.5
+                        local push_count = count - compute_buffer(network_item, provide_item)
                         local push_want_deliveries = math.floor(push_count / network_item.delivery_size) - deliveries
                         if push_want_deliveries > 0 then
                             list_extend_or_create(network.push_tickets, item_key, station_id, push_want_deliveries)
@@ -222,7 +222,7 @@ local function tick_poll()
                 local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
                 if want_deliveries > 0 then
                     if request_item.pull then
-                        local pull_count = count - network_item.delivery_size * 0.5
+                        local pull_count = count - compute_buffer(network_item, request_item)
                         local pull_want_deliveries = math.floor(pull_count / network_item.delivery_size) - deliveries
                         if pull_want_deliveries > 0 then
                             list_extend_or_create(network.pull_tickets, item_key, station_id, pull_want_deliveries)
@@ -506,12 +506,12 @@ local function tick_request_done()
             list_append_or_create(network.fuel_haulers, hauler.class, hauler_id)
             hauler.to_fuel = true
             set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
-            send_hauler_to_named_stop(hauler, class.fueler_name)
+            send_hauler_to_fueler(hauler, class)
         else
             list_append_or_create(network.depot_haulers, hauler.class, hauler_id)
             hauler.to_depot = true
             set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
-            send_hauler_to_named_stop(hauler, class.depot_name)
+            send_hauler_to_depot(hauler, class)
         end
     else
         set_hauler_status(hauler, { "sspp-alert.class-not-in-network" })
@@ -526,39 +526,20 @@ end
 
 function on_tick()
 
-    if not storage.entities then
-        storage.entities = {}
-        storage.stop_comb_ids = storage.stop_combs
-        storage.comb_stop_ids = storage.comb_stops
-        storage.stop_combs = nil
-        storage.comb_stops = nil
-    end
-
     for _, station in pairs(storage.stations) do
-        if not station.total_deliveries then
-            station.total_deliveries = 0
-            if station.provide_deliveries then
-                for _, hauler_ids in pairs(station.provide_deliveries) do
-                    station.total_deliveries = station.total_deliveries + #hauler_ids
-                end
-            end
-            if station.request_deliveries then
-                for _, hauler_ids in pairs(station.request_deliveries) do
-                    station.total_deliveries = station.total_deliveries + #hauler_ids
+        if station.provide_items then
+            for _, provide_item in pairs(station.provide_items) do
+                if not provide_item.latency then
+                    provide_item.latency = 30.0
                 end
             end
         end
-        if not station.provide_hidden_combs and station.provide_io then
-            station.provide_hidden_combs = {}
-        end
-        if not station.request_hidden_combs and station.request_io then
-            station.request_hidden_combs = {}
-        end
-    end
-
-    for _, network in pairs(storage.networks) do
-        if not network.liquidate_haulers then
-            network.liquidate_haulers = {}
+        if station.request_items then
+            for _, request_item in pairs(station.request_items) do
+                if not request_item.latency then
+                    request_item.latency = 30.0
+                end
+            end
         end
     end
 

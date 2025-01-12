@@ -40,34 +40,6 @@ local function find_nearby_stops(comb)
     return stop_ids, stops
 end
 
----@param comb_id uint
----@param stop_id uint
----@return uint[]
-local function remove_from_nearby_stops(comb_id, stop_id)
-    local stop_ids = storage.comb_stop_ids[comb_id]
-    for i = 1, #stop_ids do
-        if stop_ids[i] == stop_id then
-            table.remove(stop_ids, i)
-            break
-        end
-    end
-    return stop_ids
-end
-
----@param stop_id uint
----@param comb_id uint
----@return uint[]
-local function remove_from_nearby_combs(stop_id, comb_id)
-    local comb_ids = storage.stop_comb_ids[stop_id]
-    for i = 1, #comb_ids do
-        if comb_ids[i] == comb_id then
-            table.remove(comb_ids, i)
-            break
-        end
-    end
-    return comb_ids
-end
-
 --------------------------------------------------------------------------------
 
 ---@param entity_id uint
@@ -113,11 +85,11 @@ local function try_create_station(stop, combs)
         local io_connector = provide_io.get_wire_connector(defines.wire_connector_id.combinator_input_red, true)
         stop_connector.connect_to(io_connector, true)
 
-        local properties = helpers.json_to_table(provide_io.combinator_description) --[[@as table]]
         station.provide_io = provide_io
-        station.provide_items = properties.provide_items or {}
+        station.provide_items = combinator_description_to_provide_items(provide_io)
         station.provide_deliveries = {}
         station.provide_hidden_combs = {}
+
         ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, station.provide_items)
     end
 
@@ -126,11 +98,11 @@ local function try_create_station(stop, combs)
         local io_connector = request_io.get_wire_connector(defines.wire_connector_id.combinator_input_green, true)
         stop_connector.connect_to(io_connector, true)
 
-        local properties = helpers.json_to_table(request_io.combinator_description) --[[@as table]]
         station.request_io = request_io
-        station.request_items = properties.request_items or {}
+        station.request_items = combinator_description_to_request_items(request_io)
         station.request_deliveries = {}
         station.request_hidden_combs = {}
+
         ensure_hidden_combs(station.request_io, station.request_hidden_combs, station.request_items)
     end
 
@@ -244,16 +216,15 @@ function on_comb_built(comb, ghost_unit_number)
         on_comb_broken(ghost_unit_number, nil)
     end
 
-    if comb.combinator_description == "" then
-        local properties = {}
-        if comb.name == "sspp-general-io" then
-            -- TODO
-        elseif comb.name == "sspp-provide-io" then
-            properties.provide_items = {}
-        elseif comb.name == "sspp-request-io" then
-            properties.request_items = {}
-        end
-        comb.combinator_description = helpers.table_to_json(properties)
+    local name = comb.name
+    if comb.name == "entity-ghost" then name = comb.ghost_name end
+
+    if name == "sspp-general-io" then
+        comb.combinator_description = "{}" -- TODO
+    elseif name == "sspp-provide-io" then
+        comb.combinator_description = helpers.table_to_json(combinator_description_to_provide_items(comb))
+    elseif name == "sspp-request-io" then
+        comb.combinator_description = helpers.table_to_json(combinator_description_to_request_items(comb))
     end
 
     storage.entities[comb.unit_number] = comb
@@ -306,10 +277,16 @@ function on_stop_broken(stop_id, stop)
     storage.entities[stop_id] = nil
 
     for _, comb_id in pairs(comb_ids) do
-        local stop_ids = remove_from_nearby_stops(comb_id, stop_id)
+        local stop_ids = storage.comb_stop_ids[comb_id]
+        list_remove_value(stop_ids, stop_id)
+
         for _, other_stop_id in pairs(stop_ids) do
             local other_comb_ids = storage.stop_comb_ids[other_stop_id]
-            try_create_station(storage.entities[other_stop_id], other_comb_ids)
+            local other_combs = {}
+            for _, other_comb_id in pairs(other_comb_ids) do
+                other_combs[#other_combs+1] = storage.entities[other_comb_id] -- might be nil
+            end
+            try_create_station(storage.entities[other_stop_id], other_combs)
         end
     end
 
@@ -330,8 +307,14 @@ function on_comb_broken(comb_id, comb)
     storage.entities[comb_id] = nil
 
     for _, stop_id in pairs(stop_ids) do
-        local comb_ids = remove_from_nearby_combs(stop_id, comb_id)
-        try_create_station(storage.entities[stop_id], comb_ids)
+        local comb_ids = storage.stop_comb_ids[stop_id]
+        list_remove_value(comb_ids, comb_id)
+
+        local other_combs = {}
+        for _, other_comb_id in pairs(comb_ids) do
+            other_combs[#other_combs+1] = storage.entities[other_comb_id] -- might be nil
+        end
+        try_create_station(storage.entities[stop_id], other_combs)
     end
 
     storage.comb_stop_ids[comb_id] = nil
@@ -434,7 +417,7 @@ local function on_hauler_set_to_automatic(hauler)
         list_append_or_create(network.fuel_haulers, hauler.class, train.id)
         hauler.to_fuel = true
         set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
-        send_hauler_to_named_stop(hauler, class.fueler_name)
+        send_hauler_to_fueler(hauler, class)
         return
     end
 
@@ -454,7 +437,7 @@ local function on_hauler_set_to_automatic(hauler)
             list_append_or_create(network.liquidate_haulers, item_key, train.id)
             hauler.to_liquidate = item_key
             set_hauler_status(hauler, { "sspp-alert.holding-cargo" }, item_key)
-            send_hauler_to_named_stop(hauler, class.depot_name)
+            send_hauler_to_depot(hauler, class)
         else
             set_hauler_status(hauler, { "sspp-alert.cargo-not-in-network" }, item_key)
             send_alert_for_train(train, hauler.status)
@@ -466,7 +449,7 @@ local function on_hauler_set_to_automatic(hauler)
     list_append_or_create(network.depot_haulers, hauler.class, train.id)
     hauler.to_depot = true
     set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
-    send_hauler_to_named_stop(hauler, class.depot_name)
+    send_hauler_to_depot(hauler, class)
 end
 
 ---@param hauler Hauler
@@ -543,6 +526,21 @@ local function on_hauler_arrived_at_fuel_stop(hauler)
 end
 
 ---@param hauler Hauler
+local function on_hauler_fully_fueled(hauler)
+    local train = hauler.train
+    local network = storage.networks[hauler.network]
+    local class = network.classes[hauler.class]
+
+    list_remove_value_or_destroy(network.fuel_haulers, hauler.class, train.id)
+    hauler.to_fuel = nil
+
+    list_append_or_create(network.depot_haulers, hauler.class, train.id)
+    hauler.to_depot = true
+    set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
+    send_hauler_to_depot(hauler, class)
+end
+
+---@param hauler Hauler
 local function on_hauler_arrived_at_depot_stop(hauler)
     --- if the name of the stop has changed, then we can try to re-path
     -- local correct_name = storage.networks[hauler.network].classes[hauler.class].depot_name
@@ -582,7 +580,11 @@ local function on_train_changed_state(event)
     end
 
     if new_state == defines.train_state.no_path or new_state == defines.train_state.destination_full then
-        set_hauler_status(hauler, { "sspp-alert.path-broken" })
+        if train.schedule.current == 2 then
+            set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", train.schedule.records[2].station }, hauler.status_item)
+        else
+            set_hauler_status(hauler, { "sspp-alert.path-broken" })
+        end
         send_alert_for_train(train, hauler.status)
         train.manual_mode = true
         return
@@ -608,6 +610,17 @@ local function on_train_changed_state(event)
             on_hauler_arrived_at_depot_stop(hauler)
             return
         end
+    end
+
+    if is_manual and was_manual then
+        -- don't care what the train does while set to manual
+        return
+    end
+
+    if train.schedule.current == 2 then
+        assert(hauler.to_fuel)
+        on_hauler_fully_fueled(hauler)
+        return
     end
 end
 

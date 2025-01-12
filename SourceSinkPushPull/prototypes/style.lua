@@ -37,7 +37,7 @@ styles.sspp_station_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecificat
         type = "vertical_flow_style",
         vertical_spacing = 0,
     },
-    height = 32 + 102 * 4 + 36,
+    height = 32 + (120 + 12) * 4 + 36,
 }
 
 --------------------------------------------------------------------------------
@@ -124,6 +124,13 @@ styles.sspp_compact_slot_button = { ---@type data.ButtonStyleSpecification
     size = 32,
     top_margin = -2,
     bottom_margin = -2,
+}
+
+styles.sspp_station_item_frame = { ---@type data.FrameStyleSpecification
+    type = "frame_style",
+    parent = "invisible_frame",
+    height = 30 * 4,
+    vertical_align = "center",
 }
 
 styles.sspp_station_item_property_flow = { ---@type data.HorizontalFlowStyleSpecification

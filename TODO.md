@@ -1,0 +1,3 @@
+- delete button for classes
+- expanded information/minimaps views
+- update station names when items added to network
