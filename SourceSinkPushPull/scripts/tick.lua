@@ -142,6 +142,8 @@ local function tick_poll()
         local transfer_counts = make_dict_from_signals(station.provide_io, defines.wire_connector_id.combinator_input_green)
         local train_counts = make_dict_from_signals(station.provide_io, defines.wire_connector_id.combinator_input_red)
 
+        station.provide_surplus = {}
+
         for item_key, provide_item in pairs(station.provide_items) do
             local network_item = network.items[item_key]
             if network_item then
@@ -167,6 +169,8 @@ local function tick_poll()
                     hauler_provide_item_key = nil
                 end
 
+                station.provide_surplus[item_key] = count
+
                 local deliveries = len_or_zero(station.provide_deliveries[item_key])
                 local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
                 if want_deliveries > 0 then
@@ -189,6 +193,8 @@ local function tick_poll()
     if station.request_items then
         local transfer_counts = make_dict_from_signals(station.request_io, defines.wire_connector_id.combinator_input_red)
         local train_counts = make_dict_from_signals(station.request_io, defines.wire_connector_id.combinator_input_green)
+
+        station.request_deficit = {}
 
         for item_key, request_item in pairs(station.request_items) do
             local network_item = network.items[item_key]
@@ -217,6 +223,8 @@ local function tick_poll()
 
                 --- for requests, count is the number of items missing
                 count = compute_storage_needed(network_item, request_item) - count
+
+                station.request_deficit[item_key] = count
 
                 local deliveries = len_or_zero(station.request_deliveries[item_key])
                 local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries

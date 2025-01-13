@@ -8,7 +8,7 @@
             "type": "factoriomod",
             "request": "launch",
             "name": "Factorio Mod Debug",
-            "factorioArgs": [ "--load-game", "sspp cs" ]
+            "factorioArgs": [ "--load-game", "sspp py" ]
         },
         {
             "type": "factoriomod",

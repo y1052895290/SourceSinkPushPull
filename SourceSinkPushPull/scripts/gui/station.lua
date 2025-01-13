@@ -107,6 +107,9 @@ local function add_new_provide_row(provide_table, elem_type)
             make_property_flow("sspp-gui.storage-needed", "sspp-gui.provide-storage-needed-tooltip", {
                 type = "label", style = "sspp_station_item_value",
             }),
+            make_property_flow("sspp-gui.current-surplus", "sspp-gui.provide-current-surplus-tooltip", {
+                type = "label", style = "sspp_station_item_value",
+            }),
         } },
     })
 end
@@ -154,6 +157,9 @@ local function add_new_request_row(request_table, elem_type)
             make_property_flow("sspp-gui.storage-needed", "sspp-gui.request-storage-needed-tooltip", {
                 type = "label", style = "sspp_station_item_value",
             }),
+            make_property_flow("sspp-gui.current-deficit", "sspp-gui.provide-current-deficit-tooltip", {
+                type = "label", style = "sspp_station_item_value",
+            }),
         } },
     })
 end
@@ -187,17 +193,17 @@ local function populate_row_from_provide_item(network_items, from_nothing, provi
     if network_item then
         local table_children = provide_table.children
 
-        local fmt_delivery_size = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
-        local fmt_storage_needed = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
+        local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+        local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
         local stack_size = quality and prototypes.item[name].stack_size or 1
 
         local network_children = table_children[i + 2].children
         network_children[1].children[2].caption = network_item.class
-        network_children[2].children[2].caption = { fmt_delivery_size, network_item.delivery_size }
+        network_children[2].children[2].caption = { fmt_items_or_units, network_item.delivery_size }
         network_children[3].children[2].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
 
         local statistics_children = table_children[i + 4].children
-        statistics_children[1].children[2].caption = { fmt_storage_needed, compute_storage_needed(network_item, item) / stack_size }
+        statistics_children[1].children[2].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
     end
 end
 
@@ -227,17 +233,17 @@ local function populate_row_from_request_item(network_items, from_nothing, reque
     if network_item then
         local table_children = request_table.children
 
-        local fmt_delivery_size = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
-        local fmt_storage_needed = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
+        local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+        local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
         local stack_size = quality and prototypes.item[name].stack_size or 1
 
         local network_children = table_children[i + 2].children
         network_children[1].children[2].caption = network_item.class
-        network_children[2].children[2].caption = { fmt_delivery_size, network_item.delivery_size }
+        network_children[2].children[2].caption = { fmt_items_or_units, network_item.delivery_size }
         network_children[3].children[2].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
 
         local statistics_children = table_children[i + 4].children
-        statistics_children[1].children[2].caption = { fmt_storage_needed, compute_storage_needed(network_item, item) / stack_size }
+        statistics_children[1].children[2].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
     end
 end
 
@@ -344,7 +350,42 @@ end
 
 ---@param player_state PlayerState
 function gui.station_poll_finished(player_state)
-    -- TODO
+    local station = storage.stations[player_state.parts.stop.unit_number] --[[@as Station?]]
+    if not station then return end
+
+    if station.provide_surplus then
+        local provide_table = player_state.elements.provide_table
+        local columns, table_children = provide_table.column_count, provide_table.children
+
+        for i = columns, #table_children - 1, columns do
+            local elem_value = table_children[i + 1].elem_value ---@type (table|string)?
+            if elem_value then
+                local _, quality, item_key = gui.extract_elem_value_fields(elem_value)
+
+                local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+
+                local statistics_children = table_children[i + 4].children
+                statistics_children[2].children[2].caption = { fmt_items_or_units, station.provide_surplus[item_key] }
+            end
+        end
+    end
+
+    if station.request_deficit then
+        local request_table = player_state.elements.request_table
+        local columns, table_children = request_table.column_count, request_table.children
+
+        for i = columns, #table_children - 1, columns do
+            local elem_value = table_children[i + 1].elem_value ---@type (table|string)?
+            if elem_value then
+                local _, quality, item_key = gui.extract_elem_value_fields(elem_value)
+
+                local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+
+                local statistics_children = table_children[i + 4].children
+                statistics_children[2].children[2].caption = { fmt_items_or_units, station.request_deficit[item_key] }
+            end
+        end
+    end
 end
 
 --------------------------------------------------------------------------------

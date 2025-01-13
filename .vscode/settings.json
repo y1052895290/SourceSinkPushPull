@@ -10,7 +10,7 @@
     "Lua.workspace.library": [
         ".vscode/factorio/library",
         ".vscode/factorio-data",
-        ".vscode/flib",
+        ".vscode/flib"
     ],
     "Lua.runtime.version": "Lua 5.2",
     "Lua.runtime.path": [

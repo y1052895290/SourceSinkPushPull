@@ -74,6 +74,8 @@
 ---@field public request_items {[ItemKey]: RequestItem}?
 ---@field public provide_deliveries {[ItemKey]: HaulerId[]}?
 ---@field public request_deliveries {[ItemKey]: HaulerId[]}?
+---@field public provide_surplus {[ItemKey]: integer}?
+---@field public request_deficit {[ItemKey]: integer}?
 ---@field public provide_hidden_combs LuaEntity[]?
 ---@field public request_hidden_combs LuaEntity[]?
 ---@field public total_deliveries integer
