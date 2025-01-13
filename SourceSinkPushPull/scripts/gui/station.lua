@@ -350,7 +350,9 @@ end
 
 ---@param player_state PlayerState
 function gui.station_poll_finished(player_state)
-    local station = storage.stations[player_state.parts.stop.unit_number] --[[@as Station?]]
+    local parts = player_state.parts
+    if not parts then return end
+    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
     if not station then return end
 
     if station.provide_surplus then
