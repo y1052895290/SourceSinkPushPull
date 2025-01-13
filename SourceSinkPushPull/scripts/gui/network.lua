@@ -35,7 +35,7 @@ local function handle_class_fueler_name_changed(event)
 end
 
 ---@param event EventData.on_gui_click
-local function handle_class_expand(event)
+local function handle_class_haulers_expand(event)
     -- TODO
 end
 
@@ -62,23 +62,16 @@ local function handle_item_delivery_time_changed(event)
 end
 
 ---@param event EventData.on_gui_click
-local function handle_item_expand(event)
+local function handle_item_stations_expand(event)
+    -- TODO
+end
+
+---@param event EventData.on_gui_click
+local function handle_item_haulers_expand(event)
     -- TODO
 end
 
 --------------------------------------------------------------------------------
-
----@param def flib.GuiElemDef
----@return flib.GuiElemDef
-local function make_right_flow(def)
-    return {
-        type = "flow", style = "horizontal_flow",
-        children = {
-            { type = "empty-widget", style = "flib_horizontal_pusher" },
-            def,
-        },
-    } --[[@as flib.GuiElemDef]]
-end
 
 ---@param class_table LuaGuiElement
 local function add_new_class_row(class_table)
@@ -112,10 +105,11 @@ local function add_new_class_row(class_table)
             text = "",
             handler = { [defines.events.on_gui_text_changed] = handle_class_fueler_name_changed },
         },
-        make_right_flow({
+        {
             type = "sprite-button", style = "sspp_compact_slot_button", sprite = "utility/search",
-            handler = { [defines.events.on_gui_click] = handle_class_expand },
-        }),
+            handler = { [defines.events.on_gui_click] = handle_class_haulers_expand },
+        },
+        { type = "label", style = "label" },
     })
 end
 
@@ -143,13 +137,16 @@ local function add_new_item_row(item_table, elem_type)
             text = "1",
             handler = { [defines.events.on_gui_text_changed] = handle_item_delivery_time_changed },
         },
-        { type = "label", style = "label" },
-        { type = "label", style = "label" },
-        { type = "label", style = "label" },
-        make_right_flow({
+        {
             type = "sprite-button", style = "sspp_compact_slot_button", sprite = "utility/search",
-            handler = { [defines.events.on_gui_click] = handle_item_expand },
-        }),
+            handler = { [defines.events.on_gui_click] = handle_item_stations_expand },
+        },
+        { type = "label", style = "label" },
+        {
+            type = "sprite-button", style = "sspp_compact_slot_button", sprite = "utility/search",
+            handler = { [defines.events.on_gui_click] = handle_item_haulers_expand },
+        },
+        { type = "label", style = "label" },
     })
 end
 
@@ -275,35 +272,53 @@ end
 function gui.network_poll_finished(player_state)
     local network = storage.networks[player_state.network]
 
-    local liquidate_haulers = network.liquidate_haulers
-    local provide_haulers = network.provide_haulers
-    local request_haulers = network.request_haulers
+    local class_hauler_totals = {} ---@type {[ClassName]: integer}
+    do
+        local push_tickets = network.push_tickets
+        local pull_tickets = network.pull_tickets
 
-    local push_tickets = network.push_tickets
-    local provide_tickets = network.provide_tickets
-    local pull_tickets = network.pull_tickets
-    local request_tickets = network.request_tickets
+        local provide_haulers = network.provide_haulers
+        local request_haulers = network.request_haulers
+        local liquidate_haulers = network.liquidate_haulers
 
-    local item_table = player_state.elements.item_table
+        local item_table = player_state.elements.item_table
+        local columns = item_table.column_count
+        local table_children = item_table.children
 
-    local columns = item_table.column_count
-    local table_children = item_table.children
+        for i = columns, #table_children - 1, columns do
+            local elem_value = table_children[i + 1].elem_value ---@type (table|string)?
+            if elem_value then
+                local _, _, item_key = gui.extract_elem_value_fields(elem_value)
 
-    for i = columns, #table_children - 1, columns do
-        local elem_value = table_children[i + 1].elem_value ---@type (table|string)?
-        if elem_value then
-            local _, _, item_key = gui.extract_elem_value_fields(elem_value)
+                local provide_total = len_or_zero(provide_haulers[item_key])
+                local request_total = len_or_zero(request_haulers[item_key])
+                local liquidate_total = len_or_zero(liquidate_haulers[item_key])
 
-            local liquidate_current = len_or_zero(liquidate_haulers[item_key])
-            local provide_current = len_or_zero(provide_haulers[item_key])
-            local request_current = len_or_zero(request_haulers[item_key])
+                table_children[i + 6].caption = { "sspp-gui.fmt-item-demand", len_or_zero(push_tickets[item_key]), len_or_zero(pull_tickets[item_key]) }
+                table_children[i + 8].caption = { "sspp-gui.fmt-item-haulers", provide_total, request_total, liquidate_total }
 
-            local provide_maximum = len_or_zero(push_tickets[item_key]) + len_or_zero(provide_tickets[item_key])
-            local request_maximum = len_or_zero(pull_tickets[item_key]) + len_or_zero(request_tickets[item_key])
+                local class_name = table_children[i + 2].text
+                class_hauler_totals[class_name] = (class_hauler_totals[class_name] or 0) + provide_total + request_total + liquidate_total
+            end
+        end
+    end
 
-            table_children[i + 5].caption = tostring(liquidate_current)
-            table_children[i + 6].caption = tostring(provide_current) .. " / " .. tostring(provide_maximum)
-            table_children[i + 7].caption = tostring(request_current) .. " / " .. tostring(request_maximum)
+    do
+        local depot_haulers = network.depot_haulers
+        local fuel_haulers = network.fuel_haulers
+
+        local class_table = player_state.elements.class_table
+        local columns = class_table.column_count
+        local table_children = class_table.children
+
+        for i = columns, #table_children - 1, columns do
+            local class_name = table_children[i + 2].text
+            if class_name ~= "" then
+                local available = len_or_zero(depot_haulers[class_name])
+                local total = available + (class_hauler_totals[class_name] or 0) + len_or_zero(fuel_haulers[class_name])
+
+                table_children[i + 8].caption = { "sspp-gui.fmt-class-available", available, total }
+            end
         end
     end
 end
@@ -367,14 +382,15 @@ function gui.network_open(player_id, network_name)
                         {
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.classes" } },
                             content = { type = "scroll-pane", style = "sspp_network_left_scroll_pane", direction = "vertical", children = {
-                                { type = "table", name = "class_table", style = "sspp_network_class_table", column_count = 7, children = {
+                                { type = "table", name = "class_table", style = "sspp_network_class_table", column_count = 8, children = {
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.name" }, tooltip = { "sspp-gui.class-name-tooltip" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.item-capacity" }, tooltip = { "sspp-gui.class-item-capacity-tooltip" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.fluid-capacity" }, tooltip = { "sspp-gui.class-fluid-capacity-tooltip" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.depot-name" }, tooltip = { "sspp-gui.class-depot-name-tooltip" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.fueler-name" }, tooltip = { "sspp-gui.class-fueler-name-tooltip" } },
-                                    { type = "empty-widget" },
+                                    { type = "label", style = "bold_label", caption = " [item=locomotive]" },
+                                    { type = "label", style = "bold_label", caption = { "sspp-gui.available" }, tooltip = { "sspp-gui.class-available-tooltip" } },
                                 } },
                                 { type = "flow", style = "horizontal_flow", children = {
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-class" }, handler = handle_add_class },
@@ -390,10 +406,10 @@ function gui.network_open(player_id, network_name)
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.class" }, tooltip = { "sspp-gui.item-class-tooltip" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.delivery-size" }, tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.delivery-time" }, tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
-                                    { type = "label", style = "bold_label", caption = "[img=virtual-signal.signal-skull]", tooltip = { "sspp-gui.liquidate" } },
-                                    { type = "label", style = "bold_label", caption = "[img=virtual-signal.up-arrow]", tooltip = { "sspp-gui.provide" } },
-                                    { type = "label", style = "bold_label", caption = "[img=virtual-signal.down-arrow]", tooltip = { "sspp-gui.request" } },
-                                    { type = "empty-widget" },
+                                    { type = "label", style = "bold_label", caption = " [item=sspp-stop]" },
+                                    { type = "label", style = "bold_label", caption = "[virtual-signal=up-arrow][virtual-signal=down-arrow]", tooltip = { "sspp-gui.item-demand-tooltip" } },
+                                    { type = "label", style = "bold_label", caption = " [item=locomotive]" },
+                                    { type = "label", style = "bold_label", caption = "[virtual-signal=up-arrow][virtual-signal=down-arrow][virtual-signal=signal-skull]", tooltip = { "sspp-gui.item-haulers-tooltip" } },
                                 } },
                                 { type = "flow", style = "horizontal_flow", children = {
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_add_item },
@@ -444,12 +460,13 @@ function gui.network_add_flib_handlers()
         ["network_class_fluid_capacity_changed"] = handle_class_fluid_capacity_changed,
         ["network_class_depot_name_changed"] = handle_class_depot_name_changed,
         ["network_class_fueler_name_changed"] = handle_class_fueler_name_changed,
-        ["network_class_expand"] = handle_class_expand,
+        ["network_class_haulers_expand"] = handle_class_haulers_expand,
         ["network_item_resource_changed"] = handle_item_resource_changed,
         ["network_item_class_changed"] = handle_item_class_changed,
         ["network_item_delivery_size_changed"] = handle_item_delivery_size_changed,
         ["network_item_delivery_time_changed"] = handle_item_delivery_time_changed,
-        ["network_item_expand"] = handle_item_expand,
+        ["network_item_stations_expand"] = handle_item_stations_expand,
+        ["network_item_haulers_expand"] = handle_item_haulers_expand,
         ["network_add_class"] = handle_add_class,
         ["network_add_item"] = handle_add_item,
         ["network_add_fluid"] = handle_add_fluid,
