@@ -2,33 +2,6 @@
 
 --------------------------------------------------------------------------------
 
----@param comb LuaEntity
----@param wire_a defines.wire_connector_id
----@param wire_b defines.wire_connector_id?
----@return {[ItemKey]: integer}
-local function make_dict_from_signals(comb, wire_a, wire_b)
-    local dict = {} ---@type {[ItemKey]: integer}
-    --- TODO: this is a silly workaround to a silly api bug
-    local signals ---@type Signal[]?
-    if wire_b then
-        signals = comb.get_signals(wire_a, wire_b)
-    else
-        signals = comb.get_signals(wire_a)
-    end
-    if signals then
-        for _, signal in pairs(signals) do
-            local id = signal.signal
-            local type = id.type or "item"
-            if type == "item" then
-                dict[id.name .. ":" .. (id.quality or "normal")] = signal.count
-            elseif type == "fluid" then
-                dict[id.name] = signal.count
-            end
-        end
-    end
-    return dict
-end
-
 ---@param list NetworkItemKey[]
 ---@param length integer
 ---@param network_name NetworkName
@@ -270,7 +243,7 @@ local function prepare_for_tick_liquidate()
     storage.tick_state = "LIQUIDATE"
 end
 
-function tick_liquidate()
+local function tick_liquidate()
     local network_name, item_key ---@type NetworkName, ItemKey
 
     repeat
@@ -410,7 +383,7 @@ local function prepare_for_tick_provide_done()
     storage.tick_state = "PROVIDE_DONE"
 end
 
-function tick_provide_done()
+local function tick_provide_done()
     local network_name, item_key ---@type NetworkName, ItemKey
 
     repeat

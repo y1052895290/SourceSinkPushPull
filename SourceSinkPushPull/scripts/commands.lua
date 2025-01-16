@@ -41,9 +41,9 @@ local function reboot_command()
             if name == "entity-ghost" then name = entity.ghost_name end
 
             if name == "sspp-stop" then
-                on_stop_built(entity, nil)
+                main.stop_built(entity, nil)
             elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-                on_comb_built(entity, nil)
+                main.comb_built(entity, nil)
             end
         end
     end

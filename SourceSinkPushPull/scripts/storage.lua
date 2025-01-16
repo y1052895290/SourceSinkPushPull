@@ -178,17 +178,6 @@ function init_network(surface)
         provide_done_tickets = {},
         request_done_tickets = {},
     }
-
-    -- storage.networks[surface.name].classes = {
-    --     ["20 slots"] = { list_index = 1, name = "20 slots", item_slot_capacity = 20, depot_name = "Depot", fueler_name = "Fuel" },
-    --     ["25k units"] = { list_index = 2, name = "25k units", fluid_capacity = 25000, depot_name = "Depot", fueler_name = "Fuel" },
-    -- }
-    -- storage.networks[surface.name].items = {
-    --     ["iron-plate:normal"] = { list_index = 1, name = "iron-plate", quality = "normal", delivery_size = 2000, delivery_time = 60, class = "20 slots" },
-    --     ["coal:normal"] = { list_index = 2, name = "coal", quality = "normal", delivery_size = 1000, delivery_time = 60, class = "20 slots" },
-    --     ["stone:normal"] = { list_index = 3, name = "stone", quality = "normal", delivery_size = 1000, delivery_time = 80, class = "20 slots" },
-    --     ["water"] = { list_index = 4, name = "water", delivery_size = 25000, delivery_time = 60, class = "25k units" },
-    -- }
 end
 
 function populate_mod_settings()
