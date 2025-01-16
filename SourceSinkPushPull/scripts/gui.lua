@@ -129,8 +129,8 @@ function gui.register_event_handlers()
     gui.station_add_flib_handlers()
     gui.hauler_add_flib_handlers()
 
-    flib_gui.handle_events()
-
     script.on_event(defines.events.on_gui_opened, on_gui_opened)
     script.on_event(defines.events.on_gui_closed, on_gui_closed)
+
+    flib_gui.handle_events()
 end

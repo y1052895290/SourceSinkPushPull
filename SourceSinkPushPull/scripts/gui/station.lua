@@ -355,7 +355,9 @@ function gui.station_poll_finished(player_state)
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
     if not station then return end
 
-    if station.provide_surplus then
+    local network_items = storage.networks[station.stop.surface.name].items
+
+    if station.provide_counts then
         local provide_table = player_state.elements.provide_table
         local columns, table_children = provide_table.column_count, provide_table.children
 
@@ -364,15 +366,18 @@ function gui.station_poll_finished(player_state)
             if elem_value then
                 local _, quality, item_key = gui.extract_elem_value_fields(elem_value)
 
-                local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+                local network_item = network_items[item_key]
+                if network_item then
+                    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
 
-                local statistics_children = table_children[i + 4].children
-                statistics_children[2].children[2].caption = { fmt_items_or_units, station.provide_surplus[item_key] }
+                    local statistics_children = table_children[i + 4].children
+                    statistics_children[2].children[2].caption = { fmt_items_or_units, station.provide_counts[item_key] }
+                end
             end
         end
     end
 
-    if station.request_deficit then
+    if station.request_counts then
         local request_table = player_state.elements.request_table
         local columns, table_children = request_table.column_count, request_table.children
 
@@ -381,10 +386,13 @@ function gui.station_poll_finished(player_state)
             if elem_value then
                 local _, quality, item_key = gui.extract_elem_value_fields(elem_value)
 
-                local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+                local network_item = network_items[item_key]
+                if network_item then
+                    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
 
-                local statistics_children = table_children[i + 4].children
-                statistics_children[2].children[2].caption = { fmt_items_or_units, station.request_deficit[item_key] }
+                    local statistics_children = table_children[i + 4].children
+                    statistics_children[2].children[2].caption = { fmt_items_or_units, station.request_counts[item_key] }
+                end
             end
         end
     end

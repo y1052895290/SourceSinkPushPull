@@ -150,7 +150,7 @@ hidden_io_entity = {
 
     type = "arithmetic-combinator",
     name = "sspp-hidden-io",
-    flags = { "placeable-off-grid" },
+    flags = { "placeable-off-grid", "not-on-map", "hide-alt-info" },
     collision_mask = { layers = {} },
     energy_source = { type = "void" },
     active_energy_usage = "1W",

@@ -126,50 +126,61 @@ local function tick_poll()
     if not station_id then return true end
 
     local station = storage.stations[station_id]
-
-    local hauler_provide_item_key, hauler_request_item_key ---@type ItemKey?, ItemKey?
-    if station.hauler then
-        local hauler = storage.haulers[station.hauler]
-        if hauler.to_provide then hauler_provide_item_key = hauler.to_provide.item end
-        if hauler.to_request then hauler_request_item_key = hauler.to_request.item end
-    end
-
     local network = storage.networks[station.stop.surface.name]
 
-    local storage_counts = make_dict_from_signals(station.general_io, defines.wire_connector_id.combinator_input_red, defines.wire_connector_id.combinator_input_green)
+    local hauler_provide_item_key, hauler_request_item_key ---@type ItemKey?, ItemKey?
+
+    local hauler_id = station.hauler
+    if hauler_id then
+        local hauler = storage.haulers[hauler_id]
+        if hauler.to_provide then
+            if hauler.to_provide.phase == "DONE" then
+                hauler_provide_item_key = hauler.to_provide.item
+                list_append_or_create(network.provide_done_tickets, hauler_provide_item_key, station_id)
+            end
+        else
+            if hauler.to_request.phase == "DONE" then
+                hauler_request_item_key = hauler.to_request.item
+                list_append_or_create(network.request_done_tickets, hauler_request_item_key, station_id)
+            end
+        end
+    end
+
+    local storage_counts = {} ---@type {[ItemKey]: integer}
+
+    local storage_signals = station.general_io.get_signals(defines.wire_connector_id.combinator_input_red, defines.wire_connector_id.combinator_input_green)
+    if storage_signals then
+        for _, signal in pairs(storage_signals) do
+            local id = signal.signal
+            local type = id.type or "item"
+            if type == "item" then
+                storage_counts[id.name .. ":" .. (id.quality or "normal")] = signal.count
+            elseif type == "fluid" then
+                storage_counts[id.name] = signal.count
+            end
+        end
+    end
 
     if station.provide_items then
-        local transfer_counts = make_dict_from_signals(station.provide_io, defines.wire_connector_id.combinator_input_green)
-        local train_counts = make_dict_from_signals(station.provide_io, defines.wire_connector_id.combinator_input_red)
-
-        station.provide_surplus = {}
+        local provide_counts = {} ---@type {[ItemKey]: integer}
+        station.provide_counts = provide_counts
 
         for item_key, provide_item in pairs(station.provide_items) do
             local network_item = network.items[item_key]
             if network_item then
-                local storage_count = storage_counts[item_key] or 0
-                local transfer_count = transfer_counts[item_key] or 0
-                local train_count = train_counts[item_key] or 0
-
-                if network_item.quality then
-                    for spoil_result in next_spoil_result, prototypes.item[network_item.name] do
-                        local spoil_result_item_key = spoil_result.name .. ":" .. network_item.quality
-                        transfer_count = transfer_count + (transfer_counts[spoil_result_item_key] or 0)
-                        train_count = train_count + (train_counts[spoil_result_item_key] or 0)
-                    end
-                end
-
-                local count = storage_count + transfer_count
+                -- for provide items, count is the number of items in storage
+                local count = storage_counts[item_key] or 0
+                provide_counts[item_key] = count
 
                 if hauler_provide_item_key == item_key then
-                    if transfer_count == 0 and train_count >= compute_load_target(network_item, provide_item) then
-                        list_append_or_create(network.provide_done_tickets, item_key, station_id)
+                    local minimum_count = station.provide_minimum_active_count ---@type integer
+                    if minimum_count > count then
+                        count = minimum_count
+                    elseif minimum_count < count then
+                        station.provide_minimum_active_count = count
                     end
-                    count = count + train_count -- only include train count if it's the expected item
                     hauler_provide_item_key = nil
                 end
-
-                station.provide_surplus[item_key] = count
 
                 local deliveries = len_or_zero(station.provide_deliveries[item_key])
                 local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
@@ -191,40 +202,25 @@ local function tick_poll()
     end
 
     if station.request_items then
-        local transfer_counts = make_dict_from_signals(station.request_io, defines.wire_connector_id.combinator_input_red)
-        local train_counts = make_dict_from_signals(station.request_io, defines.wire_connector_id.combinator_input_green)
-
-        station.request_deficit = {}
+        local request_counts = {} ---@type {[ItemKey]: integer}
+        station.request_counts = request_counts
 
         for item_key, request_item in pairs(station.request_items) do
             local network_item = network.items[item_key]
             if network_item then
-                local storage_count = storage_counts[item_key] or 0
-                local transfer_count = transfer_counts[item_key] or 0
-                local train_count = train_counts[item_key] or 0
-
-                if network_item.quality then
-                    for spoil_result in next_spoil_result, prototypes.item[network_item.name] do
-                        local spoil_result_item_key = spoil_result.name .. ":" .. network_item.quality
-                        transfer_count = transfer_count + (transfer_counts[spoil_result_item_key] or 0)
-                        train_count = train_count + (train_counts[spoil_result_item_key] or 0)
-                    end
-                end
-
-                local count = storage_count + transfer_count
+                -- for request items, count is the number of items missing from storage
+                local count = compute_storage_needed(network_item, request_item) - (storage_counts[item_key] or 0)
+                request_counts[item_key] = count
 
                 if hauler_request_item_key == item_key then
-                    if train_count == 0 then
-                        list_append_or_create(network.request_done_tickets, item_key, station_id)
+                    local minimum_count = station.request_minimum_active_count ---@type integer
+                    if minimum_count > count then
+                        count = minimum_count
+                    elseif minimum_count < count then
+                        station.request_minimum_active_count = count
                     end
-                    count = count + train_count -- only include train count if it's the expected item
                     hauler_request_item_key = nil
                 end
-
-                --- for requests, count is the number of items missing
-                count = compute_storage_needed(network_item, request_item) - count
-
-                station.request_deficit[item_key] = count
 
                 local deliveries = len_or_zero(station.request_deliveries[item_key])
                 local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
@@ -304,7 +300,7 @@ function tick_liquidate()
 
     list_append_or_create(network.request_haulers, item_key, hauler_id)
     list_append_or_create(request_station.request_deliveries, item_key, hauler_id)
-    hauler.to_request = { item = item_key, station = request_station_id }
+    hauler.to_request = { item = item_key, station = request_station_id, phase = "TRAVEL" }
     request_station.total_deliveries = request_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
@@ -383,7 +379,7 @@ local function tick_dispatch()
 
     list_append_or_create(network.provide_haulers, item_key, hauler_id)
     list_append_or_create(provide_station.provide_deliveries, item_key, hauler_id)
-    hauler.to_provide = { item = item_key, station = provide_station_id }
+    hauler.to_provide = { item = item_key, station = provide_station_id, phase = "TRAVEL" }
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
@@ -436,10 +432,10 @@ function tick_provide_done()
     local hauler_id = assert(provide_station.hauler)
     local hauler = storage.haulers[hauler_id]
 
-    clear_arithmetic_control_behavior(provide_station.provide_io)
     list_remove_value_or_destroy(network.provide_haulers, item_key, hauler_id)
     list_remove_value_or_destroy(provide_station.provide_deliveries, item_key, hauler_id)
     hauler.to_provide = nil
+    provide_station.provide_minimum_active_count = nil
     provide_station.hauler = nil
     provide_station.total_deliveries = provide_station.total_deliveries - 1
 
@@ -453,7 +449,7 @@ function tick_provide_done()
 
     list_append_or_create(network.request_haulers, item_key, hauler_id)
     list_append_or_create(request_station.request_deliveries, item_key, hauler_id)
-    hauler.to_request = { item = item_key, station = request_station_id }
+    hauler.to_request = { item = item_key, station = request_station_id, phase = "TRAVEL" }
     request_station.total_deliveries = request_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
@@ -501,10 +497,10 @@ local function tick_request_done()
     local hauler_id = assert(request_station.hauler)
     local hauler = storage.haulers[hauler_id]
 
-    clear_arithmetic_control_behavior(request_station.request_io)
     list_remove_value_or_destroy(network.request_haulers, item_key, hauler_id)
     list_remove_value_or_destroy(request_station.request_deliveries, item_key, hauler_id)
     hauler.to_request = nil
+    request_station.request_minimum_active_count = nil
     request_station.hauler = nil
     request_station.total_deliveries = request_station.total_deliveries - 1
 
@@ -512,14 +508,14 @@ local function tick_request_done()
     if class then
         if check_if_hauler_needs_fuel(hauler, class) then
             list_append_or_create(network.fuel_haulers, hauler.class, hauler_id)
-            hauler.to_fuel = true
+            hauler.to_fuel = "TRAVEL"
             set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
-            send_hauler_to_fueler(hauler, class)
+            send_hauler_to_named_stop(hauler, class.fueler_name)
         else
             list_append_or_create(network.depot_haulers, hauler.class, hauler_id)
             hauler.to_depot = true
             set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
-            send_hauler_to_depot(hauler, class)
+            send_hauler_to_named_stop(hauler, class.depot_name)
         end
     else
         set_hauler_status(hauler, { "sspp-alert.class-not-in-network" })
@@ -535,19 +531,21 @@ end
 function on_tick()
 
     for _, station in pairs(storage.stations) do
-        if station.provide_items then
-            for _, provide_item in pairs(station.provide_items) do
-                if not provide_item.latency then
-                    provide_item.latency = 30.0
-                end
-            end
+        if station.provide_minimum_active_surplus then
+            station.provide_minimum_active_count = station.provide_minimum_active_surplus
+            station.provide_minimum_active_surplus = nil
         end
-        if station.request_items then
-            for _, request_item in pairs(station.request_items) do
-                if not request_item.latency then
-                    request_item.latency = 30.0
-                end
-            end
+        if station.request_minimum_active_deficit then
+            station.request_minimum_active_count = station.request_minimum_active_deficit
+            station.request_minimum_active_deficit = nil
+        end
+        if station.provide_surplus then
+            station.provide_counts = station.provide_surplus
+            station.provide_surplus = nil
+        end
+        if station.request_deficit then
+            station.request_counts = station.request_deficit
+            station.request_deficit = nil
         end
     end
 

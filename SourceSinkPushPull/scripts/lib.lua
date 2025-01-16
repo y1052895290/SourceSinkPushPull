@@ -205,8 +205,13 @@ end
 ---@param provide_item ProvideItem
 ---@return integer
 function compute_load_target(network_item, provide_item)
-    local granularity = provide_item.granularity
-    return math.floor(network_item.delivery_size / granularity) * granularity
+    local delivery_size, granularity = network_item.delivery_size, provide_item.granularity
+    if network_item.quality then
+        -- for items, granularity is exact, so round down to the nearest multiple of granularity
+        return math.floor(delivery_size / granularity) * granularity
+    end
+    -- for fluids, loading exact amounts is not possible, so just subtract granularity
+    return delivery_size - granularity
 end
 
 ---@param provide_items {[ItemKey]: ProvideItem}?
@@ -437,32 +442,16 @@ function send_hauler_to_station(hauler, station)
 end
 
 ---@param hauler Hauler
----@param class Class
-function send_hauler_to_depot(hauler, class)
+---@param stop_name string
+function send_hauler_to_named_stop(hauler, stop_name)
     local train = hauler.train
 
-    train.schedule = { current = 1, records = { { station = class.depot_name } } }
+    train.schedule = { current = 1, records = { { station = stop_name } } }
     train.recalculate_path()
 
     local state = train.state
     if state == defines.train_state.no_path or state == defines.train_state.destination_full then
-        set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", class.depot_name }, hauler.status_item)
-        send_alert_for_train(train, hauler.status)
-        train.manual_mode = true
-    end
-end
-
----@param hauler Hauler
----@param class Class
-function send_hauler_to_fueler(hauler, class)
-    local train = hauler.train
-
-    train.schedule = { current = 1, records = { { station = class.fueler_name, wait_conditions = { { type = "fuel_full" } } }, { station = class.depot_name } } }
-    train.recalculate_path()
-
-    local state = train.state
-    if state == defines.train_state.no_path or state == defines.train_state.destination_full then
-        set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", class.fueler_name }, hauler.status_item)
+        set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", stop_name }, hauler.status_item)
         send_alert_for_train(train, hauler.status)
         train.manual_mode = true
     end
@@ -564,8 +553,8 @@ function ensure_hidden_combs(comb, hidden_combs, items)
         local name, quality = split_item_key(item_key)
         if quality then
             local spoil_depth = 0
-            for _ in next_spoil_result, prototypes.item[name] do
-                spoil_depth = spoil_depth + 1
+            for i, _ in enumerate_spoil_results(prototypes.item[name]) do
+                spoil_depth = i
             end
             if spoil_depth > new_spoil_depth then
                 new_spoil_depth = spoil_depth
@@ -598,12 +587,17 @@ function destroy_hidden_combs(hidden_combs)
     end
 end
 
---------------------------------------------------------------------------------
-
----@param proto LuaItemPrototype
-function next_spoil_result(proto)
-    return proto.spoil_result
+---@param hidden_combs LuaEntity[]?
+function clear_hidden_comb_control_behaviors(hidden_combs)
+    if hidden_combs then
+        for _, hidden_comb in pairs(hidden_combs) do
+            local cb = hidden_comb.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
+            cb.parameters = nil
+        end
+    end
 end
+
+--------------------------------------------------------------------------------
 
 ---@param proto LuaItemPrototype
 function enumerate_spoil_results(proto)

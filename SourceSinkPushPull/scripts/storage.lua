@@ -10,6 +10,7 @@
 ---@alias HaulerId uint
 ---@alias PlayerId uint
 ---@alias TickState "INITIAL"|"POLL"|"LIQUIDATE"|"DISPATCH"|"PROVIDE_DONE"|"REQUEST_DONE"
+---@alias HaulerPhase "TRAVEL"|"TRANSFER"|"DONE"
 
 ---@class (exact) SourceSinkPushPull.Storage
 ---@field public tick_state TickState
@@ -72,10 +73,12 @@
 ---@field public request_io LuaEntity?
 ---@field public provide_items {[ItemKey]: ProvideItem}?
 ---@field public request_items {[ItemKey]: RequestItem}?
+---@field public provide_counts {[ItemKey]: integer}?
+---@field public request_counts {[ItemKey]: integer}?
+---@field public provide_minimum_active_count integer?
+---@field public request_minimum_active_count integer?
 ---@field public provide_deliveries {[ItemKey]: HaulerId[]}?
 ---@field public request_deliveries {[ItemKey]: HaulerId[]}?
----@field public provide_surplus {[ItemKey]: integer}?
----@field public request_deficit {[ItemKey]: integer}?
 ---@field public provide_hidden_combs LuaEntity[]?
 ---@field public request_hidden_combs LuaEntity[]?
 ---@field public total_deliveries integer
@@ -102,7 +105,7 @@
 ---@field public class ClassName
 ---@field public to_provide HaulerToStation?
 ---@field public to_request HaulerToStation?
----@field public to_fuel true?
+---@field public to_fuel HaulerPhase?
 ---@field public to_depot true?
 ---@field public to_liquidate ItemKey?
 ---@field public status LocalisedString
@@ -112,6 +115,7 @@
 ---@class (exact) HaulerToStation
 ---@field public item ItemKey
 ---@field public station StationId
+---@field public phase HaulerPhase
 
 --------------------------------------------------------------------------------
 
