@@ -1,10 +1,10 @@
 {
     "name": "SourceSinkPushPull",
     "version": "0.0.1",
-    "title": "SSPP Train System",
+    "title": "SSPP Logistics Train Mod",
     "author": "jagoly",
     "factorio_version": "2.0",
-    "description": "Source-Sink-Push-Pull, or SSPP, is a simple algorithm for dispatching trains.",
+    "description": "A logistics train mod that aims to be as pleasant to use as possible, even when knee-deep in byproducts. SSPP stands for Source-Sink-Push-Pull.",
     "dependencies": [
         "base",
         "flib >= 0.16.0",

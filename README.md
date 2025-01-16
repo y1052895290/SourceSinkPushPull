@@ -1,3 +1,19 @@
-# Source-Sink-Push-Pull Train System for Factorio
+# <img src="SourceSinkPushPull/thumbnail.png" align="left" width=72px> Source-Sink-Push-Pull <br> Opinionated Logistics Train Mod
 
-![](SourceSinkPushPull/thumbnail.png)
+A logistics train mod that aims to be as pleasant to use as possible, even when knee-deep in byproducts.
+
+## Getting Started
+
+TODO
+
+## Networks
+
+TODO
+
+## Classes
+
+TODO
+
+## Stations
+
+TODO

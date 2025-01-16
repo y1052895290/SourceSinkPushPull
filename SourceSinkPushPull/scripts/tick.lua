@@ -502,26 +502,6 @@ end
 -------------------------------------------------------------------------------
 
 function on_tick()
-
-    for _, station in pairs(storage.stations) do
-        if station.provide_minimum_active_surplus then
-            station.provide_minimum_active_count = station.provide_minimum_active_surplus
-            station.provide_minimum_active_surplus = nil
-        end
-        if station.request_minimum_active_deficit then
-            station.request_minimum_active_count = station.request_minimum_active_deficit
-            station.request_minimum_active_deficit = nil
-        end
-        if station.provide_surplus then
-            station.provide_counts = station.provide_surplus
-            station.provide_surplus = nil
-        end
-        if station.request_deficit then
-            station.request_counts = station.request_deficit
-            station.request_deficit = nil
-        end
-    end
-
     local tick_state = storage.tick_state
 
     if tick_state == "POLL" then
