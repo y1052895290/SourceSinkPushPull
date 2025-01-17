@@ -6,6 +6,8 @@ local flib_gui = require("__flib__.gui")
 
 ---@param event EventData.on_gui_click
 local function handle_class_delete(event)
+    local element = event.element
+    element.parent.children[element.get_index_in_parent() + 1].text = ""
     gui.update_network_after_change(event.player_index, true)
 end
 
