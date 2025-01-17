@@ -56,7 +56,7 @@ For those looking to do more advanced setups, the exact inputs/outputs of each c
 
 ## Depots and Fuelers
 
-In SSPP, a *depot* or *fueler* is simply a vanilla train stop with the appropriate name. Depots **must** be configured with a train limit of one, as trains waiting behind others may still be tasked with new deliveries. Fuelers **must** be configured with a train limit of zero, as SSPP expects a fueler to always be available.
+In SSPP, a *depot* or *fueler* is simply a vanilla train stop with the appropriate name. Depots **must** be configured with a train limit of one, as trains waiting behind others may still be tasked with new deliveries. Fuelers **must** be configured with no train limit, unless you have as many of them as you have trains, as SSPP expects a fueler to always be available.
 
 ## FAQ
 
