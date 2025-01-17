@@ -6,8 +6,8 @@ Check out the blueprint book (TODO) to get started.
 
 ## Networks
 
-Every surface (planet) has an associated *network*. To open the network configuration window, click the Network button from any *station* or *train*. This is where you configure all of the items/fluids that SSPP will distribute. For each item/fluid, you must define a few things:
-- Class: The name of the *class* of train that should deliver this item/fluid.
+Every surface (planet) has an associated *network*. To open the network configuration window, click the Network button from any station or train. This is where you configure all of the items/fluids that SSPP will distribute. For each item/fluid, you must define a few things:
+- Class: The name of the class of train that should deliver this item/fluid.
 - Delivery Size: The amount of this item/fluid in one delivery. Larger values mean less congestion, but also larger buffers.
 - Delivery Time: The maximum travel time from any depot to any provider to any requester. Larger values mean larger buffers.
 
@@ -15,19 +15,15 @@ Additionally, from this view you can see current demand and active deliveries fo
 
 ## Classes
 
-Within a *network*, you must define at least one *class* of train to make deliveries. A class represents a train layout where every train is interchangeable. For each class, you must define a few things:
-- Name: The unique name used to identify this class. Used when assigning a *train* to this class.
+Within a network, you must define at least one *class* of train to make deliveries. A class represents a train layout where every train is interchangeable. For each class, you must define a few things:
+- Name: The unique name used to identify this class. Used when assigning a train to this class.
 - Item Capacity and/or Fluid Capacity: The item slot capacity and fluid capacity of every train.
-- Depot Name: The name of the *depot* train stops to go to when not busy.
-- Fueler Name: The name of the *fueler* train stops to go to when low on fuel. Required, but may be the same as the depot name.
+- Depot Name: The name of the depot train stops to go to when not busy.
+- Fueler Name: The name of the fueler train stops to go to when low on fuel. Required, but may be the same as the depot name.
 
 Additionally, from this view you can see the number of available trains for each class. Click the button to see the locations of assigned trains.
 
-## Trains
-
-To actually add a *train* to a *class*, click on the train that you wish to add. In the bottom right, you will see a new SSPP widget. Switch the train to manual, and then type the name of a class into the text box. Switch the train back to automatic, and the train will automatically head to the depot, ready for work.
-
-Additionally, from this view you can also see the current status of the train. If something goes wrong, check here to get more information.
+To actually add a train to a class, click on the train that you wish to add. In the bottom right, you will see a new SSPP widget. Switch the train to manual, and then type the name of a class into the text box. Switch the train back to automatic, and the train will automatically head to the depot, ready for work.
 
 ## Stations
 
