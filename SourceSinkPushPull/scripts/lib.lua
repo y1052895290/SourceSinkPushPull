@@ -285,7 +285,7 @@ function combinator_description_to_provide_items(provide_io)
     local items = {} ---@type {[ItemKey]: ProvideItem}
     local indices = {} ---@type {[integer]: true?}
 
-    for item_key, json_item in pairs(json.provide_items or json) do
+    for item_key, json_item in pairs(json) do
         local name, quality = split_item_key(item_key)
         if quality then
             if not prototypes.item[name] then goto continue end
@@ -337,7 +337,7 @@ function combinator_description_to_request_items(request_io)
     local items = {} ---@type {[ItemKey]: RequestItem}
     local indices = {} ---@type {[integer]: true?}
 
-    for item_key, json_item in pairs(json.request_items or json) do
+    for item_key, json_item in pairs(json) do
         local name, quality = split_item_key(item_key)
         if quality then
             if not prototypes.item[name] then goto continue end

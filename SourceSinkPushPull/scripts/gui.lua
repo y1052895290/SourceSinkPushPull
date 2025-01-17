@@ -16,8 +16,7 @@ local function on_gui_opened(event)
         local entity = event.entity ---@type LuaEntity
         local name = entity.name
         if name == "entity-ghost" then name = entity.ghost_name end
-        -- if name == "sspp-stop" or name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-        if name == "sspp-stop" then
+        if name == "sspp-stop" or name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
             gui.station_open(event.player_index, entity)
         elseif entity.type == "locomotive" then
             gui.hauler_opened(event.player_index, entity.train.id)

@@ -519,7 +519,7 @@ local function add_gui_incomplete(player)
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close },
             } },
-            { type = "label", style = "label", caption = { "sspp-gui.incomplete-station-message" } },
+            { type = "label", style = "info_label", caption = { "sspp-gui.incomplete-station-message" } },
         } },
     })
 end

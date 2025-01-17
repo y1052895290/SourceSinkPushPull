@@ -1,3 +1,2 @@
 - expanded information/minimaps views
 - investigate how editor extensions does % text boxes
-- improve incomplete station message (make bullet list)
