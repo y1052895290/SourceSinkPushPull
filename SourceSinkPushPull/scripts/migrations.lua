@@ -3,7 +3,7 @@
 local flib_migration = require("__flib__.migration")
 
 local migrations_table = {
-    ["0.0.1"] = function()
+    ["0.1.0"] = function()
         -- do stuff
     end,
 }
