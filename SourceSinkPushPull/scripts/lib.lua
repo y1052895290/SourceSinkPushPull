@@ -499,7 +499,7 @@ function get_station_parts(entity)
     else
         local stop_ids = storage.comb_stop_ids[entity.unit_number]
         if #stop_ids ~= 1 then return nil end
-        stop = stop_ids[1]
+        stop = storage.entities[stop_ids[1]]
     end
 
     local comb_ids = storage.stop_comb_ids[stop.unit_number]
