@@ -134,7 +134,7 @@ end
 
 ---@param stop LuaEntity
 ---@param ghost_unit_number uint?
-function main.on_stop_built(stop, ghost_unit_number)
+function main.stop_built(stop, ghost_unit_number)
     if ghost_unit_number then
         main.stop_broken(ghost_unit_number, nil)
     end

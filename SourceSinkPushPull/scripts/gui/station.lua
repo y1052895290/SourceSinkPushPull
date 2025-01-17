@@ -499,7 +499,7 @@ local function add_gui_complete(player, provide, request)
                 } },
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
-                        { type = "label", style = "subheader_caption_label", caption = { "sspp-gui.deliveries" } },
+                        { type = "label", style = "subheader_caption_label", caption = "TODO" },
                     } },
                 } },
             } },
