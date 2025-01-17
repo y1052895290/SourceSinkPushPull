@@ -7,27 +7,27 @@ local flib_gui = require("__flib__.gui")
 ---@param event EventData.on_gui_elem_changed
 local function handle_resource_changed(event)
     local clear = event.element.elem_value == nil
-    gui.update_station_after_change(event.player_index, clear)
+    gui.update_station_after_change(event.player_index, clear, true)
 end
 
 ---@param event EventData.on_gui_switch_state_changed
 local function handle_mode_changed(event)
-    gui.update_station_after_change(event.player_index, false)
+    gui.update_station_after_change(event.player_index, false, false)
 end
 
 ---@param event EventData.on_gui_text_changed
 local function handle_throughput_changed(event)
-    gui.update_station_after_change(event.player_index, false)
+    gui.update_station_after_change(event.player_index, false, false)
 end
 
 ---@param event EventData.on_gui_text_changed
 local function handle_granularity_changed(event)
-    gui.update_station_after_change(event.player_index, false)
+    gui.update_station_after_change(event.player_index, false, false)
 end
 
 ---@param event EventData.on_gui_text_changed
 local function handle_latency_changed(event)
-    gui.update_station_after_change(event.player_index, false)
+    gui.update_station_after_change(event.player_index, false, false)
 end
 
 --------------------------------------------------------------------------------
@@ -292,7 +292,8 @@ end
 
 ---@param player_id PlayerId
 ---@param from_nothing boolean
-function gui.update_station_after_change(player_id, from_nothing)
+---@param update_name boolean
+function gui.update_station_after_change(player_id, from_nothing, update_name)
     local player_state = storage.player_states[player_id]
 
     local parts = assert(player_state.parts)
@@ -338,7 +339,7 @@ function gui.update_station_after_change(player_id, from_nothing)
         gui.populate_table_from_dict(from_nothing, request_table, request_items, bind_1_of_6(populate_row_from_request_item, network_items))
     end
 
-    if from_nothing and station then
+    if update_name and station then
         --- note that we don't need to update schedules, the game will do that for us
         local new_stop_name = compute_stop_name(station.provide_items, station.request_items)
         station.stop.backer_name = new_stop_name

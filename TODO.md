@@ -1,5 +1,3 @@
-- delete button for classes
 - expanded information/minimaps views
-- update station names when items added to network
 - investigate how editor extensions does % text boxes
 - improve incomplete station message (make bullet list)
