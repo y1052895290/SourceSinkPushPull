@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.1.1
+Date: 2025-01-17
+  Changes:
+    - Add py science pack 1 to pyanodon's technology
+  Bugfixes:
+    - Fixed opening the station gui via combinators
+---------------------------------------------------------------------------------------------------
 Version: 0.1.0
 Date: 2025-01-17
   Features:
