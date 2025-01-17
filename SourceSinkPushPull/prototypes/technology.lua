@@ -2,6 +2,7 @@
 
 --------------------------------------------------------------------------------
 
+---@type data.TechnologyPrototype
 technology = flib.copy_prototype(data.raw["technology"]["automated-rail-transportation"], "sspp-train-system")
 
 technology.icon = "__SourceSinkPushPull__/graphics/technology.png"
@@ -20,6 +21,5 @@ technology.unit.count = 200
 technology.order = "c-g-c"
 
 if mods["pypostprocessing"] then
-    -- TODO: put in late py science 1 or early logistic
-    technology.unit.ingredients[2] = nil
+    technology.unit.ingredients[2][1] = "py-science-pack-1"
 end
