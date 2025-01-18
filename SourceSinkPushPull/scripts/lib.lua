@@ -57,6 +57,24 @@ function list_extend_or_create(object, key, value, copies)
     end
 end
 
+--- Remove a value from a list if it exists.
+---@generic T
+---@param list T[]
+---@param value T
+function list_remove_value_if_exists(list, value)
+    local length = #list
+
+    for index = 1, length do
+        if list[index] == value then
+            if length > 1 then
+                list[index] = list[length]
+            end
+            list[length] = nil
+            return
+        end
+    end
+end
+
 --- Remove a known value from a list.
 ---@generic T
 ---@param list T[]
