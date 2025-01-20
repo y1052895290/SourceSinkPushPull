@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.2.0
+Date: 2025-01-21
+  Features:
+    - Implement the train and station grid views for network classes and items
+    - The automatic station name now truncates cleanly for stations with many items
+  Changes:
+    - Made json more compact. Blueprints will lose their settings hopefully for the last time.
+  Bugfixes:
+    - Fixed crash due to old station ids not getting removed (reported by @Serjevski)
+    - Fixed problems related to exceeding combinator_description max length
+---------------------------------------------------------------------------------------------------
 Version: 0.1.1
 Date: 2025-01-17
   Changes:
