@@ -11,6 +11,7 @@
 ---@alias PlayerId uint
 ---@alias TickState "INITIAL"|"POLL"|"LIQUIDATE"|"DISPATCH"|"PROVIDE_DONE"|"REQUEST_DONE"
 ---@alias HaulerPhase "TRAVEL"|"TRANSFER"|"DONE"
+---@alias PlayerGui PlayerNetworkGui|PlayerStationGui|PlayerHaulerGui
 
 ---@class (exact) SourceSinkPushPull.Storage
 ---@field public tick_state TickState
@@ -20,7 +21,7 @@
 ---@field public networks {[NetworkName]: Network}
 ---@field public stations {[StationId]: Station}
 ---@field public haulers {[HaulerId]: Hauler}
----@field public player_states {[PlayerId]: PlayerState}
+---@field public player_guis {[PlayerId]: PlayerGui}
 ---@field public poll_stations StationId[]
 ---@field public liquidate_items NetworkItemKey[]
 ---@field public dispatch_items NetworkItemKey[]
@@ -67,6 +68,7 @@
 --------------------------------------------------------------------------------
 
 ---@class (exact) Station
+---@field public network NetworkName
 ---@field public stop LuaEntity
 ---@field public general_io LuaEntity
 ---@field public provide_io LuaEntity?
@@ -126,11 +128,22 @@
 ---@field public provide_io LuaEntity?
 ---@field public request_io LuaEntity?
 
----@class (exact) PlayerState
+---@class (exact) PlayerNetworkGui
 ---@field public network NetworkName
----@field public entity LuaEntity?
+---@field public elements {[string]: LuaGuiElement}
+---@field public haulers_class ClassName?
+---@field public haulers_item ItemKey?
+---@field public stations_item ItemKey?
+
+---@class (exact) PlayerStationGui
+---@field public network NetworkName
+---@field public unit_number uint
 ---@field public parts StationParts?
----@field public train LuaTrain?
+---@field public elements {[string]: LuaGuiElement}
+
+---@class (exact) PlayerHaulerGui
+---@field public network NetworkName
+---@field public train LuaTrain
 ---@field public elements {[string]: LuaGuiElement}
 
 --------------------------------------------------------------------------------
@@ -151,7 +164,7 @@ function init_storage()
     storage.networks = {}
     storage.stations = {}
     storage.haulers = {}
-    storage.player_states = {}
+    storage.player_guis = {}
     storage.poll_stations = {}
     storage.liquidate_items = {}
     storage.dispatch_items = {}

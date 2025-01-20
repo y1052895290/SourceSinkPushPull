@@ -68,7 +68,7 @@ local function try_create_station(stop, combs)
     local request_io = combs_by_name["sspp-request-io"]
     if not (provide_io or request_io) then return end
 
-    local station = { stop = stop, general_io = general_io, total_deliveries = 0 } ---@type Station
+    local station = { network = stop.surface.name, stop = stop, general_io = general_io, total_deliveries = 0 } ---@type Station
 
     if provide_io then
         local stop_connector = stop.get_wire_connector(defines.wire_connector_id.circuit_red, true)
@@ -101,12 +101,14 @@ local function try_create_station(stop, combs)
     storage.stations[station_id] = station
 end
 
----@param entity_id uint
-local function try_close_entity_guis(entity_id)
-    for player_id, player_state in pairs(storage.player_states) do
-        local parts = player_state.parts
-        if parts and parts.ids[entity_id] then
-            gui.station_closed(player_id, player_state.elements["sspp-station"])
+---@param unit_number uint
+local function try_close_entity_guis(unit_number)
+    for player_id, player_gui in pairs(storage.player_guis) do
+        if player_gui.unit_number then
+            ---@cast player_gui PlayerStationGui
+            if player_gui.unit_number == unit_number or player_gui.parts and player_gui.parts.ids[unit_number] then
+                gui.station_closed(player_id, player_gui.elements["sspp-station"])
+            end
         end
     end
 end
@@ -189,9 +191,9 @@ function main.comb_built(comb, ghost_unit_number)
     if name == "sspp-general-io" then
         comb.combinator_description = "{}" -- TODO
     elseif name == "sspp-provide-io" then
-        comb.combinator_description = helpers.table_to_json(combinator_description_to_provide_items(comb))
+        comb.combinator_description = provide_items_to_combinator_description(combinator_description_to_provide_items(comb))
     elseif name == "sspp-request-io" then
-        comb.combinator_description = helpers.table_to_json(combinator_description_to_request_items(comb))
+        comb.combinator_description = request_items_to_combinator_description(combinator_description_to_request_items(comb))
     end
 
     storage.entities[comb.unit_number] = comb

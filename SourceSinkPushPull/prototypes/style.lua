@@ -23,7 +23,15 @@ styles.sspp_network_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecificat
         type = "vertical_flow_style",
         vertical_spacing = 0,
     },
-    height = 32 + 36 * 12 + 36,
+    height = 28 + 36 * 15 + 36,
+}
+
+styles.sspp_network_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
+    type = "scroll_pane_style",
+    parent = "naked_scroll_pane",
+    padding = 0,
+    background_graphical_set = deep_slot_background_tiling(152, 152),
+    height = 640,
 }
 
 styles.sspp_station_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
@@ -58,11 +66,7 @@ styles.sspp_network_class_table = { ---@type data.TableStyleSpecification
         { column = 7, width = 32 },
         { column = 8, width = 80 },
     },
-    odd_row_graphical_set = {
-        filename = "__core__/graphics/gui-new.png",
-        position = { 472, 25 },
-        size = 1,
-    },
+    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
     vertical_spacing = 0,
 }
@@ -83,11 +87,7 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
         { column = 7, width = 32 },
         { column = 8, width = 188 },
     },
-    odd_row_graphical_set = {
-        filename = "__core__/graphics/gui-new.png",
-        position = { 472, 25 },
-        size = 1,
-    },
+    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
     vertical_spacing = 0,
 }
@@ -107,14 +107,17 @@ styles.sspp_station_item_table = { ---@type data.TableStyleSpecification
         { column = 3, width = 200 },
         { column = 4, width = 200 },
     },
-    odd_row_graphical_set = {
-        filename = "__core__/graphics/gui-new.png",
-        position = { 472, 25 },
-        size = 1,
-    },
+    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
     vertical_spacing = 0,
-    horizontal_align = "right",
+}
+
+styles.sspp_network_grid_table = { ---@type data.TableStyleSpecification
+    type = "table_style",
+    parent = "table",
+    width = 152 * 3,
+    horizontal_spacing = 0,
+    vertical_spacing = 0,
 }
 
 --------------------------------------------------------------------------------
@@ -176,6 +179,43 @@ styles.sspp_aligned_switch = { ---@type data.SwitchStyleSpecification
     parent = "switch",
     horizontal_align = "center",
     vertical_align = "center",
+}
+
+styles.sspp_minimap = { ---@type data.MinimapStyleSpecification
+    type = "minimap_style",
+    parent = "minimap",
+    size = 128,
+}
+
+styles.sspp_minimap_button = { ---@type data.ButtonStyleSpecification
+    type = "button_style",
+    parent = "locomotive_minimap_button",
+    size = 128,
+    hovered_graphical_set = {
+		base = { position = { 81, 80 }, size = 1, opacity = 0.7 },
+	},
+    clicked_graphical_set = {
+        base = { position = { 70, 146 }, size = 1, opacity = 0.7 },
+    },
+    default_graphical_set = {},
+}
+
+styles.sspp_minimap_top_label = { ---@type data.LabelStyleSpecification
+    type = "label_style",
+    parent = "semibold_label",
+    size = 128,
+    padding = 4,
+    horizontal_align = "left",
+    vertical_align = "top",
+}
+
+styles.sspp_minimap_bottom_label = { ---@type data.LabelStyleSpecification
+    type = "label_style",
+    parent = "semibold_label",
+    size = 128,
+    padding = 4,
+    horizontal_align = "right",
+    vertical_align = "bottom",
 }
 
 styles.sspp_frame_tool_button = { ---@type data.ButtonStyleSpecification

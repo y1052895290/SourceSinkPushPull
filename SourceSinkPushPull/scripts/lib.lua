@@ -264,11 +264,54 @@ function compute_stop_name(provide_items, request_items)
     end
 
     if provide_icons and request_icons then
-        return "[virtual-signal=up-arrow]" .. table.concat(provide_icons) .. " / " .. "[virtual-signal=down-arrow]" .. table.concat(request_icons)
+        local provide_string, request_string, total_length = "", "", 0
+        local max_length = 199 - #"[virtual-signal=up-arrow]" - #"…" - #" / " - #"[virtual-signal=down-arrow]" - #"…"
+        local p, r, p_len, r_len = 1, 1, #provide_icons, #request_icons
+        repeat
+            if p < p_len then
+                p = p + 1
+                local icon = provide_icons[p]
+                total_length = total_length + #icon
+                if total_length > max_length then
+                    p, icon = p_len, "…"
+                end
+                request_string = request_string .. icon
+            end
+            if r < r_len then
+                r = r + 1
+                local icon = provide_icons[r]
+                total_length = total_length + #icon
+                if total_length > max_length then
+                    r, icon = r_len, "…"
+                end
+                request_string = request_string .. icon
+            end
+        until p == p_len and r == r_len
+        return "[virtual-signal=up-arrow]" .. provide_string .. " / " .. "[virtual-signal=down-arrow]" .. request_string
     elseif provide_icons then
-        return "[virtual-signal=up-arrow]" .. table.concat(provide_icons)
+        local max_length = 199 - #"[virtual-signal=up-arrow]" - #"…"
+        local provide_string, length = "", 0
+        for _, icon in pairs(provide_icons) do
+            length = length + #icon
+            if length > max_length then
+                provide_string = provide_string .. "…"
+                break
+            end
+            provide_string = provide_string .. icon
+        end
+        return "[virtual-signal=up-arrow]" .. provide_string
     elseif request_icons then
-        return "[virtual-signal=down-arrow]" .. table.concat(request_icons)
+        local max_length = 199 - #"[virtual-signal=down-arrow]" - #"…"
+        local request_string, length = "", 0
+        for _, icon in pairs(request_icons) do
+            length = length + #icon
+            if length > max_length then
+                request_string = request_string .. "…"
+                break
+            end
+            request_string = request_string .. icon
+        end
+        return "[virtual-signal=down-arrow]" .. request_string
     end
 
     return "[virtual-signal=signal-ghost]"
@@ -311,19 +354,19 @@ function combinator_description_to_provide_items(provide_io)
             if not prototypes.fluid[name] then goto continue end
         end
 
-        local list_index = json_item.list_index
+        local list_index = json_item[1]
         if type(list_index) ~= "number" then list_index = 0 end
 
-        local push = json_item.push
+        local push = json_item[2]
         if type(push) ~= "boolean" then push = false end
 
-        local throughput = json_item.throughput
+        local throughput = json_item[3]
         if type(throughput) ~= "number" then throughput = 0.0 end
 
-        local latency = json_item.latency
+        local latency = json_item[4]
         if type(latency) ~= "number" then latency = 30 end
 
-        local granularity = json_item.granularity
+        local granularity = json_item[5]
         if type(granularity) ~= "number" then granularity = 1 end
 
         items[item_key] = { list_index = list_index, push = push, throughput = throughput, latency = latency, granularity = granularity }
@@ -342,6 +385,16 @@ function combinator_description_to_provide_items(provide_io)
     end
 
     return items
+end
+
+---@param provide_items {[ItemKey]: ProvideItem}
+---@return string
+function provide_items_to_combinator_description(provide_items)
+    local json = {}
+    for item_key, item in pairs(provide_items) do
+        json[item_key] = { item.list_index, item.push, item.throughput, item.latency, item.granularity }
+    end
+    return helpers.table_to_json(json)
 end
 
 ---@param request_io LuaEntity
@@ -363,16 +416,16 @@ function combinator_description_to_request_items(request_io)
             if not prototypes.fluid[name] then goto continue end
         end
 
-        local list_index = json_item.list_index
+        local list_index = json_item[1]
         if type(list_index) ~= "number" then list_index = 0 end
 
-        local pull = json_item.pull
+        local pull = json_item[2]
         if type(pull) ~= "boolean" then pull = false end
 
-        local throughput = json_item.throughput
+        local throughput = json_item[3]
         if type(throughput) ~= "number" then throughput = 0.0 end
 
-        local latency = json_item.latency
+        local latency = json_item[4]
         if type(latency) ~= "number" then latency = 30 end
 
         items[item_key] = { list_index = list_index, pull = pull, throughput = throughput, latency = latency }
@@ -393,6 +446,16 @@ function combinator_description_to_request_items(request_io)
     return items
 end
 
+---@param request_items {[ItemKey]: RequestItem}
+---@return string
+function request_items_to_combinator_description(request_items)
+    local json = {}
+    for item_key, item in pairs(request_items) do
+        json[item_key] = { item.list_index, item.pull, item.throughput, item.latency }
+    end
+    return helpers.table_to_json(json)
+end
+
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
@@ -403,10 +466,12 @@ function set_hauler_status(hauler, message, item, stop)
     hauler.status = message
     hauler.status_item = item
     hauler.status_stop = stop
-    for _, player_state in pairs(storage.player_states) do
-        local train = player_state.train
-        if train and train.id == hauler.train.id then
-            gui.hauler_status_changed(player_state)
+    for _, player_gui in pairs(storage.player_guis) do
+        if player_gui.train then
+            ---@cast player_gui PlayerHaulerGui
+            if player_gui.train.id == hauler.train.id then
+                gui.hauler_status_changed(player_gui)
+            end
         end
     end
 end

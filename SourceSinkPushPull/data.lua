@@ -5,6 +5,7 @@ flib = require("__flib__.data-util")
 require("prototypes.entity")
 require("prototypes.item")
 require("prototypes.technology")
+require("prototypes.sprite")
 
 data:extend({
     stop_entity,
@@ -21,6 +22,8 @@ data:extend({
     provide_io_recipe,
     request_io_recipe,
     technology,
+    sspp_fuel_icon,
+    sspp_depot_icon,
 })
 
 require("prototypes.style")

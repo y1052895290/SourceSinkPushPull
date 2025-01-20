@@ -1,34 +1,35 @@
 -- SSPP by jagoly
 
 local flib_gui = require("__flib__.gui")
+local events = defines.events
 
 --------------------------------------------------------------------------------
 
 ---@param event EventData.on_gui_elem_changed
-local function handle_resource_changed(event)
+local handle_resource_changed = { [events.on_gui_elem_changed] = function(event)
     local clear = event.element.elem_value == nil
     gui.update_station_after_change(event.player_index, clear, true)
-end
+end }
 
 ---@param event EventData.on_gui_switch_state_changed
-local function handle_mode_changed(event)
+local handle_mode_changed = { [events.on_gui_switch_state_changed] = function(event)
     gui.update_station_after_change(event.player_index, false, false)
-end
+end }
 
 ---@param event EventData.on_gui_text_changed
-local function handle_throughput_changed(event)
+local handle_throughput_changed = { [events.on_gui_text_changed] = function(event)
     gui.update_station_after_change(event.player_index, false, false)
-end
+end }
 
 ---@param event EventData.on_gui_text_changed
-local function handle_granularity_changed(event)
+local handle_granularity_changed = { [events.on_gui_text_changed] = function(event)
     gui.update_station_after_change(event.player_index, false, false)
-end
+end }
 
 ---@param event EventData.on_gui_text_changed
-local function handle_latency_changed(event)
+local handle_latency_changed = { [events.on_gui_text_changed] = function(event)
     gui.update_station_after_change(event.player_index, false, false)
-end
+end }
 
 --------------------------------------------------------------------------------
 
@@ -63,11 +64,7 @@ end
 ---@param elem_type "item-with-quality"|"fluid"
 local function add_new_provide_row(provide_table, elem_type)
     flib_gui.add(provide_table, {
-        {
-            type = "choose-elem-button", style = "big_slot_button",
-            elem_type = elem_type,
-            handler = { [defines.events.on_gui_elem_changed] = handle_resource_changed },
-        },
+        { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_resource_changed },
         { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
             make_property_flow("sspp-gui.class", nil, {
                 type = "label", style = "sspp_station_item_value",
@@ -82,25 +79,20 @@ local function add_new_provide_row(provide_table, elem_type)
         { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
             make_center_flow({
                 type = "switch", style = "sspp_aligned_switch",
-                left_label_caption = { "sspp-gui.source" }, right_label_caption = { "sspp-gui.push" },
-                tooltip = { "sspp-gui.provide-mode-tooltip" },
-                switch_state = "left",
-                handler = { [defines.events.on_gui_switch_state_changed] = handle_mode_changed },
+                left_label_caption = { "sspp-gui.source" }, right_label_caption = { "sspp-gui.push" }, tooltip = { "sspp-gui.provide-mode-tooltip" },
+                switch_state = "left", handler = handle_mode_changed,
             }),
             make_property_flow("sspp-gui.throughput", "sspp-gui.provide-throughput-tooltip", {
                 type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true,
-                text = "0",
-                handler = { [defines.events.on_gui_text_changed] = handle_throughput_changed },
+                text = "0", handler = handle_throughput_changed,
             }),
             make_property_flow("sspp-gui.latency", "sspp-gui.provide-latency-tooltip", {
                 type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true,
-                text = "30",
-                handler = { [defines.events.on_gui_text_changed] = handle_latency_changed },
+                text = "30", handler = handle_latency_changed,
             }),
             make_property_flow("sspp-gui.granularity", "sspp-gui.provide-granularity-tooltip", {
                 type = "textfield", style = "sspp_number_textbox", numeric = true,
-                text = "1",
-                handler = { [defines.events.on_gui_text_changed] = handle_granularity_changed },
+                text = "1", handler = handle_granularity_changed,
             }),
         } },
         { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
@@ -118,11 +110,7 @@ end
 ---@param elem_type "item-with-quality"|"fluid"
 local function add_new_request_row(request_table, elem_type)
     flib_gui.add(request_table, {
-        {
-            type = "choose-elem-button", style = "big_slot_button",
-            elem_type = elem_type,
-            handler = { [defines.events.on_gui_elem_changed] = handle_resource_changed },
-        },
+        { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_resource_changed },
         { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
             make_property_flow("sspp-gui.class", nil, {
                 type = "label", style = "sspp_station_item_value",
@@ -137,20 +125,16 @@ local function add_new_request_row(request_table, elem_type)
         { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
             make_center_flow({
                 type = "switch", style = "sspp_aligned_switch",
-                left_label_caption = { "sspp-gui.sink" }, right_label_caption = { "sspp-gui.pull" },
-                tooltip = { "sspp-gui.request-mode-tooltip" },
-                switch_state = "left",
-                handler = { [defines.events.on_gui_switch_state_changed] = handle_mode_changed },
+                left_label_caption = { "sspp-gui.sink" }, right_label_caption = { "sspp-gui.pull" }, tooltip = { "sspp-gui.request-mode-tooltip" },
+                switch_state = "left", handler = handle_mode_changed,
             }),
             make_property_flow("sspp-gui.throughput", "sspp-gui.request-throughput-tooltip", {
                 type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true,
-                text = "0",
-                handler = { [defines.events.on_gui_text_changed] = handle_throughput_changed },
+                text = "0", handler = handle_throughput_changed,
             }),
             make_property_flow("sspp-gui.latency", "sspp-gui.request-latency-tooltip", {
                 type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true,
-                text = "30",
-                handler = { [defines.events.on_gui_text_changed] = handle_latency_changed },
+                text = "30", handler = handle_latency_changed,
             }),
         } },
         { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
@@ -162,6 +146,20 @@ local function add_new_request_row(request_table, elem_type)
             }),
         } },
     })
+end
+
+---@param player_id PlayerId
+---@param table_name string
+---@param inner function
+---@param elem_type "item-with-quality"|"fluid"
+local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
+    local table = storage.player_guis[player_id].elements[table_name]
+    if #table.children <= table.column_count * 10 then
+        inner(table, elem_type)
+    else
+        local player = game.get_player(player_id) --[[@as LuaPlayer]]
+        player.play_sound({ path = "utility/cannot_build" })
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -189,21 +187,26 @@ local function populate_row_from_provide_item(network_items, from_nothing, provi
         station_children[4].children[2].text = tostring(item.granularity)
     end
 
+    local table_children = provide_table.children
+    local network_children = table_children[i + 2].children
+    local statistics_children = table_children[i + 4].children
+
     local network_item = network_items[item_key]
     if network_item then
-        local table_children = provide_table.children
-
         local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
         local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
         local stack_size = quality and prototypes.item[name].stack_size or 1
 
-        local network_children = table_children[i + 2].children
         network_children[1].children[2].caption = network_item.class
         network_children[2].children[2].caption = { fmt_items_or_units, network_item.delivery_size }
         network_children[3].children[2].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
-
-        local statistics_children = table_children[i + 4].children
         statistics_children[1].children[2].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
+    else
+        network_children[1].children[2].caption = ""
+        network_children[2].children[2].caption = ""
+        network_children[3].children[2].caption = ""
+        statistics_children[1].children[2].caption = ""
+        statistics_children[2].children[2].caption = ""
     end
 end
 
@@ -229,21 +232,26 @@ local function populate_row_from_request_item(network_items, from_nothing, reque
         station_children[3].children[2].text = tostring(item.latency)
     end
 
+    local table_children = request_table.children
+    local network_children = table_children[i + 2].children
+    local statistics_children = table_children[i + 4].children
+
     local network_item = network_items[item_key]
     if network_item then
-        local table_children = request_table.children
-
         local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
         local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
         local stack_size = quality and prototypes.item[name].stack_size or 1
 
-        local network_children = table_children[i + 2].children
         network_children[1].children[2].caption = network_item.class
         network_children[2].children[2].caption = { fmt_items_or_units, network_item.delivery_size }
         network_children[3].children[2].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
-
-        local statistics_children = table_children[i + 4].children
         statistics_children[1].children[2].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
+    else
+        network_children[1].children[2].caption = ""
+        network_children[2].children[2].caption = ""
+        network_children[3].children[2].caption = ""
+        statistics_children[1].children[2].caption = ""
+        statistics_children[2].children[2].caption = ""
     end
 end
 
@@ -294,18 +302,17 @@ end
 ---@param from_nothing boolean
 ---@param update_name boolean
 function gui.update_station_after_change(player_id, from_nothing, update_name)
-    local player_state = storage.player_states[player_id]
-
-    local parts = assert(player_state.parts)
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
+    local parts = player_gui.parts --[[@as StationParts]]
 
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
-    local network_items = storage.networks[player_state.network].items
+    local network_items = storage.networks[player_gui.network].items
 
     if parts.provide_io then
-        local provide_table = player_state.elements.provide_table
+        local provide_table = player_gui.elements.provide_table
         local provide_items = gui.generate_dict_from_table(provide_table, generate_provide_item_from_row)
 
-        parts.provide_io.combinator_description = helpers.table_to_json(provide_items)
+        parts.provide_io.combinator_description = provide_items_to_combinator_description(provide_items)
 
         if station then
             for item_key, _ in pairs(station.provide_items) do
@@ -321,10 +328,10 @@ function gui.update_station_after_change(player_id, from_nothing, update_name)
     end
 
     if parts.request_io then
-        local request_table = player_state.elements.request_table
+        local request_table = player_gui.elements.request_table
         local request_items = gui.generate_dict_from_table(request_table, generate_request_item_from_row)
 
-        parts.request_io.combinator_description = helpers.table_to_json(request_items)
+        parts.request_io.combinator_description = request_items_to_combinator_description(request_items)
 
         if station then
             for item_key, _ in pairs(station.request_items) do
@@ -343,23 +350,23 @@ function gui.update_station_after_change(player_id, from_nothing, update_name)
         --- note that we don't need to update schedules, the game will do that for us
         local new_stop_name = compute_stop_name(station.provide_items, station.request_items)
         station.stop.backer_name = new_stop_name
-        player_state.elements.stop_name.caption = new_stop_name
+        player_gui.elements.stop_name.caption = new_stop_name
     end
 end
 
 --------------------------------------------------------------------------------
 
----@param player_state PlayerState
-function gui.station_poll_finished(player_state)
-    local parts = player_state.parts
+---@param player_gui PlayerStationGui
+function gui.station_poll_finished(player_gui)
+    local parts = player_gui.parts
     if not parts then return end
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
     if not station then return end
 
-    local network_items = storage.networks[station.stop.surface.name].items
+    local network_items = storage.networks[player_gui.network].items
 
     if station.provide_counts then
-        local provide_table = player_state.elements.provide_table
+        local provide_table = player_gui.elements.provide_table
         local columns, table_children = provide_table.column_count, provide_table.children
 
         for i = columns, #table_children - 1, columns do
@@ -379,7 +386,7 @@ function gui.station_poll_finished(player_state)
     end
 
     if station.request_counts then
-        local request_table = player_state.elements.request_table
+        local request_table = player_gui.elements.request_table
         local columns, table_children = request_table.column_count, request_table.children
 
         for i = columns, #table_children - 1, columns do
@@ -402,44 +409,40 @@ end
 --------------------------------------------------------------------------------
 
 ---@param event EventData.on_gui_click
-local function handle_open_network(event)
+local handle_open_network = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
-    local network_name = storage.player_states[player_id].network
+    local network_name = storage.player_guis[player_id].network
 
     gui.network_open(player_id, network_name)
-end
+end }
 
 ---@param event EventData.on_gui_click
-local function handle_add_provide_item(event)
-    local provide_table = storage.player_states[event.player_index].elements.provide_table
-    add_new_provide_row(provide_table, "item-with-quality")
-end
+local handle_add_provide_item = { [events.on_gui_click] = function(event)
+    try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "item-with-quality")
+end }
 
 ---@param event EventData.on_gui_click
-local function handle_add_provide_fluid(event)
-    local provide_table = storage.player_states[event.player_index].elements.provide_table
-    add_new_provide_row(provide_table, "fluid")
-end
+local handle_add_provide_fluid = { [events.on_gui_click] = function(event)
+    try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "fluid")
+end }
 
 ---@param event EventData.on_gui_click
-local function handle_add_request_item(event)
-    local request_table = storage.player_states[event.player_index].elements.request_table
-    add_new_request_row(request_table, "item-with-quality")
-end
+local handle_add_request_item = { [events.on_gui_click] = function(event)
+    try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, "item-with-quality")
+end }
 
 ---@param event EventData.on_gui_click
-local function handle_add_request_fluid(event)
-    local request_table = storage.player_states[event.player_index].elements.request_table
-    add_new_request_row(request_table, "fluid")
-end
+local handle_add_request_fluid = { [events.on_gui_click] = function(event)
+    try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, "fluid")
+end }
 
 ---@param event EventData.on_gui_click
-local function handle_close(event)
+local handle_close_window = { [events.on_gui_click] = function(event)
     local player = assert(game.get_player(event.player_index))
     assert(player.opened.name == "sspp-station")
 
     player.opened = nil
-end
+end }
 
 --------------------------------------------------------------------------------
 
@@ -449,12 +452,12 @@ end
 ---@return {[string]: LuaGuiElement} elements, LuaGuiElement window
 local function add_gui_complete(player, provide, request)
     return flib_gui.add(player.gui.screen, {
-        { type = "frame", style = "frame", direction = "vertical", name = "sspp-station", children = {
-            { type = "flow", name = "titlebar", style = "frame_header_flow", children = {
+        { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
+            { type = "flow", style = "frame_header_flow", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
-                { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close },
+                { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
@@ -491,8 +494,8 @@ local function add_gui_complete(player, provide, request)
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.statistics" } },
                                 } },
                                 { type = "flow", style = "horizontal_flow", children = {
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_add_request_item },
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_add_request_fluid },
+                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_request_item },
+                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_request_fluid },
                                 } },
                             } },
                         } or {},
@@ -512,12 +515,12 @@ end
 ---@return {[string]: LuaGuiElement} elements, LuaGuiElement window
 local function add_gui_incomplete(player)
     return flib_gui.add(player.gui.screen, {
-        { type = "frame", style = "frame", direction = "vertical", name = "sspp-station", children = {
-            { type = "flow", name = "titlebar", style = "frame_header_flow", children = {
+        { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
+            { type = "flow", style = "frame_header_flow", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.incomplete-station" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
-                { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close },
+                { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
             { type = "label", style = "info_label", caption = { "sspp-gui.incomplete-station-message" } },
         } },
@@ -530,6 +533,7 @@ end
 ---@param entity LuaEntity
 function gui.station_open(player_id, entity)
     local player = assert(game.get_player(player_id))
+    local unit_number = entity.unit_number --[[@as uint]]
     local parts = get_station_parts(entity)
     local network_name = entity.surface.name
 
@@ -538,13 +542,12 @@ function gui.station_open(player_id, entity)
     local elements, window ---@type {[string]: LuaGuiElement}, LuaGuiElement
     if parts then
         elements, window = add_gui_complete(player, parts.provide_io, parts.request_io)
-        storage.player_states[player_id] = { network = network_name, entity = entity, parts = parts, elements = elements }
+        storage.player_guis[player_id] = { network = network_name, unit_number = unit_number, parts = parts, elements = elements }
     else
         elements, window = add_gui_incomplete(player)
-        storage.player_states[player_id] = { network = network_name, entity = entity, elements = elements }
+        storage.player_guis[player_id] = { network = network_name, unit_number = unit_number, elements = elements }
     end
 
-    window.titlebar.drag_target = window
     window.force_auto_center()
 
     if parts then
@@ -569,34 +572,34 @@ end
 ---@param player_id PlayerId
 ---@param window LuaGuiElement
 function gui.station_closed(player_id, window)
-    local player = assert(game.get_player(player_id))
-
     assert(window.name == "sspp-station")
     window.destroy()
 
-    local entity = storage.player_states[player_id].entity --[[@as LuaEntity]]
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
+    local entity = storage.entities[player_gui.unit_number]
 
     if entity.valid and entity.name ~= "entity-ghost" then
+        local player = game.get_player(player_id) --[[@as LuaPlayer]]
         player.play_sound({ path = "entity-close/sspp-stop" })
     end
 
-    storage.player_states[player_id] = nil
+    storage.player_guis[player_id] = nil
 end
 
 --------------------------------------------------------------------------------
 
 function gui.station_add_flib_handlers()
     flib_gui.add_handlers({
-        ["station_resource_changed"] = handle_resource_changed,
-        ["station_mode_changed"] = handle_mode_changed,
-        ["station_throughput_changed"] = handle_throughput_changed,
-        ["station_granularity_changed"] = handle_granularity_changed,
-        ["station_latency_changed"] = handle_latency_changed,
-        ["station_open_network"] = handle_open_network,
-        ["station_add_provide_item"] = handle_add_provide_item,
-        ["station_add_provide_fluid"] = handle_add_provide_fluid,
-        ["station_add_request_item"] = handle_add_request_item,
-        ["station_add_request_fluid"] = handle_add_request_fluid,
-        ["station_close"] = handle_close,
+        ["station_resource_changed"] = handle_resource_changed[events.on_gui_elem_changed],
+        ["station_mode_changed"] = handle_mode_changed[events.on_gui_switch_state_changed],
+        ["station_throughput_changed"] = handle_throughput_changed[events.on_gui_text_changed],
+        ["station_granularity_changed"] = handle_granularity_changed[events.on_gui_text_changed],
+        ["station_latency_changed"] = handle_latency_changed[events.on_gui_text_changed],
+        ["station_open_network"] = handle_open_network[events.on_gui_click],
+        ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],
+        ["station_add_provide_fluid"] = handle_add_provide_fluid[events.on_gui_click],
+        ["station_add_request_item"] = handle_add_request_item[events.on_gui_click],
+        ["station_add_request_fluid"] = handle_add_request_fluid[events.on_gui_click],
+        ["station_close_window"] = handle_close_window[events.on_gui_click],
     })
 end

@@ -40,11 +40,13 @@ local function on_gui_closed(event)
 end
 
 function gui.on_poll_finished()
-    for _, player_state in pairs(storage.player_states) do
-        if player_state.elements["sspp-network"] then
-            gui.network_poll_finished(player_state)
-        elseif player_state.elements["sspp-station"] then
-            gui.station_poll_finished(player_state)
+    for _, player_gui in pairs(storage.player_guis) do
+        if player_gui.unit_number then
+            gui.station_poll_finished(player_gui --[[@as PlayerStationGui]])
+        elseif player_gui.train then
+            -- gui.hauler_poll_finished(player_gui --[[@as PlayerHaulerGui]])
+        else
+            gui.network_poll_finished(player_gui --[[@as PlayerNetworkGui]])
         end
     end
 end
@@ -102,7 +104,7 @@ function gui.generate_dict_from_table(table, inner)
 
     for i = columns, #table_children - 1, columns do
         local key, value = inner(table_children, list_index + 1, i)
-        if key then
+        if key and not dict[key] then
             list_index = list_index + 1
             dict[key] = value
         end
@@ -114,9 +116,11 @@ end
 ---@param hauler_id HaulerId
 ---@param enabled boolean
 function gui.hauler_set_widget_enabled(hauler_id, enabled)
-    for _, player_state in pairs(storage.player_states) do
-        if player_state.train and player_state.train.id == hauler_id then
-            player_state.elements.class_textbox.enabled = enabled
+    for _, player_gui in pairs(storage.player_guis) do
+        if player_gui.train then
+            if player_gui.train.id == hauler_id then
+                player_gui.elements.class_textbox.enabled = enabled
+            end
         end
     end
 end

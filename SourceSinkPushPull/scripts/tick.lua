@@ -99,7 +99,7 @@ local function tick_poll()
     if not station_id then return true end
 
     local station = storage.stations[station_id]
-    local network = storage.networks[station.stop.surface.name]
+    local network = storage.networks[station.network]
 
     local hauler_provide_item_key, hauler_request_item_key ---@type ItemKey?, ItemKey?
 
