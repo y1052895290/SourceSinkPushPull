@@ -113,11 +113,14 @@ local function try_close_entity_guis(unit_number)
     end
 end
 
----@param station_items {[ItemKey]: ProvideItem|RequestItem}
-local function disable_station_items(station_items)
-    if station_items then
-        for item_key, _ in pairs(station_items) do
+---@param items {[ItemKey]: ProvideItem|RequestItem}?
+---@param deliveries {[ItemKey]: HaulerId[]}?
+local function disable_items_and_haulers(items, deliveries)
+    if items then
+        ---@cast deliveries {[ItemKey]: HaulerId[]}
+        for item_key, _ in pairs(items) do
             storage.disabled_items[item_key] = true
+            set_haulers_to_manual(deliveries[item_key], { "sspp-alert.station-broken" })
         end
     end
 end
@@ -131,11 +134,8 @@ local function try_destroy_station(stop)
     if station then
         list_remove_value_if_exists(storage.poll_stations, station_id)
 
-        disable_station_items(station.provide_items)
-        disable_station_items(station.request_items)
-
-        set_haulers_to_manual(station.provide_deliveries, { "sspp-alert.station-broken" })
-        set_haulers_to_manual(station.request_deliveries, { "sspp-alert.station-broken" })
+        disable_items_and_haulers(station.provide_items, station.provide_deliveries)
+        disable_items_and_haulers(station.request_items, station.request_deliveries)
 
         destroy_hidden_combs(station.provide_hidden_combs)
         destroy_hidden_combs(station.request_hidden_combs)
