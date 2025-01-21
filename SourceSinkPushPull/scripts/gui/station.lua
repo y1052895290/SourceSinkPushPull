@@ -267,13 +267,16 @@ local function generate_provide_item_from_row(table_children, list_index, i)
 
     local station_children = table_children[i + 3].children
 
+    local granularity = tonumber(station_children[4].children[2].text) or 1
+    if granularity < 1 then granularity = 1 end
+
     local _, _, item_key = gui.extract_elem_value_fields(elem_value)
     return item_key, {
         list_index = list_index,
         push = station_children[1].children[2].switch_state == "right",
         throughput = tonumber(station_children[2].children[2].text) or 0.0,
         latency = tonumber(station_children[3].children[2].text) or 30.0,
-        granularity = tonumber(station_children[4].children[2].text) or 1,
+        granularity = granularity,
     } --[[@as ProvideItem]]
 end
 

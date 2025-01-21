@@ -276,14 +276,20 @@ local function generate_item_from_row(table_children, list_index, i)
     local elem_value = table_children[i + 1].elem_value ---@type (table|string)?
     if elem_value == nil then return end
 
+    local delivery_size = tonumber(table_children[i + 3].text) or 1
+    if delivery_size < 1 then delivery_size = 1 end
+
+    local delivery_time = tonumber(table_children[i + 4].text) or 1.0
+    if delivery_time < 1.0 then delivery_time = 1.0 end
+
     local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
     return item_key, {
         list_index = list_index,
         name = name,
         quality = quality,
         class = table_children[i + 2].text,
-        delivery_size = tonumber(table_children[i + 3].text) or 0,
-        delivery_time = tonumber(table_children[i + 4].text) or 0.0,
+        delivery_size = delivery_size,
+        delivery_time = delivery_time,
     } --[[@as NetworkItem]]
 end
 
