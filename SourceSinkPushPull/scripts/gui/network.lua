@@ -66,9 +66,7 @@ local function clear_grid_and_header(player_gui)
     local elements = player_gui.elements
 
     elements.grid_title.caption = ""
-    elements.grid_mode_switch.enabled = false
-    elements.grid_mode_switch.left_label_tooltip = ""
-    elements.grid_mode_switch.right_label_tooltip = ""
+    elements.grid_stations_mode_switch.visible = false
     elements.grid_provide_toggle.enabled = false
     elements.grid_provide_toggle.tooltip = ""
     elements.grid_request_toggle.enabled = false
@@ -159,9 +157,7 @@ local handle_expand_item_stations = { [events.on_gui_click] = function(event)
     else
         elements.grid_title.caption = { "sspp-gui.fmt-fluid-stations-title", name }
     end
-    elements.grid_mode_switch.enabled = true
-    elements.grid_mode_switch.left_label_tooltip = { "sspp-gui.grid-stations-hauler-tooltip" }
-    elements.grid_mode_switch.right_label_tooltip = { "sspp-gui.grid-stations-station-tooltip" }
+    elements.grid_stations_mode_switch.visible = true
     elements.grid_provide_toggle.enabled = true
     elements.grid_provide_toggle.tooltip = { "sspp-gui.grid-stations-provide-tooltip" }
     elements.grid_request_toggle.enabled = true
@@ -357,9 +353,9 @@ local function get_or_add_next_minimap(grid_table, table_children, old_length, n
     if new_length > old_length then
         local zoom, open_handler
         if for_station then
-            zoom, flib_handler = 2.0, handle_open_station
+            zoom, open_handler = 2.0, handle_open_station
         else
-            zoom, flib_handler = 1.0, handle_open_hauler
+            zoom, open_handler = 1.0, handle_open_hauler
         end
 
         local outer_frame = grid_table.add({ type = "frame", style = "train_with_minimap_frame" })
@@ -436,7 +432,6 @@ function gui.network_poll_finished(player_gui)
         end
     end
 
-    local mode_count = elements.grid_mode_switch.switch_state == "right" or nil
     local provide_enabled = elements.grid_provide_toggle.toggled or nil
     local request_enabled = elements.grid_request_toggle.toggled or nil
     local liquidate_enabled = elements.grid_liquidate_toggle.toggled or nil
@@ -515,11 +510,12 @@ function gui.network_poll_finished(player_gui)
 
     local stations_item_key = player_gui.stations_item
     if stations_item_key then
+        local count_mode_enabled = elements.grid_stations_mode_switch.switch_state == "right" or nil
         for _, station in pairs(storage.stations) do
             if station.network == network_name then
                 local value, icon ---@type integer?, string?
                 if provide_enabled and station.provide_items and station.provide_items[stations_item_key] then
-                    if mode_count then
+                    if count_mode_enabled then
                         value = station.provide_counts[stations_item_key]
                     else
                         value = len_or_zero(station.provide_deliveries[stations_item_key])
@@ -527,7 +523,7 @@ function gui.network_poll_finished(player_gui)
                     icon = "[img=virtual-signal/up-arrow]"
                 end
                 if request_enabled and station.request_items and station.request_items[stations_item_key] then
-                    if mode_count then
+                    if count_mode_enabled then
                         value = station.request_counts[stations_item_key]
                     else
                         value = len_or_zero(station.request_deliveries[stations_item_key])
@@ -651,7 +647,7 @@ function gui.network_open(player_id, network_name)
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
                         { type = "label", name = "grid_title", style = "subheader_caption_label" },
                         { type = "empty-widget", style = "flib_horizontal_pusher" },
-                        { type = "switch", name = "grid_mode_switch", style = "switch", left_label_caption = "[item=locomotive]", right_label_caption = "[item=sspp-stop]", enabled = false },
+                        { type = "switch", name = "grid_stations_mode_switch", style = "switch", left_label_caption = "[item=locomotive]", right_label_caption = "[item=sspp-stop]", left_label_tooltip = { "sspp-gui.grid-stations-hauler-tooltip" }, right_label_tooltip = { "sspp-gui.grid-stations-station-tooltip" }, visible = false },
                         { type = "sprite-button", name = "grid_provide_toggle", style = "control_settings_section_button", sprite = "virtual-signal/up-arrow", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_request_toggle", style = "control_settings_section_button", sprite = "virtual-signal/down-arrow", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_liquidate_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-skull", enabled = false, auto_toggle = true, toggled = true },

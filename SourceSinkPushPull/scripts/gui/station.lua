@@ -438,7 +438,7 @@ end }
 
 ---@param event EventData.on_gui_click
 local handle_close_window = { [events.on_gui_click] = function(event)
-    local player = assert(game.get_player(event.player_index))
+    local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
     assert(player.opened.name == "sspp-station")
 
     player.opened = nil
