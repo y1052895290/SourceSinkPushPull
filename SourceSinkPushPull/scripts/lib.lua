@@ -364,7 +364,7 @@ function combinator_description_to_provide_items(provide_io)
         if type(throughput) ~= "number" then throughput = 0.0 end
 
         local latency = json_item[4]
-        if type(latency) ~= "number" then latency = 30 end
+        if type(latency) ~= "number" then latency = 30.0 end
 
         local granularity = json_item[5]
         if type(granularity) ~= "number" then granularity = 1 end
@@ -426,7 +426,7 @@ function combinator_description_to_request_items(request_io)
         if type(throughput) ~= "number" then throughput = 0.0 end
 
         local latency = json_item[4]
-        if type(latency) ~= "number" then latency = 30 end
+        if type(latency) ~= "number" then latency = 30.0 end
 
         items[item_key] = { list_index = list_index, pull = pull, throughput = throughput, latency = latency }
         indices[list_index] = true

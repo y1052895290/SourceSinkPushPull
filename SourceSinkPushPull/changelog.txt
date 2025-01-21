@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.2.1
+Date: 2025-01-21
+  Bugfixes:
+    - Fixed clicking on minimaps to open things not working
+    - Fixed a crash when destroying stations with assigned trains
+    - Prevent setting some things to zero that would cause freezes (reported by @deweykai on GH)
+---------------------------------------------------------------------------------------------------
 Version: 0.2.0
 Date: 2025-01-21
   Features:

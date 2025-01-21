@@ -1,8 +1,8 @@
 #!/bin/env bash
 
 FMTK_VERSION=2.0.5
-FACTORIO_VERSION=2.0.31
-FLIB_VERSION=v0.16.0
+FACTORIO_VERSION=2.0.32
+FLIB_VERSION=v0.16.1
 
 FACTORIO_ROOT="$1"
 FMTK_BIN="$HOME/.vscode/extensions/justarandomgeek.factoriomod-debug-$FMTK_VERSION/bin/fmtk"
