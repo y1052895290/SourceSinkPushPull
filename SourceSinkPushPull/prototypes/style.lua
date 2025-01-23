@@ -122,6 +122,15 @@ styles.sspp_network_grid_table = { ---@type data.TableStyleSpecification
 
 --------------------------------------------------------------------------------
 
+styles.sspp_subheader_caption_textbox = { ---@type data.TextBoxStyleSpecification
+    type = "textbox_style",
+    parent = "textbox",
+    width = 276,
+    minimal_height = 30,
+    left_padding = 4,
+    font = "heading-2",
+}
+
 styles.sspp_compact_slot_button = { ---@type data.ButtonStyleSpecification
     type = "button_style",
     parent = "slot_button",
@@ -191,12 +200,9 @@ styles.sspp_minimap_button = { ---@type data.ButtonStyleSpecification
     type = "button_style",
     parent = "locomotive_minimap_button",
     size = 128,
-    hovered_graphical_set = {
-		base = { position = { 81, 80 }, size = 1, opacity = 0.7 },
-	},
-    clicked_graphical_set = {
-        base = { position = { 70, 146 }, size = 1, opacity = 0.7 },
-    },
+    -- doesn't match vanilla style, but makes text more readable
+    hovered_graphical_set = { position = { 8, 8 }, size = 1, opacity = 0.7 },
+    clicked_graphical_set = { position = { 42, 8 }, size = 1, opacity = 0.7 },
     default_graphical_set = {},
 }
 

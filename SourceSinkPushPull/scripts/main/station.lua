@@ -96,7 +96,9 @@ local function try_create_station(stop, combs)
         ensure_hidden_combs(station.request_io, station.request_hidden_combs, station.request_items)
     end
 
-    stop.backer_name = compute_stop_name(station.provide_items, station.request_items)
+    if not read_stop_flag(stop, e_stop_flags.custom_name) then
+        stop.backer_name = compute_stop_name(station.provide_items, station.request_items)
+    end
 
     storage.stations[station_id] = station
 end
@@ -143,7 +145,9 @@ local function try_destroy_station(stop)
         storage.stations[station_id] = nil
     end
 
-    stop.backer_name = "[virtual-signal=signal-ghost]"
+    if not read_stop_flag(stop, e_stop_flags.custom_name) then
+        stop.backer_name = "[virtual-signal=signal-ghost]"
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -155,10 +159,13 @@ function main.stop_built(stop, ghost_unit_number)
         main.stop_broken(ghost_unit_number, nil)
     end
 
+    if not read_stop_flag(stop, e_stop_flags.custom_name) then
+        stop.backer_name = "[virtual-signal=signal-ghost]"
+    end
+    stop.trains_limit = 0
+
     local stop_cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     stop_cb.read_from_train = true
-    stop.trains_limit = 0
-    stop.backer_name = "[virtual-signal=signal-ghost]"
 
     storage.entities[stop.unit_number] = stop
 

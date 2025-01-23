@@ -2,6 +2,11 @@
 
 --------------------------------------------------------------------------------
 
+---@enum StopFlag
+e_stop_flags = { custom_name = 1 }
+
+--------------------------------------------------------------------------------
+
 ---@alias NetworkName string
 ---@alias ClassName string
 ---@alias ItemKey string

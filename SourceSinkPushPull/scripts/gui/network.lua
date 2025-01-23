@@ -603,7 +603,7 @@ function gui.network_open(player_id, network_name)
             { type = "flow", style = "frame_header_flow", drag_target = "sspp-network", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.network-for-surface", localised_name }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
-                { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close_window },
+                { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {

@@ -349,11 +349,10 @@ function gui.update_station_after_change(player_id, from_nothing, update_name)
         gui.populate_table_from_dict(from_nothing, request_table, request_items, bind_1_of_6(populate_row_from_request_item, network_items))
     end
 
-    if update_name and station then
-        --- note that we don't need to update schedules, the game will do that for us
+    if update_name and station and not read_stop_flag(station.stop, e_stop_flags.custom_name) then
         local new_stop_name = compute_stop_name(station.provide_items, station.request_items)
         station.stop.backer_name = new_stop_name
-        player_gui.elements.stop_name.caption = new_stop_name
+        player_gui.elements.stop_name_label.caption = new_stop_name
     end
 end
 
@@ -420,6 +419,86 @@ local handle_open_network = { [events.on_gui_click] = function(event)
 end }
 
 ---@param event EventData.on_gui_click
+local handle_toggle_name = { [events.on_gui_click] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local parts = player_gui.parts --[[@as StationParts]]
+
+    if event.element.toggled then
+        if not player_gui.elements.stop_name_clear_button.enabled then
+            player_gui.elements.stop_name_input.text = parts.stop.backer_name
+        end
+        player_gui.elements.stop_name_label.visible = false
+        player_gui.elements.stop_name_input.visible = true
+        player_gui.elements.stop_name_input.focus()
+    else
+        player_gui.elements.stop_name_label.caption = parts.stop.backer_name
+        player_gui.elements.stop_name_input.visible = false
+        player_gui.elements.stop_name_label.visible = true
+    end
+end }
+
+---@param event EventData.on_gui_click
+local handle_clear_name = { [events.on_gui_click] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local parts = player_gui.parts --[[@as StationParts]]
+
+    write_stop_flag(parts.stop, e_stop_flags.custom_name, false)
+
+    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+    local stop_name ---@type string
+    if station then
+        stop_name = compute_stop_name(station.provide_items, station.request_items)
+    else
+        stop_name = "[virtual-signal=signal-ghost]"
+    end
+    parts.stop.backer_name = stop_name
+    player_gui.elements.stop_name_label.caption = stop_name
+
+    player_gui.elements.stop_name_input.visible = false
+    player_gui.elements.stop_name_label.visible = true
+
+    player_gui.elements.stop_name_edit_toggle.toggled = false
+    player_gui.elements.stop_name_clear_button.enabled = false
+end }
+
+local handle_name_changed_or_confirmed = {}
+
+---@param event EventData.on_gui_text_changed
+handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local parts = player_gui.parts --[[@as StationParts]]
+
+    local stop_name = string.sub(event.element.text, 1, 199)
+    if event.element.text ~= stop_name then event.element.text = stop_name end
+
+    local has_custom_name = stop_name ~= ""
+    player_gui.elements.stop_name_clear_button.enabled = has_custom_name
+    write_stop_flag(parts.stop, e_stop_flags.custom_name, has_custom_name)
+
+    if not has_custom_name then
+        local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+        if station then
+            stop_name = compute_stop_name(station.provide_items, station.request_items)
+        else
+            stop_name = "[virtual-signal=signal-ghost]"
+        end
+    end
+    parts.stop.backer_name = stop_name
+end
+
+---@param event EventData.on_gui_confirmed
+handle_name_changed_or_confirmed[events.on_gui_confirmed] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local parts = player_gui.parts --[[@as StationParts]]
+
+    player_gui.elements.stop_name_label.caption = parts.stop.backer_name
+    player_gui.elements.stop_name_input.visible = false
+    player_gui.elements.stop_name_label.visible = true
+
+    player_gui.elements.stop_name_edit_toggle.toggled = false
+end
+
+---@param event EventData.on_gui_click
 local handle_add_provide_item = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "item-with-quality")
 end }
@@ -450,25 +529,30 @@ end }
 --------------------------------------------------------------------------------
 
 ---@param player LuaPlayer
----@param provide any?
----@param request any?
+---@param parts StationParts
 ---@return {[string]: LuaGuiElement} elements, LuaGuiElement window
-local function add_gui_complete(player, provide, request)
+local function add_gui_complete(player, parts)
+    local name = parts.stop.backer_name
+    local has_custom_name = read_stop_flag(parts.stop, e_stop_flags.custom_name)
     return flib_gui.add(player.gui.screen, {
         { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
             { type = "flow", style = "frame_header_flow", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
-                { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close_window },
+                { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
-                        { type = "label", style = "subheader_caption_label", name = "stop_name" },
+                        { type = "label", name = "stop_name_label", style = "subheader_caption_label", caption = name, visible = not has_custom_name },
+                        { type = "textfield", name = "stop_name_input", style = "sspp_subheader_caption_textbox", icon_selector = true, text = name, visible = has_custom_name, handler = handle_name_changed_or_confirmed },
+                        { type = "empty-widget", style = "flib_horizontal_pusher" },
+                        { type = "sprite-button", name = "stop_name_edit_toggle", style = "control_settings_section_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.edit-custom-name" }, auto_toggle = true, toggled = has_custom_name, handler = handle_toggle_name },
+                        { type = "sprite-button", name = "stop_name_clear_button", style = "control_settings_section_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.clear-custom-name" }, enabled = has_custom_name, handler = handle_clear_name },
                     } },
                     { type = "tabbed-pane", style = "tabbed_pane", children = {
-                        provide and {
+                        parts.provide_io and {
                             ---@type flib.GuiElemDef
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.provide" } },
                             ---@type flib.GuiElemDef
@@ -485,7 +569,7 @@ local function add_gui_complete(player, provide, request)
                                 } },
                             } },
                         } or {},
-                        request and {
+                        parts.request_io and {
                             ---@type flib.GuiElemDef
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.request" } },
                             ---@type flib.GuiElemDef
@@ -544,14 +628,13 @@ function gui.station_open(player_id, entity)
 
     local elements, window ---@type {[string]: LuaGuiElement}, LuaGuiElement
     if parts then
-        elements, window = add_gui_complete(player, parts.provide_io, parts.request_io)
-        storage.player_guis[player_id] = { network = network_name, unit_number = unit_number, parts = parts, elements = elements }
+        elements, window = add_gui_complete(player, parts)
     else
         elements, window = add_gui_incomplete(player)
-        storage.player_guis[player_id] = { network = network_name, unit_number = unit_number, elements = elements }
     end
 
     window.force_auto_center()
+    storage.player_guis[player_id] = { network = network_name, unit_number = unit_number, parts = parts, elements = elements }
 
     if parts then
         local network_items = storage.networks[network_name].items
@@ -565,8 +648,6 @@ function gui.station_open(player_id, entity)
             local request_items = combinator_description_to_request_items(parts.request_io)
             gui.populate_table_from_dict(true, elements.request_table, request_items, bind_1_of_6(populate_row_from_request_item, network_items))
         end
-
-        elements.stop_name.caption = parts.stop.backer_name
     end
 
     player.opened = window
@@ -599,6 +680,10 @@ function gui.station_add_flib_handlers()
         ["station_granularity_changed"] = handle_granularity_changed[events.on_gui_text_changed],
         ["station_latency_changed"] = handle_latency_changed[events.on_gui_text_changed],
         ["station_open_network"] = handle_open_network[events.on_gui_click],
+        ["station_toggle_name"] = handle_toggle_name[events.on_gui_click],
+        ["station_clear_name"] = handle_clear_name[events.on_gui_click],
+        ["station_name_changed"] = handle_name_changed_or_confirmed[events.on_gui_text_changed],
+        ["station_name_confirmed"] = handle_name_changed_or_confirmed[events.on_gui_confirmed],
         ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],
         ["station_add_provide_fluid"] = handle_add_provide_fluid[events.on_gui_click],
         ["station_add_request_item"] = handle_add_request_item[events.on_gui_click],

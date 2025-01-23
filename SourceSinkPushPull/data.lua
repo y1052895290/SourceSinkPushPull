@@ -22,6 +22,8 @@ data:extend({
     provide_io_recipe,
     request_io_recipe,
     technology,
+    sspp_reset_icon,
+    sspp_name_icon,
     sspp_fuel_icon,
     sspp_depot_icon,
 })

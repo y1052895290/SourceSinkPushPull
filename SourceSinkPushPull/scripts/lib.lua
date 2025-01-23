@@ -236,6 +236,8 @@ end
 ---@param request_items {[ItemKey]: RequestItem}?
 function compute_stop_name(provide_items, request_items)
     local provide_icons ---@type string[]?
+    local request_icons ---@type string[]?
+
     if provide_items and next(provide_items) then
         provide_icons = {}
         for item_key, item in pairs(provide_items) do
@@ -249,7 +251,6 @@ function compute_stop_name(provide_items, request_items)
         assert(#provide_icons == table_size(provide_items))
     end
 
-    local request_icons ---@type string[]?
     if request_items and next(request_items) then
         request_icons = {}
         for item_key, item in pairs(request_items) do
@@ -265,8 +266,8 @@ function compute_stop_name(provide_items, request_items)
 
     if provide_icons and request_icons then
         local provide_string, request_string, total_length = "", "", 0
-        local max_length = 199 - #"[virtual-signal=up-arrow]" - #"…" - #" / " - #"[virtual-signal=down-arrow]" - #"…"
-        local p, r, p_len, r_len = 1, 1, #provide_icons, #request_icons
+        local max_length = 199 - #"[color=green]⬆…[/color] [color=red]⬇…[/color]"
+        local p, r, p_len, r_len = 0, 0, #provide_icons, #request_icons
         repeat
             if p < p_len then
                 p = p + 1
@@ -275,11 +276,11 @@ function compute_stop_name(provide_items, request_items)
                 if total_length > max_length then
                     p, icon = p_len, "…"
                 end
-                request_string = request_string .. icon
+                provide_string = provide_string .. icon
             end
             if r < r_len then
                 r = r + 1
-                local icon = provide_icons[r]
+                local icon = request_icons[r]
                 total_length = total_length + #icon
                 if total_length > max_length then
                     r, icon = r_len, "…"
@@ -287,9 +288,9 @@ function compute_stop_name(provide_items, request_items)
                 request_string = request_string .. icon
             end
         until p == p_len and r == r_len
-        return "[virtual-signal=up-arrow]" .. provide_string .. " / " .. "[virtual-signal=down-arrow]" .. request_string
+        return "[color=green]⬆" .. provide_string .. "[/color] [color=red]⬇" .. request_string .. "[/color]"
     elseif provide_icons then
-        local max_length = 199 - #"[virtual-signal=up-arrow]" - #"…"
+        local max_length = 199 - #"[color=green]⬆…[/color]"
         local provide_string, length = "", 0
         for _, icon in pairs(provide_icons) do
             length = length + #icon
@@ -299,9 +300,9 @@ function compute_stop_name(provide_items, request_items)
             end
             provide_string = provide_string .. icon
         end
-        return "[virtual-signal=up-arrow]" .. provide_string
+        return "[color=green]⬆" .. provide_string .. "[/color]"
     elseif request_icons then
-        local max_length = 199 - #"[virtual-signal=down-arrow]" - #"…"
+        local max_length = 199 - #"[color=red]⬇…[/color]"
         local request_string, length = "", 0
         for _, icon in pairs(request_icons) do
             length = length + #icon
@@ -311,13 +312,36 @@ function compute_stop_name(provide_items, request_items)
             end
             request_string = request_string .. icon
         end
-        return "[virtual-signal=down-arrow]" .. request_string
+        return "[color=red]⬇" .. request_string .. "[/color]"
     end
 
     return "[virtual-signal=signal-ghost]"
 end
 
 --------------------------------------------------------------------------------
+
+---@param stop LuaEntity
+---@param flag StopFlag
+---@return boolean value
+function read_stop_flag(stop, flag)
+    local cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    local condition = cb.logistic_condition --[[@as CircuitCondition]]
+    return bit32.btest(condition.constant or 0, flag)
+end
+
+---@param stop LuaEntity
+---@param flag StopFlag
+---@param value boolean
+function write_stop_flag(stop, flag, value)
+    local cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    local condition = cb.logistic_condition --[[@as CircuitCondition]]
+    if value then
+        condition.constant = bit32.bor(condition.constant or 0, flag)
+    else
+        condition.constant = bit32.band(condition.constant or 0, bit32.bnot(flag))
+    end
+    cb.logistic_condition = condition --[[@as CircuitConditionDefinition]]
+end
 
 ---@param comb LuaEntity
 ---@param constant integer
