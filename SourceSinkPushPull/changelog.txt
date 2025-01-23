@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.2.2
+Date: 2025-01-23
+  Features:
+    - You can now give stations custom names, if you don't like the ones SSPP generates.
+  Changes:
+    - Tweaked the automatic station name format.
+  Bugfixes:
+    - Fixed automatic station names not working for combined provide/request stations.
+---------------------------------------------------------------------------------------------------
 Version: 0.2.1
 Date: 2025-01-21
   Bugfixes:
