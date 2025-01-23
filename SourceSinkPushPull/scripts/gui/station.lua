@@ -545,10 +545,10 @@ local function add_gui_complete(player, parts)
             { type = "flow", style = "inset_frame_container_horizontal_flow", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
-                        { type = "label", name = "stop_name_label", style = "subheader_caption_label", caption = name, visible = not has_custom_name },
-                        { type = "textfield", name = "stop_name_input", style = "sspp_subheader_caption_textbox", icon_selector = true, text = name, visible = has_custom_name, handler = handle_name_changed_or_confirmed },
+                        { type = "label", name = "stop_name_label", style = "subheader_caption_label", caption = name },
+                        { type = "textfield", name = "stop_name_input", style = "sspp_subheader_caption_textbox", icon_selector = true, text = name, visible = false, handler = handle_name_changed_or_confirmed },
                         { type = "empty-widget", style = "flib_horizontal_pusher" },
-                        { type = "sprite-button", name = "stop_name_edit_toggle", style = "control_settings_section_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.edit-custom-name" }, auto_toggle = true, toggled = has_custom_name, handler = handle_toggle_name },
+                        { type = "sprite-button", name = "stop_name_edit_toggle", style = "control_settings_section_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.edit-custom-name" }, auto_toggle = true, handler = handle_toggle_name },
                         { type = "sprite-button", name = "stop_name_clear_button", style = "control_settings_section_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.clear-custom-name" }, enabled = has_custom_name, handler = handle_clear_name },
                     } },
                     { type = "tabbed-pane", style = "tabbed_pane", children = {
