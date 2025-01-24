@@ -52,7 +52,13 @@ local handle_class_changed = { [events.on_gui_text_changed] = function(event)
     local train = player_gui.train
 
     -- disabling textboxes doesn't disable the icon selector, so hope that the user doesn't do that
-    assert(train.manual_mode, "class name changed when not manual")
+    -- assert(train.manual_mode, "class name changed when not manual")
+    -- update: a user did this, guess I should handle it properly until the api bug gets fixed
+    if not train.manual_mode then
+        local hauler = storage.haulers[train.id]
+        event.element.text = hauler and hauler.class or ""
+        return
+    end
 
     local class_name = event.element.text
     -- TODO: validate class name
