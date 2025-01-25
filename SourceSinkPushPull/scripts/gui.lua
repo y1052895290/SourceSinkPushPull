@@ -147,6 +147,40 @@ function gui.generate_dict_from_table(table, inner)
     return dict
 end
 
+---@param table LuaGuiElement
+---@param old_dict {[string]: any}
+---@param from_row fun(table_children: LuaGuiElement[], i: integer, list_index: integer): key: string?, value: any
+---@param to_row fun(table_children: LuaGuiElement[], i: integer, key: string?, value: any)
+---@param key_remove fun(key: string) 
+---@return {[string]: any}
+function gui.refresh_table(table, old_dict, from_row, to_row, key_remove)
+    local columns = table.column_count
+    local table_children = table.children
+
+    local new_dict = {}
+    local list_index = 0
+
+    for i = columns, #table_children - 1, columns do
+        local key, value = from_row(table_children, list_index + 1, i)
+
+        if key then
+            if new_dict[key] then
+                key, value = nil, nil
+            else
+                list_index, new_dict[key] = list_index + 1, value
+            end
+        end
+
+        to_row(table_children, i, key, value)
+    end
+
+    for key, _ in pairs(old_dict) do
+        if not new_dict[key] then key_remove(key) end
+    end
+
+    return new_dict
+end
+
 ---@param hauler_id HaulerId
 ---@param enabled boolean
 function gui.hauler_set_widget_enabled(hauler_id, enabled)

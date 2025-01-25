@@ -122,7 +122,10 @@ local handle_expand_class_haulers = { [events.on_gui_click] = function(event)
 
     local element = event.element
     local class_name = element.parent.children[element.get_index_in_parent() - 6].text
-    if class_name == "" then return end
+    if class_name == "" then
+        gui.update_network_after_change(event.player_index)
+        return
+    end
 
     elements.grid_title.caption = { "sspp-gui.fmt-class-haulers-title", class_name }
     elements.grid_provide_toggle.enabled = true
@@ -149,7 +152,10 @@ local handle_expand_item_haulers = { [events.on_gui_click] = function(event)
 
     local element = event.element
     local elem_value = element.parent.children[element.get_index_in_parent() - 6].children[3].elem_value
-    if not elem_value then return end
+    if not elem_value then
+        gui.update_network_after_change(event.player_index)
+        return
+    end
 
     local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
     if quality then
@@ -207,6 +213,7 @@ local function add_new_class_row(class_table)
             } },
             { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = handle_class_copy },
             { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-delete-icon", handler = handle_class_delete },
+            { type = "sprite", style = "sspp_compact_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
         } },
         { type = "textfield", style = "sspp_name_textbox", icon_selector = true, text = "", handler = handle_class_name_changed },
         { type = "textfield", style = "sspp_number_textbox", numeric = true, text = "0", handler = handle_class_item_capacity_changed },
@@ -230,6 +237,7 @@ local function add_new_item_row(item_table, elem_type)
             } },
             { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = handle_item_copy },
             { type = "choose-elem-button", style = "sspp_compact_slot_button", elem_type = elem_type, handler = handle_item_resource_changed },
+            { type = "sprite", style = "sspp_compact_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
         } },
         { type = "textfield", style = "sspp_name_textbox", icon_selector = true, text = "", handler = handle_item_class_changed },
         { type = "textfield", style = "sspp_number_textbox", numeric = true, text = "1", handler = handle_item_delivery_size_changed },
@@ -266,7 +274,7 @@ handle_item_copy[events.on_gui_click] = function(event)
     local flow = event.element.parent --[[@as LuaGuiElement]]
     local table = flow.parent --[[@as LuaGuiElement]]
 
-    add_new_item_row(table, type(flow.children[3]) == "table" and "item-with-quality" or "fluid")
+    add_new_item_row(table, type(flow.children[3].elem_value) == "table" and "item-with-quality" or "fluid")
     local i = flow.get_index_in_parent() - 1
     local j = i + table.column_count
     gui.insert_newly_added_row(table, j)
@@ -279,99 +287,165 @@ end
 
 --------------------------------------------------------------------------------
 
----@param player_gui PlayerNetworkGui
----@param from_nothing boolean
 ---@param class_table LuaGuiElement
----@param classes {[ClassName]: Class}
 ---@param class_name ClassName
----@param i integer
-local function populate_row_from_class(player_gui, from_nothing, class_table, classes, class_name, i)
-    if from_nothing then
-        local class = classes[class_name]
-
-        add_new_class_row(class_table)
-        local table_children = class_table.children
-
-        table_children[i + 2].text = class_name
-        table_children[i + 3].text = tostring(class.item_slot_capacity)
-        table_children[i + 4].text = tostring(class.fluid_capacity)
-        table_children[i + 5].text = class.depot_name
-        table_children[i + 6].text = class.fueler_name
-        table_children[i + 7].state = class.bypass_depot
-    end
+---@param class Class
+local function class_init_row(class_table, class_name, class)
+    add_new_class_row(class_table)
 
     local table_children = class_table.children
-    table_children[i + 8].toggled = class_name == player_gui.haulers_class
+    local i = #table_children - class_table.column_count
+
+    table_children[i + 1].children[4].sprite = ""
+    table_children[i + 1].children[4].tooltip = nil
+    table_children[i + 2].text = class_name
+    table_children[i + 3].text = tostring(class.item_slot_capacity)
+    table_children[i + 4].text = tostring(class.fluid_capacity)
+    table_children[i + 5].text = class.depot_name
+    table_children[i + 6].text = class.fueler_name
+    table_children[i + 7].state = class.bypass_depot
 end
-
----@param player_gui PlayerNetworkGui
----@param from_nothing boolean
----@param item_table LuaGuiElement
----@param items {[ItemKey]: NetworkItem}
----@param item_key ItemKey
----@param i integer
-local function populate_row_from_item(player_gui, from_nothing, item_table, items, item_key, i)
-    if from_nothing then
-        local item = items[item_key]
-        local name, quality = item.name, item.quality
-
-        add_new_item_row(item_table, quality and "item-with-quality" or "fluid")
-        local table_children = item_table.children
-
-        table_children[i + 1].children[3].elem_value = quality and { name = name, quality = quality } or name
-        table_children[i + 2].text = item.class
-        table_children[i + 3].text = tostring(item.delivery_size)
-        table_children[i + 4].text = tostring(item.delivery_time)
-    end
-
-    local table_children = item_table.children
-    table_children[i + 5].toggled = item_key == player_gui.stations_item
-    table_children[i + 7].toggled = item_key == player_gui.haulers_item
-end
-
---------------------------------------------------------------------------------
 
 ---@param table_children LuaGuiElement[]
 ---@param list_index integer
 ---@param i integer
 ---@return ClassName?, Class?
-local function generate_class_from_row(table_children, list_index, i)
+local function class_from_row(table_children, list_index, i)
     local class_name = table_children[i + 2].text
     if class_name == "" then return end
 
+    local item_slot_capacity = tonumber(table_children[i + 3].text)
+    if not item_slot_capacity then return end
+
+    local fluid_capacity = tonumber(table_children[i + 4].text)
+    if not fluid_capacity then return end
+
+    if item_slot_capacity == 0 and fluid_capacity == 0 then return end
+
+    local depot_name = table_children[i + 5].text
+    if depot_name == "" or #depot_name > 199 then return end
+
+    local fueler_name = table_children[i + 6].text
+    if fueler_name == "" or #fueler_name > 199 then return end
+
     return class_name, {
         list_index = list_index,
-        item_slot_capacity = tonumber(table_children[i + 3].text) or 0,
-        fluid_capacity = tonumber(table_children[i + 4].text) or 0,
-        depot_name = table_children[i + 5].text,
-        fueler_name = table_children[i + 6].text,
+        item_slot_capacity = item_slot_capacity,
+        fluid_capacity = fluid_capacity,
+        depot_name = depot_name,
+        fueler_name = fueler_name,
         bypass_depot = table_children[i + 7].state,
     } --[[@as Class]]
+end
+
+---@param player_gui PlayerNetworkGui
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@param class_name ClassName?
+---@param class Class?
+local function class_to_row(player_gui, table_children, i, class_name, class)
+    if class_name then
+        table_children[i + 1].children[4].sprite = ""
+        table_children[i + 1].children[4].tooltip = nil
+        table_children[i + 8].toggled = class_name == player_gui.haulers_class
+    else
+        table_children[i + 1].children[4].sprite = "utility/achievement_warning"
+        table_children[i + 1].children[4].tooltip = { "sspp-gui.invalid-values-tooltip" }
+        table_children[i + 8].toggled = false
+    end
+end
+
+---@param player_gui PlayerNetworkGui
+---@param class_name ClassName
+local function class_remove_key(player_gui, class_name)
+    local network = storage.networks[player_gui.network]
+
+    set_haulers_to_manual(network.fuel_haulers[class_name], { "sspp-alert.class-not-in-network" })
+    set_haulers_to_manual(network.to_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
+    set_haulers_to_manual(network.at_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
+
+    if player_gui.haulers_class == class_name then clear_grid_and_header(player_gui) end
+end
+
+--------------------------------------------------------------------------------
+
+---@param item_table LuaGuiElement
+---@param item_key ItemKey
+---@param item NetworkItem
+local function item_init_row(item_table, item_key, item)
+    local name, quality = item.name, item.quality
+    add_new_item_row(item_table, quality and "item-with-quality" or "fluid")
+
+    local table_children = item_table.children
+    local i = #table_children - item_table.column_count
+
+    table_children[i + 1].children[3].elem_value = quality and { name = name, quality = quality } or name
+    table_children[i + 1].children[4].sprite = ""
+    table_children[i + 1].children[4].tooltip = nil
+    table_children[i + 2].text = item.class
+    table_children[i + 3].text = tostring(item.delivery_size)
+    table_children[i + 4].text = tostring(item.delivery_time)
 end
 
 ---@param table_children LuaGuiElement[]
 ---@param list_index integer
 ---@param i integer
 ---@return ItemKey?, NetworkItem?
-local function generate_item_from_row(table_children, list_index, i)
+local function item_from_row(table_children, list_index, i)
     local elem_value = table_children[i + 1].children[3].elem_value ---@type (table|string)?
-    if elem_value == nil then return end
+    if not elem_value then return end
 
-    local delivery_size = tonumber(table_children[i + 3].text) or 1
-    if delivery_size < 1 then delivery_size = 1 end
+    local class = table_children[i + 2].text
+    if class == "" then return end -- NOTE: class does not need to actually exist yet
 
-    local delivery_time = tonumber(table_children[i + 4].text) or 1.0
-    if delivery_time < 1.0 then delivery_time = 1.0 end
+    local delivery_size = tonumber(table_children[i + 3].text)
+    if not delivery_size then return end
+
+    local delivery_time = tonumber(table_children[i + 4].text)
+    if not delivery_time then return end
+
+    if delivery_size < 1 or delivery_time < 1.0 then return end
 
     local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
     return item_key, {
         list_index = list_index,
         name = name,
         quality = quality,
-        class = table_children[i + 2].text,
+        class = class,
         delivery_size = delivery_size,
         delivery_time = delivery_time,
     } --[[@as NetworkItem]]
+end
+
+---@param player_gui PlayerNetworkGui
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@param item_key ItemKey?
+---@param item NetworkItem?
+local function item_to_row(player_gui, table_children, i, item_key, item)
+    if item_key then
+        table_children[i + 1].children[4].sprite = ""
+        table_children[i + 1].children[4].tooltip = nil
+        table_children[i + 5].toggled = item_key == player_gui.stations_item
+        table_children[i + 7].toggled = item_key == player_gui.haulers_item
+    else
+        table_children[i + 1].children[4].sprite = "utility/achievement_warning"
+        table_children[i + 1].children[4].tooltip = { "sspp-gui.invalid-values-tooltip" }
+        table_children[i + 5].toggled = false
+        table_children[i + 7].toggled = false
+    end
+end
+
+---@param player_gui PlayerNetworkGui
+---@param item_key ItemKey
+local function item_remove_key(player_gui, item_key)
+    local network = storage.networks[player_gui.network]
+
+    set_haulers_to_manual(network.provide_haulers[item_key], { "sspp-alert.cargo-not-in-network" }, item_key)
+    set_haulers_to_manual(network.request_haulers[item_key], { "sspp-alert.cargo-not-in-network" }, item_key)
+
+    if item_key == player_gui.haulers_item then clear_grid_and_header(player_gui) end
+    if item_key == player_gui.stations_item then clear_grid_and_header(player_gui) end
 end
 
 --------------------------------------------------------------------------------
@@ -382,38 +456,19 @@ function gui.update_network_after_change(player_id)
 
     local network = storage.networks[player_gui.network]
 
-    local class_table = player_gui.elements.class_table
-    local classes = gui.generate_dict_from_table(class_table, generate_class_from_row)
+    network.classes = gui.refresh_table(
+        player_gui.elements.class_table, network.classes,
+        class_from_row,
+        function(b, c, d, e) return class_to_row(player_gui, b, c, d, e) end,
+        function(b) return class_remove_key(player_gui, b) end
+    )
 
-    for class_name, _ in pairs(network.classes) do
-        if not classes[class_name] then
-            set_haulers_to_manual(network.fuel_haulers[class_name], { "sspp-alert.class-not-in-network" })
-            set_haulers_to_manual(network.to_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
-            set_haulers_to_manual(network.at_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
-            if player_gui.haulers_class == class_name then
-                clear_grid_and_header(player_gui)
-            end
-        end
-    end
-    network.classes = classes
-
-    gui.populate_table_from_dict(false, class_table, classes, bind_1_of_6(populate_row_from_class, player_gui))
-
-    local item_table = player_gui.elements.item_table
-    local items = gui.generate_dict_from_table(item_table, generate_item_from_row)
-
-    for item_key, _ in pairs(network.items) do
-        if not items[item_key] then
-            set_haulers_to_manual(network.provide_haulers[item_key], { "sspp-alert.cargo-not-in-network" }, item_key)
-            set_haulers_to_manual(network.request_haulers[item_key], { "sspp-alert.cargo-not-in-network" }, item_key)
-            if item_key == player_gui.haulers_item or item_key == player_gui.stations_item then
-                clear_grid_and_header(player_gui)
-            end
-        end
-    end
-    network.items = items
-
-    gui.populate_table_from_dict(false, item_table, items, bind_1_of_6(populate_row_from_item, player_gui))
+    network.items = gui.refresh_table(
+        player_gui.elements.item_table, network.items,
+        item_from_row,
+        function(b, c, d, e) return item_to_row(player_gui, b, c, d, e) end,
+        function(b) return item_remove_key(player_gui, b) end
+    )
 end
 
 --------------------------------------------------------------------------------
@@ -484,9 +539,8 @@ function gui.network_poll_finished(player_gui)
         local table_children = item_table.children
 
         for i = columns, #table_children - 1, columns do
-            local elem_value = table_children[i + 1].children[3].elem_value ---@type (table|string)?
-            if elem_value then
-                local _, _, item_key = gui.extract_elem_value_fields(elem_value)
+            if table_children[i + 1].children[4].sprite == "" then
+                local _, _, item_key = gui.extract_elem_value_fields(table_children[i + 1].children[3].elem_value)
 
                 local provide_total = len_or_zero(provide_haulers[item_key])
                 local request_total = len_or_zero(request_haulers[item_key])
@@ -497,6 +551,9 @@ function gui.network_poll_finished(player_gui)
 
                 local class_name = table_children[i + 2].text
                 class_hauler_totals[class_name] = (class_hauler_totals[class_name] or 0) + provide_total + request_total + liquidate_total
+            else
+                table_children[i + 6].caption = ""
+                table_children[i + 8].caption = ""
             end
         end
     end
@@ -512,9 +569,10 @@ function gui.network_poll_finished(player_gui)
         local table_children = class_table.children
 
         for i = columns, #table_children - 1, columns do
-            local class_name = table_children[i + 2].text
-            local class = classes[class_name]
-            if class then
+            if table_children[i + 1].children[4].sprite == "" then
+                local class_name = table_children[i + 2].text
+                local class = classes[class_name]
+
                 local available = len_or_zero(at_depot_haulers[class_name])
                 local total = available + (class_hauler_totals[class_name] or 0) + len_or_zero(fuel_haulers[class_name])
                 if class.bypass_depot then
@@ -524,6 +582,8 @@ function gui.network_poll_finished(player_gui)
                 end
 
                 table_children[i + 9].caption = { "sspp-gui.fmt-class-available", available, total }
+            else
+                table_children[i + 9].caption = ""
             end
         end
     end
@@ -770,8 +830,11 @@ function gui.network_open(player_id, network_name)
     local player_gui = { network = network_name, elements = elements }
     storage.player_guis[player_id] = player_gui
 
-    gui.populate_table_from_dict(true, elements.class_table, network.classes, bind_1_of_6(populate_row_from_class, player_gui))
-    gui.populate_table_from_dict(true, elements.item_table, network.items, bind_1_of_6(populate_row_from_item, player_gui))
+    local class_table = elements.class_table
+    for class_name, class in pairs(network.classes) do class_init_row(class_table, class_name, class) end
+
+    local item_table = elements.item_table
+    for item_key, item in pairs(network.items) do item_init_row(item_table, item_key, item) end
 
     player.opened = window
 end

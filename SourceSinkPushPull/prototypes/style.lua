@@ -57,7 +57,7 @@ styles.sspp_network_class_table = { ---@type data.TableStyleSpecification
     right_padding = 4,
     cell_padding = 4,
     column_widths = {
-        { column = 1, width = 32 + 4 + 32 + 4 + 32 },
+        { column = 1, width = 32 + 4 + 32 + 4 + 32 + 4 + 20 },
         { column = 2, width = 100 },
         { column = 3, width = 100 },
         { column = 4, width = 100 },
@@ -79,7 +79,7 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
     right_padding = 4,
     cell_padding = 4,
     column_widths = {
-        { column = 1, width = 32 + 4 + 32 + 4 + 32 },
+        { column = 1, width = 32 + 4 + 32 + 4 + 32 + 4 + 20 },
         { column = 2, width = 100 },
         { column = 3, width = 100 },
         { column = 4, width = 100 },
@@ -154,6 +154,16 @@ styles.sspp_compact_sprite_button = { ---@type data.ButtonStyleSpecification
     parent = "sspp_compact_slot_button",
     padding = 4,
     invert_colors_of_picture_when_hovered_or_toggled = true,
+}
+
+styles.sspp_compact_warning_image = { ---@type data.ImageStyleSpecification
+    type = "image_style",
+    parent = "image",
+    size = 24,
+    right_margin = -4,
+    top_margin = 2,
+    bottom_margin = 2,
+    stretch_image_to_widget_size = true,
 }
 
 styles.sspp_station_item_frame = { ---@type data.FrameStyleSpecification
