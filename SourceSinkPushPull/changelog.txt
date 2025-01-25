@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.1
+Date: 2025-01-23
+  Features:
+    - Network classes and items now warn you about invalid values.
+  Bugfixes:
+    - Hopefully fixed all the the jank with moving/cloning classes/items.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.0
 Date: 2025-01-23
   Features:
