@@ -22,10 +22,16 @@ data:extend({
     provide_io_recipe,
     request_io_recipe,
     technology,
-    sspp_reset_icon,
-    sspp_name_icon,
-    sspp_fuel_icon,
+    sspp_bypass_icon,
+    sspp_copy_icon,
+    sspp_delete_icon,
     sspp_depot_icon,
+    sspp_fuel_icon,
+    sspp_grid_icon,
+    sspp_move_down_icon,
+    sspp_move_up_icon,
+    sspp_name_icon,
+    sspp_reset_icon,
 })
 
 require("prototypes.style")

@@ -230,13 +230,26 @@ local function prepare_for_tick_liquidate()
     for network_name, network in pairs(storage.networks) do
         local pull_tickets = network.pull_tickets
         local request_tickets = network.request_tickets
+        local items = network.items
+        local classes = network.classes
 
-        for item_key, hauler_ids in pairs(network.liquidate_haulers) do
-            local pull_count = len_or_zero(pull_tickets[item_key])
-            local request_count = len_or_zero(request_tickets[item_key])
-            local haulers_to_send = math.min(#hauler_ids, pull_count + request_count)
+        local tickets_remaining = {} ---@type {[ItemKey]: integer}
 
+        for item_key, hauler_ids in pairs(network.at_depot_liquidate_haulers) do
+            local tickets = len_or_zero(pull_tickets[item_key]) + len_or_zero(request_tickets[item_key])
+            local haulers_to_send = math.min(#hauler_ids, tickets)
+
+            tickets_remaining[item_key] = tickets - haulers_to_send
             length = extend_network_item_key_list(list, length, network_name, item_key, haulers_to_send)
+        end
+
+        for item_key, hauler_ids in pairs(network.to_depot_liquidate_haulers) do
+            if classes[items[item_key].class].bypass_depot then
+                local tickets = tickets_remaining[item_key] or (len_or_zero(pull_tickets[item_key]) + len_or_zero(request_tickets[item_key]))
+                local haulers_to_send = math.min(#hauler_ids, tickets)
+
+                length = extend_network_item_key_list(list, length, network_name, item_key, haulers_to_send)
+            end
         end
     end
 
@@ -259,9 +272,15 @@ local function tick_liquidate()
 
     local network = storage.networks[network_name]
 
-    local hauler_id = list_pop_random_or_destroy(network.liquidate_haulers, item_key)
+    local hauler_id ---@type HaulerId
+    if network.at_depot_liquidate_haulers[item_key] then
+        hauler_id = list_pop_random_or_destroy(network.at_depot_liquidate_haulers, item_key)
+    else
+        hauler_id = list_pop_random_or_destroy(network.to_depot_liquidate_haulers, item_key)
+    end
     local hauler = storage.haulers[hauler_id]
-    hauler.to_liquidate = nil
+    hauler.to_depot = nil
+    hauler.at_depot = nil
 
     local request_station_id ---@type StationId
     if network.pull_tickets[item_key] then
@@ -322,6 +341,7 @@ end
 local function tick_dispatch()
     local network_name, item_key ---@type NetworkName, ItemKey
     local network, class_name ---@type Network, ClassName
+    local network_haulers ---@type {[ClassName]: HaulerId[]}
 
     repeat
         local network_item_key = list_pop_random_if_any(storage.dispatch_items)
@@ -333,14 +353,20 @@ local function tick_dispatch()
         network = storage.networks[network_name]
         class_name = network.items[item_key].class
 
-        if not network.depot_haulers[class_name] then goto continue end
+        network_haulers = network.at_depot_haulers
+        if not network_haulers[class_name] then
+            network_haulers = network.to_depot_haulers
+            if not network_haulers[class_name] then goto continue end
+            if not network.classes[class_name].bypass_depot then goto continue end
+        end
 
         break; ::continue::
     until false
 
-    local hauler_id = list_pop_random_or_destroy(network.depot_haulers, class_name)
+    local hauler_id = list_pop_random_or_destroy(network_haulers, class_name)
     local hauler = storage.haulers[hauler_id]
     hauler.to_depot = nil
+    hauler.at_depot = nil
 
     local provide_station_id ---@type StationId
     if network.push_tickets[item_key] then
@@ -485,9 +511,9 @@ local function tick_request_done()
             set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
             send_hauler_to_named_stop(hauler, class.fueler_name)
         else
-            list_append_or_create(network.depot_haulers, hauler.class, hauler_id)
-            hauler.to_depot = true
-            set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
+            list_append_or_create(network.to_depot_haulers, hauler.class, hauler_id)
+            hauler.to_depot = ""
+            set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
             send_hauler_to_named_stop(hauler, class.depot_name)
         end
     else

@@ -46,8 +46,10 @@ e_stop_flags = { custom_name = 1 }
 ---@field public provide_haulers {[ItemKey]: HaulerId[]}
 ---@field public request_haulers {[ItemKey]: HaulerId[]}
 ---@field public fuel_haulers {[ClassName]: HaulerId[]}
----@field public depot_haulers {[ClassName]: HaulerId[]}
----@field public liquidate_haulers {[ItemKey]: HaulerId[]}
+---@field public to_depot_haulers {[ClassName]: HaulerId[]}
+---@field public at_depot_haulers {[ClassName]: HaulerId[]}
+---@field public to_depot_liquidate_haulers {[ItemKey]: HaulerId[]}
+---@field public at_depot_liquidate_haulers {[ItemKey]: HaulerId[]}
 ---@field public push_tickets {[ItemKey]: StationId[]}
 ---@field public provide_tickets {[ItemKey]: StationId[]}
 ---@field public pull_tickets {[ItemKey]: StationId[]}
@@ -61,6 +63,7 @@ e_stop_flags = { custom_name = 1 }
 ---@field public fluid_capacity integer?
 ---@field public depot_name string
 ---@field public fueler_name string
+---@field public bypass_depot boolean
 
 ---@class (exact) NetworkItem
 ---@field public list_index integer
@@ -113,8 +116,8 @@ e_stop_flags = { custom_name = 1 }
 ---@field public to_provide HaulerToStation?
 ---@field public to_request HaulerToStation?
 ---@field public to_fuel HaulerPhase?
----@field public to_depot true?
----@field public to_liquidate ItemKey?
+---@field public to_depot (""|ItemKey)?
+---@field public at_depot (""|ItemKey)?
 ---@field public status LocalisedString
 ---@field public status_item ItemKey?
 ---@field public status_stop LuaEntity?
@@ -187,8 +190,10 @@ function init_network(surface)
         provide_haulers = {},
         request_haulers = {},
         fuel_haulers = {},
-        depot_haulers = {},
-        liquidate_haulers = {},
+        to_depot_haulers = {},
+        at_depot_haulers = {},
+        to_depot_liquidate_haulers = {},
+        at_depot_liquidate_haulers = {},
         push_tickets = {},
         provide_tickets = {},
         pull_tickets = {},

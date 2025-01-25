@@ -57,14 +57,15 @@ styles.sspp_network_class_table = { ---@type data.TableStyleSpecification
     right_padding = 4,
     cell_padding = 4,
     column_widths = {
-        { column = 1, width = 32 },
+        { column = 1, width = 32 + 4 + 32 + 4 + 32 },
         { column = 2, width = 100 },
         { column = 3, width = 100 },
         { column = 4, width = 100 },
         { column = 5, width = 100 },
         { column = 6, width = 100 },
         { column = 7, width = 32 },
-        { column = 8, width = 80 },
+        { column = 8, width = 32 },
+        { column = 9, width = 80 },
     },
     odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
@@ -78,14 +79,14 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
     right_padding = 4,
     cell_padding = 4,
     column_widths = {
-        { column = 1, width = 32 },
+        { column = 1, width = 32 + 4 + 32 + 4 + 32 },
         { column = 2, width = 100 },
         { column = 3, width = 100 },
         { column = 4, width = 100 },
         { column = 5, width = 32 },
         { column = 6, width = 60 },
         { column = 7, width = 32 },
-        { column = 8, width = 188 },
+        { column = 8, width = 228 },
     },
     odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
@@ -131,12 +132,28 @@ styles.sspp_subheader_caption_textbox = { ---@type data.TextBoxStyleSpecificatio
     font = "heading-2",
 }
 
+styles.sspp_move_sprite_button = {
+    type = "button_style",
+    parent = "list_box_item",
+    width = 32,
+    height = 14,
+    padding = 0,
+    invert_colors_of_picture_when_hovered_or_toggled = true,
+}
+
 styles.sspp_compact_slot_button = { ---@type data.ButtonStyleSpecification
     type = "button_style",
     parent = "slot_button",
     size = 32,
     top_margin = -2,
     bottom_margin = -2,
+}
+
+styles.sspp_compact_sprite_button = { ---@type data.ButtonStyleSpecification
+    type = "button_style",
+    parent = "sspp_compact_slot_button",
+    padding = 4,
+    invert_colors_of_picture_when_hovered_or_toggled = true,
 }
 
 styles.sspp_station_item_frame = { ---@type data.FrameStyleSpecification

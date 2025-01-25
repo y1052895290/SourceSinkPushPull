@@ -7,8 +7,10 @@ local function reboot_command()
         network.provide_haulers = {}
         network.request_haulers = {}
         network.fuel_haulers = {}
-        network.depot_haulers = {}
-        network.liquidate_haulers = {}
+        network.to_depot_haulers = {}
+        network.at_depot_haulers = {}
+        network.to_depot_liquidate_haulers = {}
+        network.at_depot_liquidate_haulers = {}
     end
 
     for hauler_id, hauler in pairs(storage.haulers) do
@@ -18,7 +20,7 @@ local function reboot_command()
             hauler.to_request = nil
             hauler.to_fuel = nil
             hauler.to_depot = nil
-            hauler.to_liquidate = nil
+            hauler.at_depot = nil
             train.manual_mode = true
         else
             storage.haulers[hauler_id] = nil

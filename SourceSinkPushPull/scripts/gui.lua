@@ -53,6 +53,40 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param table LuaGuiElement
+---@param flow_index integer
+---@param button_index integer
+function gui.move_row(table, flow_index, button_index)
+    local columns = table.column_count
+    local i = flow_index - 1
+    local j = i + (button_index * 2 - 3) * columns
+    if j >= columns and j + columns <= #table.children then
+        for c = 1, columns do
+            table.swap_children(i + c, j + c)
+        end
+    end
+end
+
+---@param table LuaGuiElement
+---@param flow_index integer
+function gui.delete_row(table, flow_index)
+    local children = table.children
+    for i = flow_index - 1 + table.column_count, flow_index, -1 do
+        children[i].destroy()
+    end
+end
+
+---@param table LuaGuiElement
+---@param destination_i integer
+function gui.insert_newly_added_row(table, destination_i)
+    local columns = table.column_count
+    for i = #table.children - columns, destination_i + columns, -columns do
+        for c = 1, columns do
+            table.swap_children(i + c, i + c - columns)
+        end
+    end
+end
+
 ---@param elem_value table|string
 ---@return string name, string? quality, ItemKey item_key
 function gui.extract_elem_value_fields(elem_value)

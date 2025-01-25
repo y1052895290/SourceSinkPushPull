@@ -42,12 +42,17 @@ function main.hauler_disabled_or_destroyed(hauler_id, hauler)
     end
 
     if hauler.to_depot then
-        list_remove_value_or_destroy(network.depot_haulers, hauler.class, hauler_id)
+        list_remove_value_or_destroy(network.to_depot_haulers, hauler.class, hauler_id)
+        if hauler.to_depot ~= "" then
+            storage.disabled_items[hauler.network .. ":" .. hauler.to_depot] = true
+        end
     end
 
-    if hauler.to_liquidate then
-        storage.disabled_items[hauler.network .. ":" .. hauler.to_liquidate] = true
-        list_remove_value_or_destroy(network.liquidate_haulers, hauler.to_liquidate, hauler_id)
+    if hauler.at_depot then
+        list_remove_value_or_destroy(network.at_depot_haulers, hauler.class, hauler_id)
+        if hauler.at_depot ~= "" then
+            storage.disabled_items[hauler.network .. ":" .. hauler.at_depot] = true
+        end
     end
 end
 
@@ -61,7 +66,7 @@ function main.hauler_set_to_manual(hauler)
     hauler.to_request = nil
     hauler.to_fuel = nil
     hauler.to_depot = nil
-    hauler.to_liquidate = nil
+    hauler.at_depot = nil
 
     hauler.train.schedule = nil
 end
@@ -100,9 +105,9 @@ function main.hauler_set_to_automatic(hauler)
     local item_key = train_fluid or train_item and (train_item.name .. ":" .. (train_item.quality or "normal"))
     if item_key then
         if network.items[item_key] then
-            list_append_or_create(network.liquidate_haulers, item_key, train.id)
-            hauler.to_liquidate = item_key
-            set_hauler_status(hauler, { "sspp-alert.holding-cargo" }, item_key)
+            list_append_or_create(network.to_depot_liquidate_haulers, item_key, train.id)
+            hauler.to_depot = item_key
+            set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.waiting-for-request" or "sspp-alert.going-to-depot" }, item_key)
             send_hauler_to_named_stop(hauler, class.depot_name)
         else
             set_hauler_status(hauler, { "sspp-alert.cargo-not-in-network" }, item_key)
@@ -112,9 +117,9 @@ function main.hauler_set_to_automatic(hauler)
         return
     end
 
-    list_append_or_create(network.depot_haulers, hauler.class, train.id)
-    hauler.to_depot = true
-    set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
+    list_append_or_create(network.to_depot_haulers, hauler.class, train.id)
+    hauler.to_depot = ""
+    set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
     send_hauler_to_named_stop(hauler, class.depot_name)
 end
 
@@ -247,10 +252,32 @@ function main.hauler_done_at_fuel_stop(hauler)
     list_remove_value_or_destroy(network.fuel_haulers, hauler.class, train.id)
     hauler.to_fuel = nil
 
-    list_append_or_create(network.depot_haulers, hauler.class, train.id)
-    hauler.to_depot = true
-    set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
+    list_append_or_create(network.to_depot_haulers, hauler.class, train.id)
+    hauler.to_depot = ""
+    set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
     send_hauler_to_named_stop(hauler, class.depot_name)
+end
+
+--------------------------------------------------------------------------------
+
+---@param hauler Hauler
+function main.hauler_arrived_at_depot_stop(hauler)
+    local hauler_id = hauler.train.id
+    local class_name = hauler.class
+    local network = storage.networks[hauler.network]
+    local item_key = hauler.to_depot
+
+    if item_key == "" then
+        list_remove_value_or_destroy(network.to_depot_haulers, class_name, hauler_id)
+        list_append_or_create(network.at_depot_haulers, class_name, hauler_id)
+    else
+        ---@cast item_key ItemKey
+        list_remove_value_or_destroy(network.to_depot_liquidate_haulers, item_key, hauler_id)
+        list_append_or_create(network.at_depot_liquidate_haulers, item_key, hauler_id)
+    end
+
+    hauler.to_depot = nil
+    hauler.at_depot = item_key
 end
 
 --------------------------------------------------------------------------------

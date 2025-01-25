@@ -128,6 +128,13 @@ local function on_train_changed_state(event)
         end
         return
     end
+
+    if hauler.to_depot then
+        if state == defines.train_state.wait_station then
+            main.hauler_arrived_at_depot_stop(hauler)
+        end
+        return
+    end
 end
 
 ---@param event EventData.on_train_created

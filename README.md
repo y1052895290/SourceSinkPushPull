@@ -20,6 +20,7 @@ Within a network, you must define at least one *class* of train to make deliveri
 - Item Capacity and/or Fluid Capacity: The item slot capacity and fluid capacity of every train.
 - Depot Name: The name of the depot train stops to go to when not busy.
 - Fueler Name: The name of the fueler train stops to go to when low on fuel. Required, but may be the same as the depot name.
+- Bypass Depot (checkbox): When enabled, trains may be given new jobs before arriving at a depot. Disable if you are using double headed trains and getting "path broken" alerts.
 
 Additionally, from this view you can see the number of available trains for each class. Click the button to see the locations of assigned trains.
 
