@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.0
+Date: 2025-01-23
+  Features:
+    - Depot bypass can now be disabled, per class. Fixes double headed trains.
+    - Classes and items within networks can now be moved and cloned.
+  Bugfixes:
+    - Work around the text field icon selector not getting disabled in the train gui.
+---------------------------------------------------------------------------------------------------
 Version: 0.2.3
 Date: 2025-01-23
   Bugfixes:
