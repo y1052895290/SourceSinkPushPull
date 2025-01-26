@@ -102,7 +102,7 @@ local handle_auto_train_class = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerHaulerGui]]
     local train = player_gui.train
 
-    local train_name = ""
+    local train_name = "" -- used as generated class name
     local item_slots = 0
     local fluid_capacity = 0
     for _, carriage in pairs(train.carriages) do
@@ -116,17 +116,16 @@ local handle_auto_train_class = { [events.on_gui_click] = function(event)
     end
 
     local network = storage.networks[player_gui.network]
-    local class = nil
-    for class_name, network_class in pairs(network.classes) do
+    local class_exists = false
+    for class_name, _ in pairs(network.classes) do
         if class_name == train_name then
-            class = network_class
+            class_exists = true
             break
         end
     end
 
-    if class == nil then
-        class = generate_network_class(item_slots, fluid_capacity)
-        network.classes[train_name] = class
+    if not class_exists then
+        network.classes[train_name] = generate_network_class(item_slots, fluid_capacity)
     end
 
     storage.haulers[train.id] = {
