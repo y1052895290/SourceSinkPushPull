@@ -151,7 +151,7 @@ end
 ---@param old_dict {[string]: any}
 ---@param from_row fun(table_children: LuaGuiElement[], i: integer): key: string?, value: any
 ---@param to_row fun(table_children: LuaGuiElement[], i: integer, key: string?, value: any)
----@param key_remove fun(key: string) 
+---@param key_remove fun(key: string)
 ---@return {[string]: any}
 function gui.refresh_table(table, old_dict, from_row, to_row, key_remove)
     local columns = table.column_count
@@ -187,6 +187,7 @@ function gui.hauler_set_widget_enabled(hauler_id, enabled)
         if player_gui.train then
             if player_gui.train.id == hauler_id then
                 player_gui.elements.class_textbox.enabled = enabled
+                player_gui.elements.auto_train_class.enabled = player_gui.train.manual_mode
             end
         end
     end
