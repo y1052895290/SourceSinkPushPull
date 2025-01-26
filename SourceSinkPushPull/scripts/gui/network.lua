@@ -307,10 +307,9 @@ local function class_init_row(class_table, class_name, class)
 end
 
 ---@param table_children LuaGuiElement[]
----@param list_index integer
 ---@param i integer
 ---@return ClassName?, Class?
-local function class_from_row(table_children, list_index, i)
+local function class_from_row(table_children, i)
     local class_name = table_children[i + 2].text
     if class_name == "" then return end
 
@@ -329,7 +328,6 @@ local function class_from_row(table_children, list_index, i)
     if fueler_name == "" or #fueler_name > 199 then return end
 
     return class_name, {
-        list_index = list_index,
         item_slot_capacity = item_slot_capacity,
         fluid_capacity = fluid_capacity,
         depot_name = depot_name,
@@ -388,10 +386,9 @@ local function item_init_row(item_table, item_key, item)
 end
 
 ---@param table_children LuaGuiElement[]
----@param list_index integer
 ---@param i integer
 ---@return ItemKey?, NetworkItem?
-local function item_from_row(table_children, list_index, i)
+local function item_from_row(table_children, i)
     local elem_value = table_children[i + 1].children[3].elem_value ---@type (table|string)?
     if not elem_value then return end
 
@@ -408,7 +405,6 @@ local function item_from_row(table_children, list_index, i)
 
     local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
     return item_key, {
-        list_index = list_index,
         name = name,
         quality = quality,
         class = class,
@@ -459,14 +455,14 @@ function gui.update_network_after_change(player_id)
     network.classes = gui.refresh_table(
         player_gui.elements.class_table, network.classes,
         class_from_row,
-        function(b, c, d, e) return class_to_row(player_gui, b, c, d, e) end,
+        function(b, c, d) return class_to_row(player_gui, b, c, d) end,
         function(b) return class_remove_key(player_gui, b) end
     )
 
     network.items = gui.refresh_table(
         player_gui.elements.item_table, network.items,
         item_from_row,
-        function(b, c, d, e) return item_to_row(player_gui, b, c, d, e) end,
+        function(b, c, d) return item_to_row(player_gui, b, c, d) end,
         function(b) return item_remove_key(player_gui, b) end
     )
 end
@@ -574,12 +570,13 @@ function gui.network_poll_finished(player_gui)
                 local class = classes[class_name]
 
                 local available = len_or_zero(at_depot_haulers[class_name])
-                local total = available + (class_hauler_totals[class_name] or 0) + len_or_zero(fuel_haulers[class_name])
+                local total = (class_hauler_totals[class_name] or 0) + len_or_zero(fuel_haulers[class_name])
                 if class.bypass_depot then
                     available = available + len_or_zero(to_depot_haulers[class_name])
                 else
                     total = total + len_or_zero(to_depot_haulers[class_name])
                 end
+                total = total + available
 
                 table_children[i + 9].caption = { "sspp-gui.fmt-class-available", available, total }
             else

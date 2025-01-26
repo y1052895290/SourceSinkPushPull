@@ -191,6 +191,18 @@ function split_item_key(item_key)
     return item_key, nil
 end
 
+---@param item_key ItemKey
+---@return boolean
+function is_item_key_invalid(item_key)
+    local name, quality = split_item_key(item_key)
+    if quality then
+        return not prototypes.item[name]
+    end
+    return not prototypes.fluid[name]
+end
+
+--------------------------------------------------------------------------------
+
 ---@param network_item NetworkItem
 ---@param station_item ProvideItem|RequestItem
 ---@return integer
@@ -371,12 +383,7 @@ function combinator_description_to_provide_items(provide_io)
     local indices = {} ---@type {[integer]: true?}
 
     for item_key, json_item in pairs(json) do
-        local name, quality = split_item_key(item_key)
-        if quality then
-            if not prototypes.item[name] then goto continue end
-        else
-            if not prototypes.fluid[name] then goto continue end
-        end
+        if is_item_key_invalid(item_key) then goto continue end
 
         local list_index = json_item[1]
         if type(list_index) ~= "number" then list_index = 0 end
@@ -433,12 +440,7 @@ function combinator_description_to_request_items(request_io)
     local indices = {} ---@type {[integer]: true?}
 
     for item_key, json_item in pairs(json) do
-        local name, quality = split_item_key(item_key)
-        if quality then
-            if not prototypes.item[name] then goto continue end
-        else
-            if not prototypes.fluid[name] then goto continue end
-        end
+        if is_item_key_invalid(item_key) then goto continue end
 
         local list_index = json_item[1]
         if type(list_index) ~= "number" then list_index = 0 end

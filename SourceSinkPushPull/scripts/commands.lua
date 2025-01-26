@@ -2,7 +2,7 @@
 
 --------------------------------------------------------------------------------
 
-local function reboot_command()
+function main.reboot()
     for _, network in pairs(storage.networks) do
         network.provide_haulers = {}
         network.request_haulers = {}
@@ -57,4 +57,4 @@ local function reboot_command()
     storage.tick_state = "INITIAL"
 end
 
-commands.add_command("sspp-reboot", { "sspp-console.reboot-command-help" }, reboot_command)
+commands.add_command("sspp-reboot", { "sspp-console.reboot-command-help" }, main.reboot)
