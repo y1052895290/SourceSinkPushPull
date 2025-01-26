@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.2
+Date: 2025-01-26
+  Bugfixes:
+    - Made migration code much more robust, should prevent future issues.
+    - Fixed incorrect total in the class gui when bypass is enabled.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.1
 Date: 2025-01-26
   Features:
