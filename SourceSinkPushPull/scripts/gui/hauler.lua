@@ -89,6 +89,11 @@ function gui.hauler_opened(player_id, hauler_id)
 
     local network_name = train.front_stock.surface.name
 
+    -- mods assigning player.opened to another locomotive won't generate a close event
+    if player.gui.screen["sspp-hauler"] then
+        gui.hauler_closed(player_id)
+    end
+
     local elements, window = flib_gui.add(player.gui.screen, {
         { type = "frame", name = "sspp-hauler", style = "sspp_hauler_frame", direction = "vertical", children = {
             { type = "flow", style = "flib_indicator_flow", children = {
