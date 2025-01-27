@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.4
+Date: 2025-01-27
+  Changes:
+    - Don't lock trains when unable to path. Improves diagnostics and prevents alert cascades.
+    - Credit goes entirely to kinonikura (deweykai on github).
+---------------------------------------------------------------------------------------------------
 Version: 0.3.3
 Date: 2025-01-26
   Features:
