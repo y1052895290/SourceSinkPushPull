@@ -12,6 +12,7 @@ function gui.hauler_status_changed(player_gui)
     local hauler = storage.haulers[train.id]
 
     elements.status_label.caption = hauler.status
+    elements.class_textbox.caption = hauler.class
     if hauler.status_item then
         local name, quality = split_item_key(hauler.status_item)
         if quality then
@@ -79,6 +80,86 @@ local handle_class_changed = { [events.on_gui_text_changed] = function(event)
     end
 end }
 
+---@param item_slots number
+---@param fluid_capacity number
+---@return Class
+function generate_network_class(item_slots, fluid_capacity)
+    ---@type Class
+    local class = {
+        bypass_depot = false,
+        depot_name = "Depot not set",
+        fluid_capacity = fluid_capacity,
+        fueler_name = "Fueler not set",
+        item_slot_capacity = item_slots,
+    }
+    return class
+end
+
+---@param event EventData.on_gui_click
+local handle_auto_train_class = { [events.on_gui_click] = function(event)
+    local player_id = event.player_index
+    local player = game.get_player(player_id)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerHaulerGui]]
+    local train = player_gui.train
+    local force_special_naming = event.shift
+
+    local train_name = "" -- used as generated class name
+    local item_slots = 0
+    local fluid_capacity = 0
+    for _, carriage in pairs(train.carriages) do
+        train_name = train_name .. string.format("[item=%s]", carriage.name)
+        if carriage.type == "cargo-wagon" then
+            local inv = carriage.get_inventory(defines.inventory.cargo_wagon)
+            item_slots = item_slots + #inv
+        elseif carriage.type == "fluid-wagon" then
+            fluid_capacity = fluid_capacity + carriage.prototype.fluid_capacity
+        end
+    end
+
+    local network = storage.networks[player_gui.network]
+    local class_name = nil
+    local ambiguous_class = false
+    for network_class_name, network_class in pairs(network.classes) do
+        -- Check for exact name
+        -- Special name has priority
+        if network_class_name == train_name then
+            class_name = network_class_name
+            ambiguous_class = false
+            break
+        end
+        if not force_special_naming then
+            -- Check for matching specification
+            if network_class.fluid_capacity == fluid_capacity and network_class.item_slot_capacity == item_slots then
+                if class_name then
+                    -- another valid class name was found
+                    ambiguous_class = true
+                else
+                    class_name = network_class_name
+                end
+            end
+        end
+    end
+
+    if ambiguous_class then
+        send_alert_for_train(train, { "sspp-gui.ambiguous-class" })
+        return
+    end
+
+    if not class_name and force_special_naming then
+        network.classes[train_name] = generate_network_class(item_slots, fluid_capacity)
+        send_alert_for_train(train, { "sspp-gui.new-class-created" })
+        class_name = train_name
+    end
+
+    storage.haulers[train.id] = {
+        train = train,
+        network = player_gui.network,
+        class = class_name,
+    }
+    train.manual_mode = false
+    gui.hauler_status_changed(player_gui)
+end }
+
 --------------------------------------------------------------------------------
 
 ---@param player_id PlayerId
@@ -99,6 +180,7 @@ function gui.hauler_opened(player_id, hauler_id)
             { type = "flow", style = "flib_indicator_flow", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.sspp" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
+                { type = "button", name = "auto_train_class", style = "sspp_frame_tool_button", caption = { "sspp-gui.auto-train-class-btn" }, tooltip = { "sspp-gui.auto-train-class-btn-tooltip" }, mouse_button_filter = { "left" }, handler = handle_auto_train_class, enabled = false },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
             } },
             { type = "flow", style = "flib_indicator_flow", children = {
@@ -131,6 +213,10 @@ function gui.hauler_opened(player_id, hauler_id)
     end
 
     elements.class_textbox.enabled = train.manual_mode
+
+    if train.manual_mode then
+        elements.auto_train_class.enabled = true
+    end
 end
 
 ---@param player_id PlayerId
@@ -147,6 +233,7 @@ end
 function gui.hauler_add_flib_handlers()
     flib_gui.add_handlers({
         ["hauler_open_network"] = handle_open_network[events.on_gui_click],
+        ["handle_auto_train_class"] = handle_auto_train_class[events.on_gui_click],
         ["hauler_stop_clicked"] = handle_stop_clicked[events.on_gui_click],
         ["hauler_class_changed"] = handle_class_changed[events.on_gui_text_changed],
     })
