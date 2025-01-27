@@ -93,14 +93,12 @@ e_stop_flags = { custom_name = 1 }
 ---@field public hauler HaulerId?
 
 ---@class (exact) ProvideItem
----@field public list_index integer
 ---@field public push boolean
 ---@field public throughput number
 ---@field public latency number
 ---@field public granularity integer
 
 ---@class (exact) RequestItem
----@field public list_index integer
 ---@field public pull boolean
 ---@field public throughput number
 ---@field public latency number

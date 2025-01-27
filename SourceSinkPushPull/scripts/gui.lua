@@ -102,58 +102,13 @@ function gui.extract_elem_value_fields(elem_value)
     return name, quality, item_key
 end
 
----@param from_nothing boolean
 ---@param table LuaGuiElement
----@param dict {[string]: any}
----@param inner fun(from_nothing: boolean, table: LuaGuiElement, dict: {[string]: any}, key: string, i: integer)
-function gui.populate_table_from_dict(from_nothing, table, dict, inner)
-    local keys = {}
-    for key, entry in pairs(dict) do keys[entry.list_index] = key end
-    assert(#keys == table_size(dict))
-
-    local columns = table.column_count
-
-    if from_nothing then
-        local table_children = table.children
-        for i = #table_children, columns + 1, -1 do table_children[i].destroy() end
-    end
-
-    for list_index = 1, #keys do
-        local i = list_index * columns
-        local key = keys[list_index]
-
-        inner(from_nothing, table, dict, key, i)
-    end
-end
-
----@param table LuaGuiElement
----@param inner fun(table_children: LuaGuiElement[], list_index: integer, i: integer): key: string, value: any
----@return {[string]: any}
-function gui.generate_dict_from_table(table, inner)
-    local columns = table.column_count
-    local table_children = table.children
-
-    local dict = {}
-    local list_index = 0
-
-    for i = columns, #table_children - 1, columns do
-        local key, value = inner(table_children, list_index + 1, i)
-        if key and not dict[key] then
-            list_index = list_index + 1
-            dict[key] = value
-        end
-    end
-
-    return dict
-end
-
----@param table LuaGuiElement
----@param old_dict {[string]: any}
 ---@param from_row fun(table_children: LuaGuiElement[], i: integer): key: string?, value: any
 ---@param to_row fun(table_children: LuaGuiElement[], i: integer, key: string?, value: any)
----@param key_remove fun(key: string) 
+---@param old_dict {[string]: any}?
+---@param key_remove fun(key: string)?
 ---@return {[string]: any}
-function gui.refresh_table(table, old_dict, from_row, to_row, key_remove)
+function gui.refresh_table(table, from_row, to_row, old_dict, key_remove)
     local columns = table.column_count
     local table_children = table.children
 
@@ -173,8 +128,11 @@ function gui.refresh_table(table, old_dict, from_row, to_row, key_remove)
         to_row(table_children, i, key, value)
     end
 
-    for key, _ in pairs(old_dict) do
-        if not new_dict[key] then key_remove(key) end
+    if old_dict then
+        ---@cast key_remove fun(key: string)
+        for key, _ in pairs(old_dict) do
+            if not new_dict[key] then key_remove(key) end
+        end
     end
 
     return new_dict

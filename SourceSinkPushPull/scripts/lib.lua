@@ -247,39 +247,37 @@ end
 ---@param provide_items {[ItemKey]: ProvideItem}?
 ---@param request_items {[ItemKey]: RequestItem}?
 function compute_stop_name(provide_items, request_items)
-    local provide_icons ---@type string[]?
-    local request_icons ---@type string[]?
+    local provide_icons, p_len = {}, 0 ---@type string[], integer
+    local request_icons, r_len = {}, 0 ---@type string[], integer
 
-    if provide_items and next(provide_items) then
-        provide_icons = {}
-        for item_key, item in pairs(provide_items) do
+    if provide_items then
+        for item_key, _ in pairs(provide_items) do
+            p_len = p_len + 1
             local name, quality = split_item_key(item_key)
             if quality then
-                provide_icons[item.list_index] = "[item=" .. name .. ",quality=" .. quality .. "]"
+                provide_icons[p_len] = "[item=" .. name .. ",quality=" .. quality .. "]"
             else
-                provide_icons[item.list_index] = "[fluid=" .. name .. "]"
+                provide_icons[p_len] = "[fluid=" .. name .. "]"
             end
         end
-        assert(#provide_icons == table_size(provide_items))
     end
 
-    if request_items and next(request_items) then
-        request_icons = {}
-        for item_key, item in pairs(request_items) do
+    if request_items then
+        for item_key, _ in pairs(request_items) do
+            r_len = r_len + 1
             local name, quality = split_item_key(item_key)
             if quality then
-                request_icons[item.list_index] = "[item=" .. name .. ",quality=" .. quality .. "]"
+                request_icons[r_len] = "[item=" .. name .. ",quality=" .. quality .. "]"
             else
-                request_icons[item.list_index] = "[fluid=" .. name .. "]"
+                request_icons[r_len] = "[fluid=" .. name .. "]"
             end
         end
-        assert(#request_icons == table_size(request_items))
     end
 
-    if provide_icons and request_icons then
+    if p_len > 0 and r_len > 0 then
         local provide_string, request_string, total_length = "", "", 0
         local max_length = 199 - #"[color=green]⬆…[/color] [color=red]⬇…[/color]"
-        local p, r, p_len, r_len = 0, 0, #provide_icons, #request_icons
+        local p, r = 0, 0
         repeat
             if p < p_len then
                 p = p + 1
@@ -301,7 +299,7 @@ function compute_stop_name(provide_items, request_items)
             end
         until p == p_len and r == r_len
         return "[color=green]⬆" .. provide_string .. "[/color] [color=red]⬇" .. request_string .. "[/color]"
-    elseif provide_icons then
+    elseif p_len > 0 then
         local max_length = 199 - #"[color=green]⬆…[/color]"
         local provide_string, length = "", 0
         for _, icon in pairs(provide_icons) do
@@ -313,7 +311,7 @@ function compute_stop_name(provide_items, request_items)
             provide_string = provide_string .. icon
         end
         return "[color=green]⬆" .. provide_string .. "[/color]"
-    elseif request_icons then
+    elseif r_len > 0 then
         local max_length = 199 - #"[color=red]⬇…[/color]"
         local request_string, length = "", 0
         for _, icon in pairs(request_icons) do
@@ -378,41 +376,29 @@ function combinator_description_to_provide_items(provide_io)
     if json_string == "" then return {} end
 
     local json = helpers.json_to_table(json_string) --[[@as table]]
-
     local items = {} ---@type {[ItemKey]: ProvideItem}
-    local indices = {} ---@type {[integer]: true?}
 
     for item_key, json_item in pairs(json) do
         if is_item_key_invalid(item_key) then goto continue end
 
-        local list_index = json_item[1]
-        if type(list_index) ~= "number" then list_index = 0 end
+        -- list_index was removed in 0.3.5
+        local offset = #json_item - 4
 
-        local push = json_item[2]
+        local push = json_item[1 + offset]
         if type(push) ~= "boolean" then push = false end
 
-        local throughput = json_item[3]
+        local throughput = json_item[2 + offset]
         if type(throughput) ~= "number" then throughput = 0.0 end
 
-        local latency = json_item[4]
+        local latency = json_item[3 + offset]
         if type(latency) ~= "number" then latency = 30.0 end
 
-        local granularity = json_item[5]
+        local granularity = json_item[4 + offset]
         if type(granularity) ~= "number" then granularity = 1 end
 
-        items[item_key] = { list_index = list_index, push = push, throughput = throughput, latency = latency, granularity = granularity }
-        indices[list_index] = true
+        items[item_key] = { push = push, throughput = throughput, latency = latency, granularity = granularity }
 
         ::continue::
-    end
-
-    local indices_length = #indices
-    if table_size(items) ~= indices_length or table_size(indices) ~= indices_length then
-        local index = 0
-        for _, item in pairs(items) do
-            index = index + 1
-            item.list_index = index
-        end
     end
 
     return items
@@ -423,7 +409,7 @@ end
 function provide_items_to_combinator_description(provide_items)
     local json = {}
     for item_key, item in pairs(provide_items) do
-        json[item_key] = { item.list_index, item.push, item.throughput, item.latency, item.granularity }
+        json[item_key] = { item.push, item.throughput, item.latency, item.granularity }
     end
     return helpers.table_to_json(json)
 end
@@ -435,38 +421,26 @@ function combinator_description_to_request_items(request_io)
     if json_string == "" then return {} end
 
     local json = helpers.json_to_table(json_string) --[[@as table]]
-
     local items = {} ---@type {[ItemKey]: RequestItem}
-    local indices = {} ---@type {[integer]: true?}
 
     for item_key, json_item in pairs(json) do
         if is_item_key_invalid(item_key) then goto continue end
 
-        local list_index = json_item[1]
-        if type(list_index) ~= "number" then list_index = 0 end
+        -- list_index was removed in 0.3.5
+        local offset = #json_item - 3
 
-        local pull = json_item[2]
+        local pull = json_item[1 + offset]
         if type(pull) ~= "boolean" then pull = false end
 
-        local throughput = json_item[3]
+        local throughput = json_item[2 + offset]
         if type(throughput) ~= "number" then throughput = 0.0 end
 
-        local latency = json_item[4]
+        local latency = json_item[3 + offset]
         if type(latency) ~= "number" then latency = 30.0 end
 
-        items[item_key] = { list_index = list_index, pull = pull, throughput = throughput, latency = latency }
-        indices[list_index] = true
+        items[item_key] = { pull = pull, throughput = throughput, latency = latency }
 
         ::continue::
-    end
-
-    local indices_length = #indices
-    if table_size(items) ~= indices_length or table_size(indices) ~= indices_length then
-        local index = 0
-        for _, item in pairs(items) do
-            index = index + 1
-            item.list_index = index
-        end
     end
 
     return items
@@ -477,7 +451,7 @@ end
 function request_items_to_combinator_description(request_items)
     local json = {}
     for item_key, item in pairs(request_items) do
-        json[item_key] = { item.list_index, item.pull, item.throughput, item.latency }
+        json[item_key] = { item.pull, item.throughput, item.latency }
     end
     return helpers.table_to_json(json)
 end

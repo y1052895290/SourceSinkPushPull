@@ -103,10 +103,11 @@ styles.sspp_station_item_table = { ---@type data.TableStyleSpecification
     top_cell_padding = 6,
     bottom_cell_padding = 6,
     column_widths = {
-        { column = 1, width = 80 },
-        { column = 2, width = 200 },
+        { column = 1, width = 32 - 4 },
+        { column = 2, width = 80 },
         { column = 3, width = 200 },
         { column = 4, width = 200 },
+        { column = 5, width = 200 },
     },
     odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,

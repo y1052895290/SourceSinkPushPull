@@ -5,6 +5,22 @@ local flib_migration = require("__flib__.migration")
 --------------------------------------------------------------------------------
 
 local migrations = {
+    ["0.3.5"] = function()
+        for _, station in pairs(storage.stations) do
+            if station.stop.valid then
+                if station.provide_items then
+                    for _, item in pairs(station.provide_items) do
+                        item.list_index = nil
+                    end
+                end
+                if station.request_items then
+                    for _, item in pairs(station.request_items) do
+                        item.list_index = nil
+                    end
+                end
+            end
+        end
+    end,
     ["0.3.4"] = function()
         for _, station in pairs(storage.stations) do
             if station.stop.valid then

@@ -453,16 +453,18 @@ function gui.update_network_after_change(player_id)
     local network = storage.networks[player_gui.network]
 
     network.classes = gui.refresh_table(
-        player_gui.elements.class_table, network.classes,
+        player_gui.elements.class_table,
         class_from_row,
-        function(b, c, d) return class_to_row(player_gui, b, c, d) end,
+        function(b, c, d, e) return class_to_row(player_gui, b, c, d, e) end,
+        network.classes,
         function(b) return class_remove_key(player_gui, b) end
     )
 
     network.items = gui.refresh_table(
-        player_gui.elements.item_table, network.items,
+        player_gui.elements.item_table,
         item_from_row,
-        function(b, c, d) return item_to_row(player_gui, b, c, d) end,
+        function(b, c, d, e) return item_to_row(player_gui, b, c, d, e) end,
+        network.items,
         function(b) return item_remove_key(player_gui, b) end
     )
 end
