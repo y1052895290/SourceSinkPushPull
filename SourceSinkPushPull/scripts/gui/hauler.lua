@@ -120,16 +120,15 @@ local handle_auto_train_class = { [events.on_gui_click] = function(event)
     local class_name = nil
     local ambiguous_class = false
     for network_class_name, network_class in pairs(network.classes) do
-        -- Check for exact name
-        -- Special name has priority
-        if network_class_name == train_name then
-            class_name = network_class_name
-            ambiguous_class = false
-            break
-        end
-        if not force_special_naming then
-            -- Check for matching specification
-            if network_class.fluid_capacity == fluid_capacity and network_class.item_slot_capacity == item_slots then
+        -- Check for matching specification
+        if network_class.fluid_capacity == fluid_capacity and network_class.item_slot_capacity == item_slots then
+            -- Special name has priority
+            if network_class_name == train_name then
+                class_name = network_class_name
+                ambiguous_class = false
+                break
+            end
+            if not force_special_naming then
                 if class_name then
                     -- another valid class name was found
                     ambiguous_class = true
