@@ -80,74 +80,44 @@ local handle_class_changed = { [events.on_gui_text_changed] = function(event)
     end
 end }
 
----@param item_slots number
----@param fluid_capacity number
----@return Class
-function generate_network_class(item_slots, fluid_capacity)
-    ---@type Class
-    local class = {
-        bypass_depot = false,
-        depot_name = "",
-        fluid_capacity = fluid_capacity,
-        fueler_name = "",
-        item_slot_capacity = item_slots,
-    }
-    return class
-end
-
 ---@param event EventData.on_gui_click
 local handle_auto_train_class = { [events.on_gui_click] = function(event)
-    local player_id = event.player_index
-    local player = game.get_player(player_id)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerHaulerGui]]
     local train = player_gui.train
-    local force_special_naming = event.shift
 
-    local train_name = "" -- used as generated class name
-    local item_slots = 0
-    local fluid_capacity = 0
-    for _, carriage in pairs(train.carriages) do
-        train_name = train_name .. string.format("[item=%s]", carriage.name)
-        if carriage.type == "cargo-wagon" then
-            local inv = carriage.get_inventory(defines.inventory.cargo_wagon)
-            item_slots = item_slots + #inv
-        elseif carriage.type == "fluid-wagon" then
-            fluid_capacity = fluid_capacity + carriage.prototype.fluid_capacity
+    local function create_train_layout(train)
+        local train_name = "" -- used as generated class name
+        for _, carriage in pairs(train.carriages) do
+            train_name = train_name .. string.format("[item=%s]", carriage.name)
+        end
+        return train_name
+    end
+
+    local train_layout = create_train_layout(train)
+    local hauler_layouts = {}
+    for _, hauler in pairs(storage.haulers) do
+        local layout = create_train_layout(hauler.train)
+        if layout == train_layout then
+            hauler_layouts[hauler.class] = true
         end
     end
 
-    local network = storage.networks[player_gui.network]
-    local class_name = nil
-    local ambiguous_class = false
-    for network_class_name, network_class in pairs(network.classes) do
-        -- Check for matching specification
-        if network_class.fluid_capacity == fluid_capacity and network_class.item_slot_capacity == item_slots then
-            -- Special name has priority
-            if network_class_name == train_name then
-                class_name = network_class_name
-                ambiguous_class = false
-                break
-            end
-            if not force_special_naming then
-                if class_name then
-                    -- another valid class name was found
-                    ambiguous_class = true
-                else
-                    class_name = network_class_name
-                end
-            end
-        end
+    local class_name
+    local valid_classes = 0
+    -- no good way to get a single element of a set inlua
+    for class, _ in pairs(hauler_layouts) do
+        valid_classes = valid_classes + 1
+        class_name = class
     end
 
-    if ambiguous_class then
-        send_alert_for_train(train, { "sspp-gui.ambiguous-class" })
+    if valid_classes > 1 then
+        send_alert_for_train(train, { "sspp-gui.train-layout-multiple-class-error" })
         return
     end
 
-    if not class_name and force_special_naming then
-        network.classes[train_name] = generate_network_class(item_slots, fluid_capacity)
-        send_alert_for_train(train, { "sspp-gui.new-class-created" })
-        class_name = train_name
+    if valid_classes == 0 then
+        send_alert_for_train(train, { "sspp-gui.train-layout-no-class-error" })
+        return
     end
 
     storage.haulers[train.id] = {
@@ -155,6 +125,7 @@ local handle_auto_train_class = { [events.on_gui_click] = function(event)
         network = player_gui.network,
         class = class_name,
     }
+
     train.manual_mode = false
     gui.hauler_status_changed(player_gui)
 end }
