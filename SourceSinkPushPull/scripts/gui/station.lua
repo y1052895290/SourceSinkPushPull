@@ -171,16 +171,16 @@ end
 ---@param table_name string
 ---@param inner function
 ---@param elem_type "item-with-quality"|"fluid"
+---@return boolean success
 local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
     local table = storage.player_guis[player_id].elements[table_name]
-    local length = #table.children
-    if length <= table.column_count * 10 then
+    if #table.children <= table.column_count * 10 then
         inner(table, elem_type)
-        return length + 1
+        return true
     else
         local player = game.get_player(player_id) --[[@as LuaPlayer]]
         player.play_sound({ path = "utility/cannot_build" })
-        return nil
+        return false
     end
 end
 
