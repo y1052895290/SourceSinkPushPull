@@ -227,7 +227,7 @@ local function add_new_class_row(class_table)
 end
 
 ---@param item_table LuaGuiElement
----@param elem_type "item-with-quality"|"fluid"
+---@param elem_type string
 local function add_new_item_row(item_table, elem_type)
     flib_gui.add(item_table, {
         { type = "flow", direction = "horizontal", children = {
@@ -274,7 +274,7 @@ handle_item_copy[events.on_gui_click] = function(event)
     local flow = event.element.parent --[[@as LuaGuiElement]]
     local table = flow.parent --[[@as LuaGuiElement]]
 
-    add_new_item_row(table, type(flow.children[3].elem_value) == "table" and "item-with-quality" or "fluid")
+    add_new_item_row(table, flow.children[3].elem_type)
     local i = flow.get_index_in_parent() - 1
     local j = i + table.column_count
     gui.insert_newly_added_row(table, j)
