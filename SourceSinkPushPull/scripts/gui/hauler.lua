@@ -87,9 +87,9 @@ function generate_network_class(item_slots, fluid_capacity)
     ---@type Class
     local class = {
         bypass_depot = false,
-        depot_name = "Depot not set",
+        depot_name = "",
         fluid_capacity = fluid_capacity,
-        fueler_name = "Fueler not set",
+        fueler_name = "",
         item_slot_capacity = item_slots,
     }
     return class
