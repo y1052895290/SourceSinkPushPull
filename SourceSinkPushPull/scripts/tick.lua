@@ -296,7 +296,7 @@ local function tick_liquidate()
     request_station.total_deliveries = request_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
-    send_hauler_to_station(hauler, request_station)
+    send_hauler_to_station(hauler, request_station.stop)
 
     return false
 end
@@ -382,7 +382,7 @@ local function tick_dispatch()
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
-    send_hauler_to_station(hauler, provide_station)
+    send_hauler_to_station(hauler, provide_station.stop)
 
     return false
 end
@@ -452,7 +452,7 @@ local function tick_provide_done()
     request_station.total_deliveries = request_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
-    send_hauler_to_station(hauler, request_station)
+    send_hauler_to_station(hauler, request_station.stop)
 
     return false
 end

@@ -532,38 +532,20 @@ function set_haulers_to_manual(hauler_ids, message, item, stop)
 end
 
 ---@param hauler Hauler
----@param station Station
-function send_hauler_to_station(hauler, station)
-    local train = hauler.train
-    local stop = station.stop
-
-    stop.trains_limit = nil
-    train.schedule = { current = 1, records = { { station = stop.backer_name } } }
-    train.recalculate_path()
-    stop.trains_limit = 0
-
-    local state = train.state
-    if state == defines.train_state.no_path then
-        set_hauler_status(hauler, { "sspp-alert.no-path-to-station" }, hauler.status_item, stop)
-        send_alert_for_train(train, hauler.status)
-        train.manual_mode = true
-    end
+---@param stop LuaEntity
+function send_hauler_to_station(hauler, stop)
+    hauler.train.schedule = { current = 1, records = {
+        { rail = stop.connected_rail, rail_direction = stop.connected_rail_direction },
+        { station = stop.backer_name },
+    } }
 end
 
 ---@param hauler Hauler
 ---@param stop_name string
 function send_hauler_to_named_stop(hauler, stop_name)
-    local train = hauler.train
-
-    train.schedule = { current = 1, records = { { station = stop_name } } }
-    train.recalculate_path()
-
-    local state = train.state
-    if state == defines.train_state.no_path or state == defines.train_state.destination_full then
-        set_hauler_status(hauler, { "sspp-alert.no-path-to-named-stop", stop_name }, hauler.status_item)
-        send_alert_for_train(train, hauler.status)
-        train.manual_mode = true
-    end
+    hauler.train.schedule = { current = 1, records = {
+        { station = stop_name },
+    } }
 end
 
 ---@param hauler Hauler
