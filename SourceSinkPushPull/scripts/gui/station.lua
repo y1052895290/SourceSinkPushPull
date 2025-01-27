@@ -64,7 +64,7 @@ local function make_center_flow(def)
 end
 
 ---@param provide_table LuaGuiElement
----@param elem_type "item-with-quality"|"fluid"
+---@param elem_type string
 local function add_new_provide_row(provide_table, elem_type)
     flib_gui.add(provide_table, {
         { type = "flow", direction = "vertical", children = {
@@ -118,7 +118,7 @@ local function add_new_provide_row(provide_table, elem_type)
 end
 
 ---@param request_table LuaGuiElement
----@param elem_type "item-with-quality"|"fluid"
+---@param elem_type string
 local function add_new_request_row(request_table, elem_type)
     flib_gui.add(request_table, {
         { type = "flow", direction = "vertical", children = {
@@ -170,7 +170,7 @@ end
 ---@param player_id PlayerId
 ---@param table_name string
 ---@param inner function
----@param elem_type "item-with-quality"|"fluid"
+---@param elem_type string
 ---@return boolean success
 local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
     local table = storage.player_guis[player_id].elements[table_name]
@@ -192,7 +192,7 @@ handle_provide_copy[events.on_gui_click] = function(event)
     local table = flow.parent --[[@as LuaGuiElement]]
 
     local i = flow.get_index_in_parent() - 1
-    local elem_type = type(table.children[i + 2].elem_value) == "table" and "item-with-quality" or "fluid"
+    local elem_type = table.children[i + 2].elem_type
     if not try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, elem_type) then return end
 
     local j = i + table.column_count
@@ -211,7 +211,7 @@ handle_request_copy[events.on_gui_click] = function(event)
     local table = flow.parent --[[@as LuaGuiElement]]
 
     local i = flow.get_index_in_parent() - 1
-    local elem_type = type(table.children[i + 2].elem_value) == "table" and "item-with-quality" or "fluid"
+    local elem_type = table.children[i + 2].elem_type
     if not try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, elem_type) then return end
 
     local j = i + table.column_count
