@@ -562,7 +562,7 @@ local handle_open_network = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local network_name = storage.player_guis[player_id].network
 
-    gui.network_open(player_id, network_name)
+    gui.network_open(player_id, network_name, 2)
 end }
 
 ---@param event EventData.on_gui_click

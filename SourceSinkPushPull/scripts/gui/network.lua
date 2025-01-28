@@ -714,7 +714,8 @@ end }
 
 ---@param player_id PlayerId
 ---@param network_name NetworkName
-function gui.network_open(player_id, network_name)
+---@param tab_index integer
+function gui.network_open(player_id, network_name, tab_index)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
     local network = storage.networks[network_name]
 
@@ -736,7 +737,7 @@ function gui.network_open(player_id, network_name)
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
-                    { type = "tabbed-pane", style = "tabbed_pane", selected_tab_index = 1, children = {
+                    { type = "tabbed-pane", name = "tabbed_pane", style = "tabbed_pane", children = {
                         ---@diagnostic disable-next-line: missing-fields
                         {
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.classes" } },
@@ -796,6 +797,7 @@ function gui.network_open(player_id, network_name)
         } },
     })
 
+    elements.tabbed_pane.selected_tab_index = tab_index
     window.force_auto_center()
 
     local player_gui = { network = network_name, elements = elements }
