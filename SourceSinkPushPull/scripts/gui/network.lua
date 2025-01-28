@@ -26,16 +26,6 @@ local handle_class_name_changed = { [events.on_gui_text_changed] = function(even
     gui.update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_text_changed
-local handle_class_item_capacity_changed = { [events.on_gui_text_changed] = function(event)
-    gui.update_network_after_change(event.player_index)
-end }
-
----@param event EventData.on_gui_text_changed
-local handle_class_fluid_capacity_changed = { [events.on_gui_text_changed] = function(event)
-    gui.update_network_after_change(event.player_index)
-end }
-
 ---@param event EventData.on_gui_click
 local handle_class_bypass_depot_changed = { [events.on_gui_click] = function(event)
     gui.update_network_after_change(event.player_index)
@@ -216,8 +206,6 @@ local function add_new_class_row(class_table)
             { type = "sprite", style = "sspp_compact_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
         } },
         { type = "textfield", style = "sspp_name_textbox", icon_selector = true, text = "", handler = handle_class_name_changed },
-        { type = "textfield", style = "sspp_number_textbox", numeric = true, text = "0", handler = handle_class_item_capacity_changed },
-        { type = "textfield", style = "sspp_number_textbox", numeric = true, text = "0", handler = handle_class_fluid_capacity_changed },
         { type = "textfield", style = "sspp_name_textbox", icon_selector = true, text = "", handler = handle_class_depot_name_changed },
         { type = "textfield", style = "sspp_name_textbox", icon_selector = true, text = "", handler = handle_class_fueler_name_changed },
         { type = "checkbox", style = "checkbox", state = true, handler = handle_class_bypass_depot_changed },
@@ -264,9 +252,7 @@ handle_class_copy[events.on_gui_click] = function(event)
     local table_children = table.children
     table_children[j + 3].text = table_children[i + 3].text
     table_children[j + 4].text = table_children[i + 4].text
-    table_children[j + 5].text = table_children[i + 5].text
-    table_children[j + 6].text = table_children[i + 6].text
-    table_children[j + 7].state = table_children[i + 7].state
+    table_children[j + 5].state = table_children[i + 5].state
 end
 
 ---@param event EventData.on_gui_click
@@ -299,11 +285,9 @@ local function class_init_row(class_table, class_name, class)
     table_children[i + 1].children[4].sprite = ""
     table_children[i + 1].children[4].tooltip = nil
     table_children[i + 2].text = class_name
-    table_children[i + 3].text = tostring(class.item_slot_capacity)
-    table_children[i + 4].text = tostring(class.fluid_capacity)
-    table_children[i + 5].text = class.depot_name
-    table_children[i + 6].text = class.fueler_name
-    table_children[i + 7].state = class.bypass_depot
+    table_children[i + 3].text = class.depot_name
+    table_children[i + 4].text = class.fueler_name
+    table_children[i + 5].state = class.bypass_depot
 end
 
 ---@param table_children LuaGuiElement[]
@@ -313,26 +297,16 @@ local function class_from_row(table_children, i)
     local class_name = table_children[i + 2].text
     if class_name == "" then return end
 
-    local item_slot_capacity = tonumber(table_children[i + 3].text)
-    if not item_slot_capacity then return end
-
-    local fluid_capacity = tonumber(table_children[i + 4].text)
-    if not fluid_capacity then return end
-
-    if item_slot_capacity == 0 and fluid_capacity == 0 then return end
-
-    local depot_name = table_children[i + 5].text
+    local depot_name = table_children[i + 3].text
     if depot_name == "" or #depot_name > 199 then return end
 
-    local fueler_name = table_children[i + 6].text
+    local fueler_name = table_children[i + 4].text
     if fueler_name == "" or #fueler_name > 199 then return end
 
     return class_name, {
-        item_slot_capacity = item_slot_capacity,
-        fluid_capacity = fluid_capacity,
         depot_name = depot_name,
         fueler_name = fueler_name,
-        bypass_depot = table_children[i + 7].state,
+        bypass_depot = table_children[i + 5].state,
     } --[[@as Class]]
 end
 
@@ -345,11 +319,11 @@ local function class_to_row(player_gui, table_children, i, class_name, class)
     if class_name then
         table_children[i + 1].children[4].sprite = ""
         table_children[i + 1].children[4].tooltip = nil
-        table_children[i + 8].toggled = class_name == player_gui.haulers_class
+        table_children[i + 6].toggled = class_name == player_gui.haulers_class
     else
         table_children[i + 1].children[4].sprite = "utility/achievement_warning"
         table_children[i + 1].children[4].tooltip = { "sspp-gui.invalid-values-tooltip" }
-        table_children[i + 8].toggled = false
+        table_children[i + 6].toggled = false
     end
 end
 
@@ -580,9 +554,9 @@ function gui.network_poll_finished(player_gui)
                 end
                 total = total + available
 
-                table_children[i + 9].caption = { "sspp-gui.fmt-class-available", available, total }
+                table_children[i + 7].caption = { "sspp-gui.fmt-class-available", available, total }
             else
-                table_children[i + 9].caption = ""
+                table_children[i + 7].caption = ""
             end
         end
     end
@@ -741,8 +715,8 @@ end }
 ---@param player_id PlayerId
 ---@param network_name NetworkName
 function gui.network_open(player_id, network_name)
-    local player = assert(game.get_player(player_id))
-    local network = assert(storage.networks[network_name])
+    local player = game.get_player(player_id) --[[@as LuaPlayer]]
+    local network = storage.networks[network_name]
 
     player.opened = nil
 
@@ -767,11 +741,9 @@ function gui.network_open(player_id, network_name)
                         {
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.classes" } },
                             content = { type = "scroll-pane", style = "sspp_network_left_scroll_pane", direction = "vertical", children = {
-                                { type = "table", name = "class_table", style = "sspp_network_class_table", column_count = 9, children = {
+                                { type = "table", name = "class_table", style = "sspp_network_class_table", column_count = 7, children = {
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.name" }, tooltip = { "sspp-gui.class-name-tooltip" } },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.item-capacity" }, tooltip = { "sspp-gui.class-item-capacity-tooltip" } },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.fluid-capacity" }, tooltip = { "sspp-gui.class-fluid-capacity-tooltip" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.depot-name" }, tooltip = { "sspp-gui.class-depot-name-tooltip" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.fueler-name" }, tooltip = { "sspp-gui.class-fueler-name-tooltip" } },
                                     { type = "label", caption = "[img=sspp-bypass-icon]", tooltip = { "sspp-gui.class-bypass-depot-tooltip" } },
@@ -855,8 +827,6 @@ function gui.network_add_flib_handlers()
         ["network_class_copy"] = handle_class_copy[events.on_gui_click],
         ["network_class_delete"] = handle_class_delete[events.on_gui_click],
         ["network_class_name_changed"] = handle_class_name_changed[events.on_gui_text_changed],
-        ["network_class_item_capacity_changed"] = handle_class_item_capacity_changed[events.on_gui_text_changed],
-        ["network_class_fluid_capacity_changed"] = handle_class_fluid_capacity_changed[events.on_gui_text_changed],
         ["network_class_bypass_depot_changed"] = handle_class_bypass_depot_changed[events.on_gui_click],
         ["network_class_depot_name_changed"] = handle_class_depot_name_changed[events.on_gui_text_changed],
         ["network_class_fueler_name_changed"] = handle_class_fueler_name_changed[events.on_gui_text_changed],

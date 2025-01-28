@@ -17,7 +17,6 @@ Additionally, from this view you can see current demand and active deliveries fo
 
 Within a network, you must define at least one *class* of train to make deliveries. A class represents a train layout where every train is interchangeable. For each class, you must define a few things:
 - Name: The unique name used to identify this class. Used when assigning a train to this class.
-- Item Capacity and/or Fluid Capacity: The item slot capacity and fluid capacity of every train.
 - Depot Name: The name of the depot train stops to go to when not busy.
 - Fueler Name: The name of the fueler train stops to go to when low on fuel. Required, but may be the same as the depot name.
 - Bypass Depot (checkbox): When enabled, trains may be given new jobs before arriving at a depot. Disable if you are using double headed trains and getting "path broken" alerts.

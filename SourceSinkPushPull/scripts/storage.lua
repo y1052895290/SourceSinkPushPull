@@ -58,8 +58,6 @@ e_stop_flags = { custom_name = 1 }
 ---@field public request_done_tickets {[ItemKey]: StationId[]}
 
 ---@class (exact) Class
----@field public item_slot_capacity integer?
----@field public fluid_capacity integer?
 ---@field public depot_name string
 ---@field public fueler_name string
 ---@field public bypass_depot boolean

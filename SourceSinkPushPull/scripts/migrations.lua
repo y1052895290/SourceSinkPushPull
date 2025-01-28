@@ -20,6 +20,12 @@ local migrations = {
                 end
             end
         end
+        for _, network in pairs(storage.networks) do
+            for _, class in pairs(network.classes) do
+                class.item_slot_capacity = nil
+                class.fluid_capacity = nil
+            end
+        end
     end,
     ["0.3.4"] = function()
         for _, station in pairs(storage.stations) do
