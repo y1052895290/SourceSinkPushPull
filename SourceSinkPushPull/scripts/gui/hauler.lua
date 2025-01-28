@@ -96,7 +96,7 @@ local handle_class_auto_assign = { [events.on_gui_click] = function(event)
     local new_carriage_names, new_length = {}, 0 ---@type string[], integer
     for _, carriage in pairs(new_train.carriages) do
         new_length = new_length + 1
-        new_carriage_names[new_length] = carriage.name
+        new_carriage_names[new_length] = map_carriage_name(carriage)
     end
 
     local matching_class ---@type ClassName?
