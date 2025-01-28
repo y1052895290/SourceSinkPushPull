@@ -79,6 +79,84 @@ local handle_class_changed = { [events.on_gui_text_changed] = function(event)
     end
 end }
 
+---@param carriage LuaEntity
+local function map_carriage_name(carriage)
+    -- TODO: Adjust names of carriages that should be treated as identical. For example, the
+    -- locomotives from Multiple Unit Train Control should map to the same strings as the
+    -- entities that they are derived from.
+    return carriage.name
+end
+
+---@param event EventData.on_gui_click
+local handle_class_auto_assign = { [events.on_gui_click] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerHaulerGui]]
+    local new_train = player_gui.train
+    local new_hauler_id = new_train.id
+
+    local new_carriage_names, new_length = {}, 0 ---@type string[], integer
+    for _, carriage in pairs(new_train.carriages) do
+        new_length = new_length + 1
+        new_carriage_names[new_length] = map_carriage_name(carriage)
+    end
+
+    local matching_class ---@type ClassName?
+    local classes_with_haulers = {} ---@type {[ClassName]: true?}
+
+    -- first, try to find a class that already has an identical train
+    for hauler_id, hauler in pairs(storage.haulers) do
+        local class_name = hauler.class
+
+        if class_name ~= matching_class and hauler_id ~= new_hauler_id then
+            local carriages = hauler.train.carriages
+            local length = #carriages
+
+            if length == new_length then
+                for i = 1, length do
+                    if map_carriage_name(carriages[i]) ~= new_carriage_names[i] then goto continue end
+                end
+                if matching_class then
+                    -- TODO: show this in the widget rather than sending an alert
+                    send_alert_for_train(new_train, { "sspp-alert.auto-assign-multiple-classes" })
+                    return
+                end
+                matching_class = class_name
+            end
+
+            classes_with_haulers[class_name] = true
+        end
+
+        ::continue::
+    end
+
+    -- second, try to find a newly added class with no trains
+    if not matching_class then
+        for class_name, _ in pairs(storage.networks[player_gui.network].classes) do
+            if not classes_with_haulers[class_name] then
+                if matching_class then
+                    -- TODO: show this in the widget rather than sending an alert
+                    send_alert_for_train(new_train, { "sspp-alert.auto-assign-multiple-classes" })
+                    return
+                end
+                matching_class = class_name
+            end
+        end
+    end
+
+    if not matching_class then
+        send_alert_for_train(new_train, { "sspp-alert.auto-assign-no-class" })
+        return
+    end
+
+    storage.haulers[new_hauler_id] = {
+        train = new_train,
+        network = player_gui.network,
+        class = matching_class,
+    }
+    player_gui.elements.class_textbox.text = matching_class
+
+    new_train.manual_mode = false
+end }
+
 --------------------------------------------------------------------------------
 
 ---@param player_id PlayerId
@@ -88,6 +166,7 @@ function gui.hauler_opened(player_id, hauler_id)
     local train = game.train_manager.get_train_by_id(hauler_id) --[[@as LuaTrain]]
 
     local network_name = train.front_stock.surface.name
+    local manual_mode = train.manual_mode
 
     -- mods assigning player.opened to another locomotive won't generate a close event
     if player.gui.screen["sspp-hauler"] then
@@ -110,7 +189,8 @@ function gui.hauler_opened(player_id, hauler_id)
             { type = "flow", style = "flib_indicator_flow", children = {
                 { type = "label", style = "bold_label", caption = { "sspp-gui.class" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", name = "class_textbox", style = "sspp_name_textbox", icon_selector = true, handler = handle_class_changed },
+                { type = "textfield", name = "class_textbox", style = "sspp_name_textbox", icon_selector = true, enabled = manual_mode, handler = handle_class_changed },
+                { type = "sprite-button", name = "class_auto_assign_button", style = "sspp_compact_slot_button", sprite = "sspp-refresh-icon", tooltip = { "sspp-gui.hauler-auto-assign-tooltip" }, mouse_button_filter = { "left" }, enabled = manual_mode, handler = handle_class_auto_assign },
             } },
         } },
     })
@@ -129,8 +209,6 @@ function gui.hauler_opened(player_id, hauler_id)
         elements.status_label.caption = { "sspp-gui.not-configured" }
         elements.stop_button.enabled = false
     end
-
-    elements.class_textbox.enabled = train.manual_mode
 end
 
 ---@param player_id PlayerId
@@ -149,5 +227,6 @@ function gui.hauler_add_flib_handlers()
         ["hauler_open_network"] = handle_open_network[events.on_gui_click],
         ["hauler_stop_clicked"] = handle_stop_clicked[events.on_gui_click],
         ["hauler_class_changed"] = handle_class_changed[events.on_gui_text_changed],
+        ["hauler_class_auto_assign"] = handle_class_auto_assign[events.on_gui_click],
     })
 end
