@@ -4,16 +4,16 @@ A logistics train mod that aims to be as pleasant to use as possible, even when 
 
 Check out the blueprint book (TODO) to get started.
 
-## Networks
+## Network (Items/Fluids)
 
-Every surface (planet) has an associated *network*. To open the network configuration window, click the Network button from any station or train. This is where you configure all of the items/fluids that SSPP will distribute. For each item/fluid, you must define a few things:
+Every surface (planet) has an associated *network*. To open the network configuration window, click the Network button from any station or train. From the "Items/Fluids" tab, you may configure all of the resources that SSPP will distribute. For each item or fluid, you must define a few things:
 - Class: The name of the class of train that should deliver this item/fluid.
 - Delivery Size: The amount of this item/fluid in one delivery. Larger values mean less congestion, but also larger buffers.
 - Delivery Time: The maximum travel time from any depot to any provider to any requester. Larger values mean larger buffers.
 
 Additionally, from this view you can see current demand and active deliveries for each item/fluid. Click the buttons to see the locations of assigned stations or trains.
 
-## Classes
+## Network (Classes)
 
 Within a network, you must define at least one *class* of train to make deliveries. A class represents a train layout where every train is interchangeable. For each class, you must define a few things:
 - Name: The unique name used to identify this class. Used when assigning a train to this class.
