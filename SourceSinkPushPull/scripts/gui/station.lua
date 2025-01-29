@@ -473,7 +473,7 @@ function gui.update_station_after_change(player_id)
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
 
     if parts.provide_io then
-        local provide_items = gui.refresh_table(
+        local items = gui.refresh_table(
             player_gui.elements.provide_table,
             provide_from_row,
             function(b, c, d, e) return provide_to_row(player_gui, b, c, d, e) end,
@@ -481,9 +481,10 @@ function gui.update_station_after_change(player_id)
             station and function(b) return provide_remove_key(player_gui, b) end
         )
         if station then
-            station.provide_items = provide_items
-            ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, provide_items)
+            station.provide_items = items
+            ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, items)
         end
+        parts.provide_io.combinator_description = provide_items_to_combinator_description(items)
     end
 
     if parts.request_io then
@@ -498,6 +499,7 @@ function gui.update_station_after_change(player_id)
             station.request_items = items
             ensure_hidden_combs(station.request_io, station.request_hidden_combs, items)
         end
+        parts.request_io.combinator_description = request_items_to_combinator_description(items)
     end
 
     if station and not read_stop_flag(station.stop, e_stop_flags.custom_name) then

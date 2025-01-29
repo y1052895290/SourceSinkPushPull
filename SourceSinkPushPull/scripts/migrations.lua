@@ -5,42 +5,38 @@ local flib_migration = require("__flib__.migration")
 --------------------------------------------------------------------------------
 
 local migrations = {
-    ["0.3.5"] = function()
+    ["0.2.0"] = function()
+        if storage.player_states then
+            storage.player_guis = storage.player_states
+            storage.player_states = nil
+        end
         for _, station in pairs(storage.stations) do
             if station.stop.valid then
-                if station.provide_items then
-                    for _, item in pairs(station.provide_items) do
-                        item.list_index = nil
+                station.network = station.stop.surface.name
+            end
+        end
+        for _, entity in pairs(storage.entities) do
+            if entity.valid then
+                if entity.name == "sspp-provide-io" then
+                    local json = helpers.json_to_table(entity.combinator_description) --[[@as table]]
+                    local provide_items = {} ---@type {[ItemKey]: ProvideItem}
+                    for item_key, item in pairs(json) do
+                        if item[1] then goto skip end
+                        provide_items[item_key] = { list_index = item.list_index, push = item.push, throughput = item.throughput, latency = item.latency, granularity = item.granularity }
                     end
+                    entity.combinator_description = provide_items_to_combinator_description(provide_items)
+                    ::skip::
                 end
-                if station.request_items then
-                    for _, item in pairs(station.request_items) do
-                        item.list_index = nil
+                if entity.name == "sspp-request-io" then
+                    local json = helpers.json_to_table(entity.combinator_description) --[[@as table]]
+                    local request_items = {} ---@type {[ItemKey]: RequestItem}
+                    for item_key, item in pairs(json) do
+                        if item[1] then goto skip end
+                        request_items[item_key] = { list_index = item.list_index, pull = item.pull, throughput = item.throughput, latency = item.latency }
                     end
+                    entity.combinator_description = request_items_to_combinator_description(request_items)
+                    ::skip::
                 end
-            end
-        end
-        for _, network in pairs(storage.networks) do
-            for _, class in pairs(network.classes) do
-                class.item_slot_capacity = nil
-                class.fluid_capacity = nil
-            end
-        end
-    end,
-    ["0.3.4"] = function()
-        for _, station in pairs(storage.stations) do
-            if station.stop.valid then
-                station.stop.trains_limit = nil
-            end
-        end
-    end,
-    ["0.3.2"] = function()
-        for _, network in pairs(storage.networks) do
-            for _, class in pairs(network.classes) do
-                class.list_index = nil
-            end
-            for _, item in pairs(network.items) do
-                item.list_index = nil
             end
         end
     end,
@@ -90,38 +86,42 @@ local migrations = {
             end
         end
     end,
-    ["0.2.0"] = function()
-        if storage.player_states then
-            storage.player_guis = storage.player_states
-            storage.player_states = nil
-        end
-        for _, station in pairs(storage.stations) do
-            if station.stop.valid then
-                station.network = station.stop.surface.name
+    ["0.3.2"] = function()
+        for _, network in pairs(storage.networks) do
+            for _, class in pairs(network.classes) do
+                class.list_index = nil
+            end
+            for _, item in pairs(network.items) do
+                item.list_index = nil
             end
         end
-        for _, entity in pairs(storage.entities) do
-            if entity.valid then
-                if entity.name == "sspp-provide-io" then
-                    local json = helpers.json_to_table(entity.combinator_description) --[[@as table]]
-                    local provide_items = {} ---@type {[ItemKey]: ProvideItem}
-                    for item_key, item in pairs(json) do
-                        if item[1] then goto skip end
-                        provide_items[item_key] = { list_index = item.list_index, push = item.push, throughput = item.throughput, latency = item.latency, granularity = item.granularity }
+    end,
+    ["0.3.4"] = function()
+        for _, station in pairs(storage.stations) do
+            if station.stop.valid then
+                station.stop.trains_limit = 4294967295
+            end
+        end
+    end,
+    ["0.3.5"] = function()
+        for _, station in pairs(storage.stations) do
+            if station.stop.valid then
+                if station.provide_items then
+                    for _, item in pairs(station.provide_items) do
+                        item.list_index = nil
                     end
-                    entity.combinator_description = provide_items_to_combinator_description(provide_items)
-                    ::skip::
                 end
-                if entity.name == "sspp-request-io" then
-                    local json = helpers.json_to_table(entity.combinator_description) --[[@as table]]
-                    local request_items = {} ---@type {[ItemKey]: RequestItem}
-                    for item_key, item in pairs(json) do
-                        if item[1] then goto skip end
-                        request_items[item_key] = { list_index = item.list_index, pull = item.pull, throughput = item.throughput, latency = item.latency }
+                if station.request_items then
+                    for _, item in pairs(station.request_items) do
+                        item.list_index = nil
                     end
-                    entity.combinator_description = request_items_to_combinator_description(request_items)
-                    ::skip::
                 end
+            end
+        end
+        for _, network in pairs(storage.networks) do
+            for _, class in pairs(network.classes) do
+                class.item_slot_capacity = nil
+                class.fluid_capacity = nil
             end
         end
     end,
