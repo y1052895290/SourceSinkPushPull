@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.5
+Date: 2025-01-29
+  Features:
+    - Added button to auto-assign a class to the SSPP train widget (@deweykai).
+    - Items in the station gui can now be moved and cloned.
+    - Items in the station gui now warn you about invalid values.
+    - Stations now show a minimap grid of all assigned trains.
+  Changes:
+    - You no longer need to specify item or fluid capacity for train classes.
+    - When opening the network from a station, the items tab will open by default.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.4
 Date: 2025-01-27
   Changes:
