@@ -111,7 +111,7 @@ local handle_expand_class_haulers = { [events.on_gui_click] = function(event)
     clear_grid_and_header(player_gui)
 
     local element = event.element
-    local class_name = element.parent.children[element.get_index_in_parent() - 6].text
+    local class_name = element.parent.children[element.get_index_in_parent() - 4].text
     if class_name == "" then
         gui.update_network_after_change(event.player_index)
         return
