@@ -138,6 +138,29 @@ function gui.refresh_table(table, from_row, to_row, old_dict, key_remove)
     return new_dict
 end
 
+---@param grid_table LuaGuiElement
+---@param grid_children LuaGuiElement[]
+---@param old_length integer
+---@param new_length integer
+---@param zoom number
+---@param handler table
+---@return LuaGuiElement
+function gui.next_minimap(grid_table, grid_children, old_length, new_length, zoom, handler)
+    if new_length > old_length then
+        local outer_frame = grid_table.add({ type = "frame", style = "train_with_minimap_frame" })
+        local inner_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        local minimap = inner_frame.add({ type = "minimap", style = "sspp_minimap", zoom = zoom })
+
+        minimap.add({ type = "button", style = "sspp_minimap_button", tags = flib_gui.format_handlers(handler) })
+        minimap.add({ type = "label", style = "sspp_minimap_top_label", ignored_by_interaction = true })
+        minimap.add({ type = "label", style = "sspp_minimap_bottom_label", ignored_by_interaction = true })
+
+        return minimap
+    end
+
+    return grid_children[new_length].children[1].children[1]
+end
+
 ---@param hauler_id HaulerId
 function gui.hauler_manual_mode_changed(hauler_id)
     for _, player_gui in pairs(storage.player_guis) do

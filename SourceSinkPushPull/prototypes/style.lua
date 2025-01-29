@@ -26,14 +26,6 @@ styles.sspp_network_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecificat
     height = 28 + 36 * 15 + 36,
 }
 
-styles.sspp_network_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
-    type = "scroll_pane_style",
-    parent = "naked_scroll_pane",
-    padding = 0,
-    background_graphical_set = deep_slot_background_tiling(152, 152),
-    height = 640,
-}
-
 styles.sspp_station_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
     type = "scroll_pane_style",
     parent = "deep_scroll_pane",
@@ -46,6 +38,14 @@ styles.sspp_station_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecificat
         vertical_spacing = 0,
     },
     height = 32 + (120 + 12) * 4 + 36,
+}
+
+styles.sspp_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
+    type = "scroll_pane_style",
+    parent = "naked_scroll_pane",
+    padding = 0,
+    background_graphical_set = deep_slot_background_tiling(152, 152),
+    vertically_stretchable = "on",
 }
 
 --------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ styles.sspp_station_item_table = { ---@type data.TableStyleSpecification
     vertical_spacing = 0,
 }
 
-styles.sspp_network_grid_table = { ---@type data.TableStyleSpecification
+styles.sspp_grid_table = { ---@type data.TableStyleSpecification
     type = "table_style",
     parent = "table",
     width = 152 * 3,

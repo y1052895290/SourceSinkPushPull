@@ -457,39 +457,6 @@ end }
 
 --------------------------------------------------------------------------------
 
----@param grid_table LuaGuiElement
----@param table_children LuaGuiElement[]
----@param old_length integer
----@param new_length integer
----@param for_station boolean
----@return LuaGuiElement
-local function get_or_add_next_minimap(grid_table, table_children, old_length, new_length, for_station)
-    if new_length > old_length then
-        local zoom, open_handler
-        if for_station then
-            zoom, open_handler = 2.0, handle_open_station
-        else
-            zoom, open_handler = 1.0, handle_open_hauler
-        end
-
-        local outer_frame = grid_table.add({ type = "frame", style = "train_with_minimap_frame" })
-        local inner_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        local minimap = inner_frame.add({ type = "minimap", style = "sspp_minimap", zoom = zoom })
-
-        minimap.add({ type = "button", style = "sspp_minimap_button", tags = flib_gui.format_handlers(open_handler) })
-        if for_station then
-            minimap.add({ type = "label", style = "sspp_minimap_top_label", ignored_by_interaction = true })
-        end
-        minimap.add({ type = "label", style = "sspp_minimap_bottom_label", ignored_by_interaction = true })
-
-        return minimap
-    end
-
-    return table_children[new_length].children[1].children[1]
-end
-
---------------------------------------------------------------------------------
-
 ---@param player_gui PlayerNetworkGui
 function gui.network_poll_finished(player_gui)
     local network_name = player_gui.network
@@ -561,53 +528,52 @@ function gui.network_poll_finished(player_gui)
         end
     end
 
-    local provide_enabled = elements.grid_provide_toggle.toggled or nil
-    local request_enabled = elements.grid_request_toggle.toggled or nil
-    local liquidate_enabled = elements.grid_liquidate_toggle.toggled or nil
-    local fuel_enabled = elements.grid_fuel_toggle.toggled or nil
-    local depot_enabled = elements.grid_depot_toggle.toggled or nil
+    local provide_enabled = elements.grid_provide_toggle.toggled
+    local request_enabled = elements.grid_request_toggle.toggled
+    local liquidate_enabled = elements.grid_liquidate_toggle.toggled
+    local fuel_enabled = elements.grid_fuel_toggle.toggled
+    local depot_enabled = elements.grid_depot_toggle.toggled
 
     local grid_table = elements.grid_table
-    local table_children = grid_table.children
-    local old_length = #table_children
+    local grid_children = grid_table.children
+    local old_length = #grid_children
     local new_length = 0
 
     local haulers_class_name = player_gui.haulers_class
     if haulers_class_name then
         for _, hauler in pairs(storage.haulers) do
             if hauler.network == network_name and hauler.class == haulers_class_name then
-                local name, quality, icon ---@type string?, string?, string?
+                local name, quality ---@type string?, string?
+                local state_icon ---@type string?
                 if provide_enabled and hauler.to_provide then
                     name, quality = split_item_key(hauler.to_provide.item)
-                    icon = "[img=virtual-signal/up-arrow]"
+                    state_icon = "[img=virtual-signal/up-arrow]"
                 end
                 if request_enabled and hauler.to_request then
                     name, quality = split_item_key(hauler.to_request.item)
-                    icon = "[img=virtual-signal/down-arrow]"
+                    state_icon = "[img=virtual-signal/down-arrow]"
                 end
                 if liquidate_enabled then
                     local item_key = hauler.to_depot or hauler.at_depot
                     if item_key and item_key ~= "" then
                         name, quality = split_item_key(item_key)
-                        icon = "[img=virtual-signal/signal-skull]"
+                        state_icon = "[img=virtual-signal/signal-skull]"
                     end
                 end
                 if fuel_enabled and hauler.to_fuel then
-                    icon = "[img=sspp-fuel-icon]"
+                    state_icon = "[img=sspp-fuel-icon]"
                 end
                 if depot_enabled and (hauler.to_depot or hauler.at_depot) == "" then
-                    icon = "[img=sspp-depot-icon]"
+                    state_icon = "[img=sspp-depot-icon]"
                 end
-                if icon then
+                if state_icon then
                     new_length = new_length + 1
-                    local minimap = get_or_add_next_minimap(grid_table, table_children, old_length, new_length, false)
-                    local minimap_children = minimap.children
-                    if quality then
-                        minimap_children[2].caption = "[item=" .. name .. ",quality=" .. quality .. "]" .. icon
-                    elseif name then
-                        minimap_children[2].caption = "[fluid=" .. name .. "]" .. icon
+                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
+                    minimap.children[2].caption = state_icon
+                    if name then
+                        minimap.children[3].caption = tostring(get_train_item_count(hauler.train, name, quality)) .. make_item_icon(name, quality)
                     else
-                        minimap_children[2].caption = icon
+                        minimap.children[3].caption = ""
                     end
                     minimap.entity = hauler.train.front_stock
                 end
@@ -617,26 +583,28 @@ function gui.network_poll_finished(player_gui)
 
     local haulers_item_key = player_gui.haulers_item
     if haulers_item_key then
+        local name, quality = split_item_key(haulers_item_key)
+        local item_icon = make_item_icon(name, quality)
         for _, hauler in pairs(storage.haulers) do
             if hauler.network == network_name then
-                local icon ---@type string?
+                local state_icon ---@type string?
                 if provide_enabled and hauler.to_provide and hauler.to_provide.item == haulers_item_key then
-                    icon = "[img=virtual-signal/up-arrow]"
+                    state_icon = "[img=virtual-signal/up-arrow]"
                 end
                 if request_enabled and hauler.to_request and hauler.to_request.item == haulers_item_key then
-                    icon = "[img=virtual-signal/down-arrow]"
+                    state_icon = "[img=virtual-signal/down-arrow]"
                 end
                 if liquidate_enabled then
                     local item_key = hauler.to_depot or hauler.at_depot
                     if item_key and item_key ~= "" then
-                        icon = "[img=virtual-signal/signal-skull]"
+                        state_icon = "[img=virtual-signal/signal-skull]"
                     end
                 end
-                if icon then
+                if state_icon then
                     new_length = new_length + 1
-                    local minimap = get_or_add_next_minimap(grid_table, table_children, old_length, new_length, false)
-                    local minimap_children = minimap.children
-                    minimap_children[2].caption = icon
+                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
+                    minimap.children[2].caption = state_icon
+                    minimap.children[3].caption = tostring(get_train_item_count(hauler.train, name, quality)) .. item_icon
                     minimap.entity = hauler.train.front_stock
                 end
             end
@@ -645,32 +613,33 @@ function gui.network_poll_finished(player_gui)
 
     local stations_item_key = player_gui.stations_item
     if stations_item_key then
-        local count_mode_enabled = elements.grid_stations_mode_switch.switch_state == "right" or nil
+        local item_icon ---@type string?
+        if elements.grid_stations_mode_switch.switch_state == "right" then
+            local name, quality = split_item_key(stations_item_key)
+            item_icon = make_item_icon(name, quality)
+        end
         for _, station in pairs(storage.stations) do
             if station.network == network_name then
-                local value, icon ---@type integer?, string?
                 if provide_enabled and station.provide_items and station.provide_items[stations_item_key] then
-                    if count_mode_enabled then
-                        value = station.provide_counts[stations_item_key]
+                    new_length = new_length + 1
+                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 2.0, handle_open_station)
+                    minimap.children[2].caption = station.stop.backer_name
+                    if item_icon then
+                        minimap.children[3].caption = "+" .. tostring(station.provide_counts[stations_item_key]) .. item_icon
                     else
-                        value = len_or_zero(station.provide_deliveries[stations_item_key])
+                        minimap.children[3].caption = tostring(len_or_zero(station.provide_deliveries[stations_item_key])) .. "[img=virtual-signal/up-arrow]"
                     end
-                    icon = "[img=virtual-signal/up-arrow]"
+                    minimap.entity = station.stop
                 end
                 if request_enabled and station.request_items and station.request_items[stations_item_key] then
-                    if count_mode_enabled then
-                        value = station.request_counts[stations_item_key]
-                    else
-                        value = len_or_zero(station.request_deliveries[stations_item_key])
-                    end
-                    icon = "[img=virtual-signal/down-arrow]"
-                end
-                if value then
                     new_length = new_length + 1
-                    local minimap = get_or_add_next_minimap(grid_table, table_children, old_length, new_length, true)
-                    local minimap_children = minimap.children
-                    minimap_children[2].caption = station.stop.backer_name
-                    minimap_children[3].caption = tostring(value) .. icon
+                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 2.0, handle_open_station)
+                    minimap.children[2].caption = station.stop.backer_name
+                    if item_icon then
+                        minimap.children[3].caption = "-" .. tostring(station.request_counts[stations_item_key]) .. item_icon
+                    else
+                        minimap.children[3].caption = tostring(len_or_zero(station.request_deliveries[stations_item_key])) .. "[img=virtual-signal/down-arrow]"
+                    end
                     minimap.entity = station.stop
                 end
             end
@@ -678,7 +647,7 @@ function gui.network_poll_finished(player_gui)
     end
 
     for i = old_length, new_length + 1, -1 do
-        table_children[i].destroy()
+        grid_children[i].destroy()
     end
 end
 
@@ -789,8 +758,8 @@ function gui.network_open(player_id, network_name, tab_index)
                         { type = "sprite-button", name = "grid_fuel_toggle", style = "control_settings_section_button", sprite = "sspp-fuel-icon", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_depot_toggle", style = "control_settings_section_button", sprite = "sspp-depot-icon", enabled = false, auto_toggle = true, toggled = true },
                     } },
-                    { type = "scroll-pane", style = "sspp_network_grid_scroll_pane", direction = "vertical", vertical_scroll_policy = "always", children = {
-                        { type = "table", name = "grid_table", style = "sspp_network_grid_table", column_count = 3 },
+                    { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", vertical_scroll_policy = "always", children = {
+                        { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
                     } },
                 } },
             } },

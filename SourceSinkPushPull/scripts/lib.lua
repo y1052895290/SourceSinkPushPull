@@ -171,16 +171,6 @@ end
 
 --------------------------------------------------------------------------------
 
----@generic A, B, C, D, E, F
----@param inner fun(a: A, b: B, c: C, d: D, e: E, f: F)
----@param a A
----@return fun(b: B, c: C, d: D, e: E, f: F)
-function bind_1_of_6(inner, a)
-    return function(b, c, d, e, f) inner(a, b, c, d, e, f) end
-end
-
---------------------------------------------------------------------------------
-
 ---@param item_key string
 ---@return string name, string? quality
 function split_item_key(item_key)
@@ -199,6 +189,25 @@ function is_item_key_invalid(item_key)
         return not prototypes.item[name]
     end
     return not prototypes.fluid[name]
+end
+
+---@param name string
+---@param quality string?
+function make_item_icon(name, quality)
+    if quality then
+        return "[item=" .. name .. ",quality=" .. quality .. "]"
+    end
+    return "[fluid=" .. name .. "]"
+end
+
+---@param train LuaTrain
+---@param name string
+---@param quality string?
+function get_train_item_count(train, name, quality)
+    if quality then
+        return train.get_item_count({ name = name, quality = quality })
+    end
+    return train.get_fluid_count(name)
 end
 
 --------------------------------------------------------------------------------
@@ -252,25 +261,17 @@ function compute_stop_name(provide_items, request_items)
 
     if provide_items then
         for item_key, _ in pairs(provide_items) do
-            p_len = p_len + 1
             local name, quality = split_item_key(item_key)
-            if quality then
-                provide_icons[p_len] = "[item=" .. name .. ",quality=" .. quality .. "]"
-            else
-                provide_icons[p_len] = "[fluid=" .. name .. "]"
-            end
+            p_len = p_len + 1
+            provide_icons[p_len] = make_item_icon(name, quality)
         end
     end
 
     if request_items then
         for item_key, _ in pairs(request_items) do
-            r_len = r_len + 1
             local name, quality = split_item_key(item_key)
-            if quality then
-                request_icons[r_len] = "[item=" .. name .. ",quality=" .. quality .. "]"
-            else
-                request_icons[r_len] = "[fluid=" .. name .. "]"
-            end
+            r_len = r_len + 1
+            request_icons[r_len] = make_item_icon(name, quality)
         end
     end
 

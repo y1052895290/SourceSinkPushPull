@@ -509,6 +509,13 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param event EventData.on_gui_click
+local handle_open_hauler = { [events.on_gui_click] = function(event)
+    game.get_player(event.player_index).opened = event.element.parent.entity
+end }
+
+--------------------------------------------------------------------------------
+
 ---@param player_gui PlayerStationGui
 function gui.station_poll_finished(player_gui)
     local parts = player_gui.parts
@@ -516,10 +523,16 @@ function gui.station_poll_finished(player_gui)
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
     if not station then return end
 
+    local elements = player_gui.elements
     local network_items = storage.networks[player_gui.network].items
 
+    local grid_table = elements.grid_table
+    local grid_children = grid_table.children
+    local old_length = #grid_children
+    local new_length = 0
+
     if station.provide_counts then
-        local provide_table = player_gui.elements.provide_table
+        local provide_table = elements.provide_table
         local columns, table_children = provide_table.column_count, provide_table.children
 
         for i = columns, #table_children - 1, columns do
@@ -534,10 +547,26 @@ function gui.station_poll_finished(player_gui)
                 end
             end
         end
+
+        if elements.grid_provide_toggle.toggled then
+            for item_key, hauler_ids in pairs(station.provide_deliveries) do
+                local name, quality = split_item_key(item_key)
+                local icon = make_item_icon(name, quality)
+
+                for _, hauler_id in pairs(hauler_ids) do
+                    new_length = new_length + 1
+                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
+                    local train = storage.haulers[hauler_id].train
+                    minimap.children[2].caption = "[img=virtual-signal/up-arrow]"
+                    minimap.children[3].caption = tostring(get_train_item_count(train, name, quality)) .. icon
+                    minimap.entity = train.front_stock
+                end
+            end
+        end
     end
 
     if station.request_counts then
-        local request_table = player_gui.elements.request_table
+        local request_table = elements.request_table
         local columns, table_children = request_table.column_count, request_table.children
 
         for i = columns, #table_children - 1, columns do
@@ -552,6 +581,26 @@ function gui.station_poll_finished(player_gui)
                 end
             end
         end
+
+        if elements.grid_request_toggle.toggled then
+            for item_key, hauler_ids in pairs(station.request_deliveries) do
+                local name, quality = split_item_key(item_key)
+                local icon = make_item_icon(name, quality)
+
+                for _, hauler_id in pairs(hauler_ids) do
+                    new_length = new_length + 1
+                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
+                    local train = storage.haulers[hauler_id].train
+                    minimap.children[2].caption = "[img=virtual-signal/down-arrow]"
+                    minimap.children[3].caption = tostring(get_train_item_count(train, name, quality)) .. icon
+                    minimap.entity = train.front_stock
+                end
+            end
+        end
+    end
+
+    for i = old_length, new_length + 1, -1 do
+        grid_children[i].destroy()
     end
 end
 
@@ -681,6 +730,8 @@ end }
 local function add_gui_complete(player, parts)
     local name = parts.stop.backer_name
     local has_custom_name = read_stop_flag(parts.stop, e_stop_flags.custom_name)
+    local no_provide = not parts.provide_io and {}
+    local no_request = not parts.request_io and {}
     return flib_gui.add(player.gui.screen, {
         { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
             { type = "flow", style = "frame_header_flow", drag_target = "sspp-station", children = {
@@ -699,7 +750,7 @@ local function add_gui_complete(player, parts)
                         { type = "sprite-button", name = "stop_name_clear_button", style = "control_settings_section_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.clear-custom-name" }, enabled = has_custom_name, handler = handle_clear_name },
                     } },
                     { type = "tabbed-pane", style = "tabbed_pane", children = {
-                        parts.provide_io and {
+                        no_provide or {
                             ---@type flib.GuiElemDef
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.provide" } },
                             ---@type flib.GuiElemDef
@@ -716,8 +767,8 @@ local function add_gui_complete(player, parts)
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_add_provide_fluid },
                                 } },
                             } },
-                        } or {},
-                        parts.request_io and {
+                        },
+                        no_request or {
                             ---@type flib.GuiElemDef
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.request" } },
                             ---@type flib.GuiElemDef
@@ -734,12 +785,18 @@ local function add_gui_complete(player, parts)
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_request_fluid },
                                 } },
                             } },
-                        } or {},
+                        },
                     } },
                 } },
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
-                        { type = "label", style = "subheader_caption_label", caption = "TODO" },
+                        { type = "label", style = "subheader_caption_label", caption = { "sspp-gui.deliveries" } },
+                        { type = "empty-widget", style = "flib_horizontal_pusher" },
+                        no_provide or { type = "sprite-button", name = "grid_provide_toggle", style = "control_settings_section_button", sprite = "virtual-signal/up-arrow", tooltip = { "sspp-gui.grid-haulers-provide-tooltip" }, auto_toggle = true, toggled = true },
+                        no_request or { type = "sprite-button", name = "grid_request_toggle", style = "control_settings_section_button", sprite = "virtual-signal/down-arrow", tooltip = { "sspp-gui.grid-haulers-request-tooltip" }, auto_toggle = true, toggled = true },
+                    } },
+                    { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", vertical_scroll_policy = "always", children = {
+                        { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
                     } },
                 } },
             } },
@@ -836,6 +893,7 @@ function gui.station_add_flib_handlers()
         ["station_clear_name"] = handle_clear_name[events.on_gui_click],
         ["station_name_changed"] = handle_name_changed_or_confirmed[events.on_gui_text_changed],
         ["station_name_confirmed"] = handle_name_changed_or_confirmed[events.on_gui_confirmed],
+        ["station_open_hauler"] = handle_open_hauler[events.on_gui_click],
         ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],
         ["station_add_provide_fluid"] = handle_add_provide_fluid[events.on_gui_click],
         ["station_add_request_item"] = handle_add_request_item[events.on_gui_click],
