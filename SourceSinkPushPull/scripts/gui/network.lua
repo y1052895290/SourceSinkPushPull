@@ -622,7 +622,7 @@ function gui.network_poll_finished(player_gui)
             if station.network == network_name then
                 if provide_enabled and station.provide_items and station.provide_items[stations_item_key] then
                     new_length = new_length + 1
-                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 2.0, handle_open_station)
+                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_station)
                     minimap.children[2].caption = station.stop.backer_name
                     if item_icon then
                         minimap.children[3].caption = "+" .. tostring(station.provide_counts[stations_item_key]) .. item_icon
@@ -633,7 +633,7 @@ function gui.network_poll_finished(player_gui)
                 end
                 if request_enabled and station.request_items and station.request_items[stations_item_key] then
                     new_length = new_length + 1
-                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 2.0, handle_open_station)
+                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_station)
                     minimap.children[2].caption = station.stop.backer_name
                     if item_icon then
                         minimap.children[3].caption = "-" .. tostring(station.request_counts[stations_item_key]) .. item_icon
