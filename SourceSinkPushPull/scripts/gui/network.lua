@@ -2,6 +2,7 @@
 
 local flib_gui = require("__flib__.gui")
 local events = defines.events
+local cwi = gui.caption_with_info
 
 --------------------------------------------------------------------------------
 
@@ -196,8 +197,8 @@ end }
 ---@param class_table LuaGuiElement
 local function add_new_class_row(class_table)
     flib_gui.add(class_table, {
-        { type = "flow", direction = "horizontal", children = {
-            { type = "flow", direction = "vertical", style = "packed_vertical_flow", children = {
+        { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
+            { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_class_move },
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_class_move },
             } },
@@ -218,8 +219,8 @@ end
 ---@param elem_type string
 local function add_new_item_row(item_table, elem_type)
     flib_gui.add(item_table, {
-        { type = "flow", direction = "horizontal", children = {
-            { type = "flow", direction = "vertical", style = "packed_vertical_flow", children = {
+        { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
+            { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_item_move },
             } },
@@ -698,13 +699,13 @@ function gui.network_open(player_id, network_name, tab_index)
     end
 
     local elements, window = flib_gui.add(player.gui.screen, {
-        { type = "frame", style = "frame", direction = "vertical", name = "sspp-network", children = {
-            { type = "flow", style = "frame_header_flow", drag_target = "sspp-network", children = {
+        { type = "frame", name = "sspp-network", style = "frame", direction = "vertical", children = {
+            { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-network", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.network-for-surface", localised_name }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
-            { type = "flow", style = "inset_frame_container_horizontal_flow", children = {
+            { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                     { type = "tabbed-pane", name = "tabbed_pane", style = "tabbed_pane", children = {
                         ---@diagnostic disable-next-line: missing-fields
@@ -713,14 +714,14 @@ function gui.network_open(player_id, network_name, tab_index)
                             content = { type = "scroll-pane", style = "sspp_network_left_scroll_pane", direction = "vertical", children = {
                                 { type = "table", name = "class_table", style = "sspp_network_class_table", column_count = 7, children = {
                                     { type = "empty-widget" },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.name" }, tooltip = { "sspp-gui.class-name-tooltip" } },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.depot-name" }, tooltip = { "sspp-gui.class-depot-name-tooltip" } },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.fueler-name" }, tooltip = { "sspp-gui.class-fueler-name-tooltip" } },
+                                    { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.name" }), tooltip = { "sspp-gui.class-name-tooltip" } },
+                                    { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.depot-name" }), tooltip = { "sspp-gui.class-depot-name-tooltip" } },
+                                    { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.fueler-name" }), tooltip = { "sspp-gui.class-fueler-name-tooltip" } },
                                     { type = "label", caption = "[img=sspp-bypass-icon]", tooltip = { "sspp-gui.class-bypass-depot-tooltip" } },
                                     { type = "label", style = "bold_label", caption = " [item=locomotive]" },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.available" }, tooltip = { "sspp-gui.class-available-tooltip" } },
+                                    { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.available" }), tooltip = { "sspp-gui.class-available-tooltip" } },
                                 } },
-                                { type = "flow", style = "horizontal_flow", children = {
+                                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-class" }, mouse_button_filter = { "left" }, handler = handle_add_class },
                                 } },
                             } },
@@ -731,15 +732,15 @@ function gui.network_open(player_id, network_name, tab_index)
                             content = { type = "scroll-pane", style = "sspp_network_left_scroll_pane", direction = "vertical", children = {
                                 { type = "table", name = "item_table", style = "sspp_network_item_table", column_count = 8, children = {
                                     { type = "empty-widget" },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.class" }, tooltip = { "sspp-gui.item-class-tooltip" } },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.delivery-size" }, tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
-                                    { type = "label", style = "bold_label", caption = { "sspp-gui.delivery-time" }, tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
+                                    { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
+                                    { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
+                                    { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-time" }), tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
                                     { type = "label", style = "bold_label", caption = " [item=sspp-stop]" },
                                     { type = "label", style = "bold_label", caption = "[virtual-signal=up-arrow][virtual-signal=down-arrow]", tooltip = { "sspp-gui.item-demand-tooltip" } },
                                     { type = "label", style = "bold_label", caption = " [item=locomotive]" },
                                     { type = "label", style = "bold_label", caption = "[virtual-signal=up-arrow][virtual-signal=down-arrow][virtual-signal=signal-skull]", tooltip = { "sspp-gui.item-haulers-tooltip" } },
                                 } },
-                                { type = "flow", style = "horizontal_flow", children = {
+                                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_item },
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_fluid },
                                 } },

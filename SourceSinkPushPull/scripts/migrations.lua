@@ -125,6 +125,15 @@ local migrations = {
             end
         end
     end,
+    ["0.3.9"] = function()
+        for _, station in pairs(storage.stations) do
+            if station.stop.valid then
+                if station.stop.trains_limit == 4294967295 then
+                    station.stop.trains_limit = 10
+                end
+            end
+        end
+    end,
 }
 
 --------------------------------------------------------------------------------

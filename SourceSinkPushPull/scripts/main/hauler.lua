@@ -218,6 +218,7 @@ function main.hauler_done_at_provide_station(hauler)
     hauler.to_provide.phase = "DONE"
     clear_arithmetic_control_behavior(station.provide_io)
     clear_hidden_comb_control_behaviors(station.provide_hidden_combs)
+    set_hauler_status(hauler, { "sspp-alert.waiting-for-request" }, hauler.status_item, hauler.status_stop)
     hauler.train.schedule = { current = 1, records = { { rail = station.stop.connected_rail } } }
 end
 

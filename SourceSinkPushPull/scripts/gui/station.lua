@@ -2,6 +2,7 @@
 
 local flib_gui = require("__flib__.gui")
 local events = defines.events
+local cwi = gui.caption_with_info
 
 --------------------------------------------------------------------------------
 
@@ -41,10 +42,13 @@ end }
 ---@param def flib.GuiElemDef
 ---@return flib.GuiElemDef
 local function make_property_flow(caption, tooltip, def)
+    local caption_ls, tooltip_ls = { caption }, nil ---@type LocalisedString, LocalisedString?
+    if tooltip then caption_ls, tooltip_ls = cwi(caption_ls), { tooltip } end
     return {
-        type = "flow", style = "sspp_station_item_property_flow",
+        type = "flow", style = "sspp_station_property_flow", direction = "horizontal",
         children = {
-            { type = "label", style = "sspp_station_item_key", caption = { caption }, tooltip = tooltip and { tooltip } },
+            { type = "label", style = "bold_label", caption = caption_ls, tooltip = tooltip_ls },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
             def,
         },
     } --[[@as flib.GuiElemDef]]
@@ -54,7 +58,7 @@ end
 ---@return flib.GuiElemDef
 local function make_center_flow(def)
     return {
-        type = "flow", style = "sspp_station_item_property_flow",
+        type = "flow", style = "sspp_station_property_flow", direction = "horizontal",
         children = {
             { type = "empty-widget", style = "flib_horizontal_pusher" },
             def,
@@ -67,8 +71,8 @@ end
 ---@param elem_type string
 local function add_new_provide_row(provide_table, elem_type)
     flib_gui.add(provide_table, {
-        { type = "flow", direction = "vertical", children = {
-            { type = "flow", direction = "vertical", style = "packed_vertical_flow", children = {
+        { type = "flow", style = "vertical_flow", direction = "vertical", children = {
+            { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_item_move },
             } },
@@ -76,18 +80,18 @@ local function add_new_provide_row(provide_table, elem_type)
             { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = handle_provide_copy },
         } },
         { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_item_elem_changed },
-        { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
-            make_property_flow("sspp-gui.class", nil, {
-                type = "label", style = "sspp_station_item_value",
+        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
+            make_property_flow("sspp-gui.class", "sspp-gui.item-class-tooltip", {
+                type = "label", style = "label",
             }),
-            make_property_flow("sspp-gui.delivery-size", nil, {
-                type = "label", style = "sspp_station_item_value",
+            make_property_flow("sspp-gui.delivery-size", "sspp-gui.item-delivery-size-tooltip", {
+                type = "label", style = "label",
             }),
-            make_property_flow("sspp-gui.delivery-time", nil, {
-                type = "label", style = "sspp_station_item_value",
+            make_property_flow("sspp-gui.delivery-time", "sspp-gui.item-delivery-time-tooltip", {
+                type = "label", style = "label",
             }),
         } },
-        { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
             make_center_flow({
                 type = "switch", style = "sspp_aligned_switch",
                 left_label_caption = { "sspp-gui.source" }, right_label_caption = { "sspp-gui.push" }, tooltip = { "sspp-gui.provide-mode-tooltip" },
@@ -106,12 +110,12 @@ local function add_new_provide_row(provide_table, elem_type)
                 text = "1", handler = handle_item_text_changed,
             }),
         } },
-        { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
             make_property_flow("sspp-gui.storage-needed", "sspp-gui.provide-storage-needed-tooltip", {
-                type = "label", style = "sspp_station_item_value",
+                type = "label", style = "label",
             }),
             make_property_flow("sspp-gui.current-surplus", "sspp-gui.provide-current-surplus-tooltip", {
-                type = "label", style = "sspp_station_item_value",
+                type = "label", style = "label",
             }),
         } },
     })
@@ -121,8 +125,8 @@ end
 ---@param elem_type string
 local function add_new_request_row(request_table, elem_type)
     flib_gui.add(request_table, {
-        { type = "flow", direction = "vertical", children = {
-            { type = "flow", direction = "vertical", style = "packed_vertical_flow", children = {
+        { type = "flow", style = "vertical_flow", direction = "vertical", children = {
+            { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_item_move },
             } },
@@ -130,18 +134,18 @@ local function add_new_request_row(request_table, elem_type)
             { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = handle_request_copy },
         } },
         { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_item_elem_changed },
-        { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
-            make_property_flow("sspp-gui.class", nil, {
-                type = "label", style = "sspp_station_item_value",
+        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
+            make_property_flow("sspp-gui.class", "sspp-gui.item-class-tooltip", {
+                type = "label", style = "label",
             }),
-            make_property_flow("sspp-gui.delivery-size", nil, {
-                type = "label", style = "sspp_station_item_value",
+            make_property_flow("sspp-gui.delivery-size", "sspp-gui.item-delivery-size-tooltip", {
+                type = "label", style = "label",
             }),
-            make_property_flow("sspp-gui.delivery-time", nil, {
-                type = "label", style = "sspp_station_item_value",
+            make_property_flow("sspp-gui.delivery-time", "sspp-gui.item-delivery-time-tooltip", {
+                type = "label", style = "label",
             }),
         } },
-        { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
             make_center_flow({
                 type = "switch", style = "sspp_aligned_switch",
                 left_label_caption = { "sspp-gui.sink" }, right_label_caption = { "sspp-gui.pull" }, tooltip = { "sspp-gui.request-mode-tooltip" },
@@ -156,12 +160,12 @@ local function add_new_request_row(request_table, elem_type)
                 text = "30", handler = handle_item_text_changed,
             }),
         } },
-        { type = "frame", style = "sspp_station_item_frame", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
             make_property_flow("sspp-gui.storage-needed", "sspp-gui.request-storage-needed-tooltip", {
-                type = "label", style = "sspp_station_item_value",
+                type = "label", style = "label",
             }),
             make_property_flow("sspp-gui.current-deficit", "sspp-gui.provide-current-deficit-tooltip", {
-                type = "label", style = "sspp_station_item_value",
+                type = "label", style = "label",
             }),
         } },
     })
@@ -200,9 +204,9 @@ handle_provide_copy[events.on_gui_click] = function(event)
 
     local table_children = table.children
     table_children[j + 4].children[1].children[2].switch_state = table_children[i + 4].children[1].children[2].switch_state
-    table_children[j + 4].children[2].children[2].text = table_children[i + 4].children[2].children[2].text
-    table_children[j + 4].children[3].children[2].text = table_children[i + 4].children[3].children[2].text
-    table_children[j + 4].children[4].children[2].text = table_children[i + 4].children[4].children[2].text
+    table_children[j + 4].children[2].children[3].text = table_children[i + 4].children[2].children[3].text
+    table_children[j + 4].children[3].children[3].text = table_children[i + 4].children[3].children[3].text
+    table_children[j + 4].children[4].children[3].text = table_children[i + 4].children[4].children[3].text
 end
 
 ---@param event EventData.on_gui_click
@@ -219,8 +223,8 @@ handle_request_copy[events.on_gui_click] = function(event)
 
     local table_children = table.children
     table_children[j + 4].children[1].children[2].switch_state = table_children[i + 4].children[1].children[2].switch_state
-    table_children[j + 4].children[2].children[2].text = table_children[i + 4].children[2].children[2].text
-    table_children[j + 4].children[3].children[2].text = table_children[i + 4].children[3].children[2].text
+    table_children[j + 4].children[2].children[3].text = table_children[i + 4].children[2].children[3].text
+    table_children[j + 4].children[3].children[3].text = table_children[i + 4].children[3].children[3].text
 end
 
 --------------------------------------------------------------------------------
@@ -232,9 +236,9 @@ local function provide_to_row_network(table_children, i, network_item)
     local quality = network_item.quality
     local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
 
-    table_children[i + 3].children[1].children[2].caption = network_item.class
-    table_children[i + 3].children[2].children[2].caption = { fmt_items_or_units, network_item.delivery_size }
-    table_children[i + 3].children[3].children[2].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
+    table_children[i + 3].children[1].children[3].caption = network_item.class
+    table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
+    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
 end
 
 ---@param table_children LuaGuiElement[]
@@ -246,7 +250,7 @@ local function provide_to_row_statistics(table_children, i, network_item, item)
     local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
     local stack_size = quality and prototypes.item[name].stack_size or 1
 
-    table_children[i + 5].children[1].children[2].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
+    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
 end
 
 ---@param network_items {[ItemKey]: NetworkItem}
@@ -269,9 +273,9 @@ local function provide_init_row(network_items, provide_table, item_key, item)
     end
 
     table_children[i + 4].children[1].children[2].switch_state = item.push and "right" or "left"
-    table_children[i + 4].children[2].children[2].text = tostring(item.throughput)
-    table_children[i + 4].children[3].children[2].text = tostring(item.latency)
-    table_children[i + 4].children[4].children[2].text = tostring(item.granularity)
+    table_children[i + 4].children[2].children[3].text = tostring(item.throughput)
+    table_children[i + 4].children[3].children[3].text = tostring(item.latency)
+    table_children[i + 4].children[4].children[3].text = tostring(item.granularity)
 
     table_children[i + 1].children[2].sprite = ""
     table_children[i + 1].children[2].tooltip = nil
@@ -286,13 +290,13 @@ local function provide_from_row(table_children, i)
 
     local _, _, item_key = gui.extract_elem_value_fields(elem_value)
 
-    local throughput = tonumber(table_children[i + 4].children[2].children[2].text)
+    local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
     if not throughput then return item_key end
 
-    local latency = tonumber(table_children[i + 4].children[3].children[2].text)
+    local latency = tonumber(table_children[i + 4].children[3].children[3].text)
     if not latency then return item_key end
 
-    local granularity = tonumber(table_children[i + 4].children[4].children[2].text)
+    local granularity = tonumber(table_children[i + 4].children[4].children[3].text)
     if not granularity or granularity < 1 then return item_key end
 
     return item_key, {
@@ -314,16 +318,16 @@ local function provide_to_row(player_gui, table_children, i, item_key, item)
     if network_item then
         provide_to_row_network(table_children, i, network_item)
     else
-        table_children[i + 3].children[1].children[2].caption = ""
-        table_children[i + 3].children[2].children[2].caption = ""
-        table_children[i + 3].children[3].children[2].caption = ""
+        table_children[i + 3].children[1].children[3].caption = ""
+        table_children[i + 3].children[2].children[3].caption = ""
+        table_children[i + 3].children[3].children[3].caption = ""
     end
 
     if network_item and item then
         provide_to_row_statistics(table_children, i, network_item, item)
     else
-        table_children[i + 5].children[1].children[2].caption = ""
-        table_children[i + 5].children[2].children[2].caption = ""
+        table_children[i + 5].children[1].children[3].caption = ""
+        table_children[i + 5].children[2].children[3].caption = ""
     end
 
     if item then
@@ -355,9 +359,9 @@ local function request_to_row_network(table_children, i, network_item)
     local quality = network_item.quality
     local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
 
-    table_children[i + 3].children[1].children[2].caption = network_item.class
-    table_children[i + 3].children[2].children[2].caption = { fmt_items_or_units, network_item.delivery_size }
-    table_children[i + 3].children[3].children[2].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
+    table_children[i + 3].children[1].children[3].caption = network_item.class
+    table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
+    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
 end
 
 ---@param table_children LuaGuiElement[]
@@ -369,7 +373,7 @@ local function request_to_row_statistics(table_children, i, network_item, item)
     local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
     local stack_size = quality and prototypes.item[name].stack_size or 1
 
-    table_children[i + 5].children[1].children[2].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
+    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
 end
 
 ---@param network_items {[ItemKey]: NetworkItem}
@@ -392,8 +396,8 @@ local function request_init_row(network_items, request_table, item_key, item)
     end
 
     table_children[i + 4].children[1].children[2].switch_state = item.pull and "right" or "left"
-    table_children[i + 4].children[2].children[2].text = tostring(item.throughput)
-    table_children[i + 4].children[3].children[2].text = tostring(item.latency)
+    table_children[i + 4].children[2].children[3].text = tostring(item.throughput)
+    table_children[i + 4].children[3].children[3].text = tostring(item.latency)
 
     table_children[i + 1].children[2].sprite = ""
     table_children[i + 1].children[2].tooltip = nil
@@ -408,10 +412,10 @@ local function request_from_row(table_children, i)
 
     local _, _, item_key = gui.extract_elem_value_fields(elem_value)
 
-    local throughput = tonumber(table_children[i + 4].children[2].children[2].text)
+    local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
     if not throughput then return item_key end
 
-    local latency = tonumber(table_children[i + 4].children[3].children[2].text)
+    local latency = tonumber(table_children[i + 4].children[3].children[3].text)
     if not latency then return item_key end
 
     return item_key, {
@@ -432,16 +436,16 @@ local function request_to_row(player_gui, table_children, i, item_key, item)
     if network_item then
         request_to_row_network(table_children, i, network_item)
     else
-        table_children[i + 3].children[1].children[2].caption = ""
-        table_children[i + 3].children[2].children[2].caption = ""
-        table_children[i + 3].children[3].children[2].caption = ""
+        table_children[i + 3].children[1].children[3].caption = ""
+        table_children[i + 3].children[2].children[3].caption = ""
+        table_children[i + 3].children[3].children[3].caption = ""
     end
 
     if network_item and item then
         request_to_row_statistics(table_children, i, network_item, item)
     else
-        table_children[i + 5].children[1].children[2].caption = ""
-        table_children[i + 5].children[2].children[2].caption = ""
+        table_children[i + 5].children[1].children[3].caption = ""
+        table_children[i + 5].children[2].children[3].caption = ""
     end
 
     if item then
@@ -545,7 +549,7 @@ function gui.station_poll_finished(player_gui)
                 if network_item then
                     local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
 
-                    table_children[i + 5].children[2].children[2].caption = { fmt_items_or_units, station.provide_counts[item_key] }
+                    table_children[i + 5].children[2].children[3].caption = { fmt_items_or_units, station.provide_counts[item_key] }
                 end
             end
         end
@@ -579,7 +583,7 @@ function gui.station_poll_finished(player_gui)
                 if network_item then
                     local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
 
-                    table_children[i + 5].children[2].children[2].caption = { fmt_items_or_units, station.request_counts[item_key] }
+                    table_children[i + 5].children[2].children[3].caption = { fmt_items_or_units, station.request_counts[item_key] }
                 end
             end
         end
@@ -696,6 +700,15 @@ handle_name_changed_or_confirmed[events.on_gui_confirmed] = function(event)
     player_gui.elements.stop_name_edit_toggle.toggled = false
 end
 
+---@param event EventData.on_gui_value_changed
+local handle_limit_changed = { [events.on_gui_value_changed] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local parts = player_gui.parts --[[@as StationParts]]
+
+    parts.stop.trains_limit = event.element.slider_value
+    player_gui.elements.limit_value.caption = tostring(event.element.slider_value)
+end }
+
 ---@param event EventData.on_gui_click
 local handle_add_provide_item = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "item-with-quality")
@@ -732,17 +745,18 @@ end }
 local function add_gui_complete(player, parts)
     local name = parts.stop.backer_name
     local has_custom_name = read_stop_flag(parts.stop, e_stop_flags.custom_name)
+    local limit = parts.stop.trains_limit
     local no_provide = not parts.provide_io and {}
     local no_request = not parts.request_io and {}
     return flib_gui.add(player.gui.screen, {
         { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
-            { type = "flow", style = "frame_header_flow", drag_target = "sspp-station", children = {
+            { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
-            { type = "flow", style = "inset_frame_container_horizontal_flow", children = {
+            { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
                         { type = "label", name = "stop_name_label", style = "subheader_caption_label", caption = name },
@@ -764,7 +778,7 @@ local function add_gui_complete(player, parts)
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.station-settings" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.statistics" } },
                                 } },
-                                { type = "flow", style = "horizontal_flow", children = {
+                                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_add_provide_item },
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_add_provide_fluid },
                                 } },
@@ -782,7 +796,7 @@ local function add_gui_complete(player, parts)
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.station-settings" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.statistics" } },
                                 } },
-                                { type = "flow", style = "horizontal_flow", children = {
+                                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_request_item },
                                     { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_request_fluid },
                                 } },
@@ -794,6 +808,9 @@ local function add_gui_complete(player, parts)
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
                         { type = "label", style = "subheader_caption_label", caption = { "sspp-gui.deliveries" } },
                         { type = "empty-widget", style = "flib_horizontal_pusher" },
+                        { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.limit" }), tooltip = { "sspp-gui.station-limit-tooltip" } },
+                        { type = "slider", style = "notched_slider", minimum_value = 1, maximum_value = 10, value = limit, handler = handle_limit_changed },
+                        { type = "label", name = "limit_value", style = "sspp_station_limit_value", caption = tostring(limit) },
                         no_provide or { type = "sprite-button", name = "grid_provide_toggle", style = "control_settings_section_button", sprite = "virtual-signal/up-arrow", tooltip = { "sspp-gui.grid-haulers-provide-tooltip" }, auto_toggle = true, toggled = true },
                         no_request or { type = "sprite-button", name = "grid_request_toggle", style = "control_settings_section_button", sprite = "virtual-signal/down-arrow", tooltip = { "sspp-gui.grid-haulers-request-tooltip" }, auto_toggle = true, toggled = true },
                     } },
@@ -811,7 +828,7 @@ end
 local function add_gui_incomplete(player)
     return flib_gui.add(player.gui.screen, {
         { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
-            { type = "flow", style = "frame_header_flow", drag_target = "sspp-station", children = {
+            { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.incomplete-station" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
@@ -895,6 +912,7 @@ function gui.station_add_flib_handlers()
         ["station_clear_name"] = handle_clear_name[events.on_gui_click],
         ["station_name_changed"] = handle_name_changed_or_confirmed[events.on_gui_text_changed],
         ["station_name_confirmed"] = handle_name_changed_or_confirmed[events.on_gui_confirmed],
+        ["station_limit_changed"] = handle_limit_changed[events.on_gui_value_changed],
         ["station_open_hauler"] = handle_open_hauler[events.on_gui_click],
         ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],
         ["station_add_provide_fluid"] = handle_add_provide_fluid[events.on_gui_click],

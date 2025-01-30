@@ -4,54 +4,13 @@ local flib_gui = require("__flib__.gui")
 
 gui = {}
 
-require("gui.network")
-require("gui.station")
-require("gui.hauler")
-
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_opened
-local function on_gui_opened(event)
-    if event.gui_type == defines.gui_type.entity then
-        local entity = event.entity ---@type LuaEntity
-        local name = entity.name
-        if name == "entity-ghost" then name = entity.ghost_name end
-        if name == "sspp-stop" or name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-            gui.station_open(event.player_index, entity)
-        elseif entity.type == "locomotive" then
-            gui.hauler_opened(event.player_index, entity.train.id)
-        end
-    end
+---@param caption LocalisedString
+---@return LocalisedString
+function gui.caption_with_info(caption)
+    return { "", caption, " [img=info]" }
 end
-
----@param event EventData.on_gui_closed
-local function on_gui_closed(event)
-    if event.gui_type == defines.gui_type.custom then
-        if event.element.name == "sspp-network" then
-            gui.network_closed(event.player_index, event.element)
-        elseif event.element.name == "sspp-station" then
-            gui.station_closed(event.player_index, event.element)
-        end
-    elseif event.gui_type == defines.gui_type.entity then
-        if event.entity.type == "locomotive" then
-            gui.hauler_closed(event.player_index)
-        end
-    end
-end
-
-function gui.on_poll_finished()
-    for _, player_gui in pairs(storage.player_guis) do
-        if player_gui.unit_number then
-            gui.station_poll_finished(player_gui --[[@as PlayerStationGui]])
-        elseif player_gui.train then
-            -- gui.hauler_poll_finished(player_gui --[[@as PlayerHaulerGui]])
-        else
-            gui.network_poll_finished(player_gui --[[@as PlayerNetworkGui]])
-        end
-    end
-end
-
---------------------------------------------------------------------------------
 
 ---@param table LuaGuiElement
 ---@param flow_index integer
@@ -161,14 +120,65 @@ function gui.next_minimap(grid_table, grid_children, old_length, new_length, zoo
     return grid_children[new_length].children[1].children[1]
 end
 
+--------------------------------------------------------------------------------
+
+require("gui.network")
+require("gui.station")
+require("gui.hauler")
+
+--------------------------------------------------------------------------------
+
+function gui.on_poll_finished()
+    for _, player_gui in pairs(storage.player_guis) do
+        if player_gui.unit_number then
+            gui.station_poll_finished(player_gui --[[@as PlayerStationGui]])
+        elseif player_gui.train then
+            -- gui.hauler_poll_finished(player_gui --[[@as PlayerHaulerGui]])
+        else
+            gui.network_poll_finished(player_gui --[[@as PlayerNetworkGui]])
+        end
+    end
+end
+
 ---@param hauler_id HaulerId
-function gui.hauler_manual_mode_changed(hauler_id)
+function gui.on_manual_mode_changed(hauler_id)
     for _, player_gui in pairs(storage.player_guis) do
         if player_gui.train then
             if player_gui.train.id == hauler_id then
                 player_gui.elements.class_textbox.enabled = player_gui.train.manual_mode
                 player_gui.elements.class_auto_assign_button.enabled = player_gui.train.manual_mode
             end
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+
+---@param event EventData.on_gui_opened
+local function on_gui_opened(event)
+    if event.gui_type == defines.gui_type.entity then
+        local entity = event.entity ---@type LuaEntity
+        local name = entity.name
+        if name == "entity-ghost" then name = entity.ghost_name end
+        if name == "sspp-stop" or name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
+            gui.station_open(event.player_index, entity)
+        elseif entity.type == "locomotive" then
+            gui.hauler_opened(event.player_index, entity.train.id)
+        end
+    end
+end
+
+---@param event EventData.on_gui_closed
+local function on_gui_closed(event)
+    if event.gui_type == defines.gui_type.custom then
+        if event.element.name == "sspp-network" then
+            gui.network_closed(event.player_index, event.element)
+        elseif event.element.name == "sspp-station" then
+            gui.station_closed(event.player_index, event.element)
+        end
+    elseif event.gui_type == defines.gui_type.entity then
+        if event.entity.type == "locomotive" then
+            gui.hauler_closed(event.player_index)
         end
     end
 end

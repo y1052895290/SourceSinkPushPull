@@ -165,33 +165,26 @@ styles.sspp_compact_warning_image = { ---@type data.ImageStyleSpecification
     stretch_image_to_widget_size = true,
 }
 
-styles.sspp_station_item_frame = { ---@type data.FrameStyleSpecification
-    type = "frame_style",
-    parent = "invisible_frame",
+styles.sspp_station_cell_flow = { ---@type data.VerticalFlowStyleSpecification
+    type = "vertical_flow_style",
+    parent = "packed_vertical_flow",
+    width = 200,
     height = 30 * 4,
     vertical_align = "center",
 }
 
-styles.sspp_station_item_property_flow = { ---@type data.HorizontalFlowStyleSpecification
+styles.sspp_station_property_flow = { ---@type data.HorizontalFlowStyleSpecification
     type = "horizontal_flow_style",
     parent = "horizontal_flow",
-    width = 200,
     height = 30,
-    horizontal_spacing = 0,
     vertical_align = "center",
 }
 
-styles.sspp_station_item_key = { ---@type data.LabelStyleSpecification
-    type = "label_style",
-    parent = "bold_label",
-    width = 100,
-    horizontal_align = "left",
-}
-
-styles.sspp_station_item_value = { ---@type data.LabelStyleSpecification
+styles.sspp_station_limit_value = { ---@type data.LabelStyleSpecification
     type = "label_style",
     parent = "label",
-    width = 100,
+    width = 16,
+    right_margin = 4,
     horizontal_align = "right",
 }
 

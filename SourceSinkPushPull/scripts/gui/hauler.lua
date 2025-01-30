@@ -175,18 +175,18 @@ function gui.hauler_opened(player_id, hauler_id)
 
     local elements, window = flib_gui.add(player.gui.screen, {
         { type = "frame", name = "sspp-hauler", style = "sspp_hauler_frame", direction = "vertical", children = {
-            { type = "flow", style = "flib_indicator_flow", children = {
+            { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.sspp" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
             } },
-            { type = "flow", style = "flib_indicator_flow", children = {
+            { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", name = "status_label", style = "label" },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
                 { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal", enabled = false },
                 { type = "sprite-button", name = "stop_button", style = "sspp_compact_slot_button", sprite = "item/train-stop", mouse_button_filter = { "left" }, handler = handle_stop_clicked },
             } },
-            { type = "flow", style = "flib_indicator_flow", children = {
+            { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = { "sspp-gui.class" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
                 { type = "textfield", name = "class_textbox", style = "sspp_name_textbox", icon_selector = true, enabled = manual_mode, handler = handle_class_changed },

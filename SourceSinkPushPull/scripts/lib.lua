@@ -75,6 +75,24 @@ function list_remove_value_if_exists(list, value)
     end
 end
 
+--- Remove all instances of a value from a list.
+---@generic T
+---@param list T[]
+---@param value T
+function list_remove_value_all(list, value)
+    local index, length = 1, #list
+
+    while index <= length do
+        if list[index] == value then
+            list[index] = list[length]
+            list[length] = nil
+            length = length - 1
+        else
+            index = index + 1
+        end
+    end
+end
+
 --- Remove a known value from a list.
 ---@generic T
 ---@param list T[]
@@ -203,11 +221,12 @@ end
 ---@param train LuaTrain
 ---@param name string
 ---@param quality string?
+---@return integer
 function get_train_item_count(train, name, quality)
     if quality then
         return train.get_item_count({ name = name, quality = quality })
     end
-    return train.get_fluid_count(name)
+    return math.ceil(train.get_fluid_count(name))
 end
 
 --------------------------------------------------------------------------------
