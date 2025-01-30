@@ -226,6 +226,7 @@ end
 function main.stop_broken(stop_id, stop)
     local comb_ids = storage.stop_comb_ids[stop_id]
 
+    try_close_entity_guis(stop_id)
     if stop then
         try_destroy_station(stop)
     end
@@ -254,6 +255,7 @@ end
 function main.comb_broken(comb_id, comb)
     local stop_ids = storage.comb_stop_ids[comb_id]
 
+    try_close_entity_guis(comb_id)
     if comb then
         for _, stop_id in pairs(stop_ids) do
             try_destroy_station(storage.entities[stop_id])
