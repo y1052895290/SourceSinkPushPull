@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.9
+Date: 2025-01-30
+  Features:
+    - Added support for train limits.
+    - Added support for automatically painting trains. Can be disabled in mod settings.
+  Bugfixes:
+    - Fixed crash when toggling manual mode on a train with cargo.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.8
 Date: 2025-01-30
   Bugfixes:
