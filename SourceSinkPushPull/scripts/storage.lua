@@ -5,6 +5,9 @@
 ---@enum StopFlag
 e_stop_flags = { custom_name = 1 }
 
+---@enum TrainColor
+e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 }
+
 --------------------------------------------------------------------------------
 
 ---@alias NetworkName string
@@ -35,6 +38,8 @@ e_stop_flags = { custom_name = 1 }
 ---@field public disabled_items {[NetworkItemKey]: true?}
 
 ---@class (exact) SourceSinkPushPull.ModSettings
+---@field public auto_paint_trains boolean?
+---@field public train_colors {[TrainColor]: Color}?
 ---@field public stations_per_tick integer?
 
 --------------------------------------------------------------------------------
@@ -197,6 +202,22 @@ function init_network(surface)
     }
 end
 
+---@param name string
+---@return Color
+local function get_rgb_setting(name)
+    local rgba = settings.global[name].value --[[@as Color]]
+    local a = rgba.a
+    return { r = rgba.r * a, g = rgba.g * a, b = rgba.b * a, a = 1.0 }
+end
+
 function populate_mod_settings()
-    mod_settings.stations_per_tick = settings.global["sspp-stations-per-tick"].value --[[@as boolean]]
+    mod_settings.auto_paint_trains = settings.global["sspp-auto-paint-trains"].value --[[@as boolean]]
+    mod_settings.train_colors = {
+        [e_train_colors.depot] = get_rgb_setting("sspp-depot-color"),
+        [e_train_colors.fuel] = get_rgb_setting("sspp-fuel-color"),
+        [e_train_colors.provide] = get_rgb_setting("sspp-provide-color"),
+        [e_train_colors.request] = get_rgb_setting("sspp-request-color"),
+        [e_train_colors.liquidate] = get_rgb_setting("sspp-liquidate-color"),
+    }
+    mod_settings.stations_per_tick = settings.global["sspp-stations-per-tick"].value --[[@as integer]]
 end

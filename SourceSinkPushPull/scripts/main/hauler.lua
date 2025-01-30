@@ -92,6 +92,7 @@ function main.hauler_set_to_automatic(hauler)
         list_append_or_create(network.fuel_haulers, hauler.class, train.id)
         hauler.to_fuel = "TRAVEL"
         set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
+        set_hauler_color(hauler, e_train_colors.fuel)
         send_hauler_to_named_stop(hauler, class.fueler_name)
         return
     end
@@ -112,6 +113,7 @@ function main.hauler_set_to_automatic(hauler)
             list_append_or_create(network.to_depot_liquidate_haulers, item_key, train.id)
             hauler.to_depot = item_key
             set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.waiting-for-request" or "sspp-alert.going-to-depot" }, item_key)
+            set_hauler_color(hauler, e_train_colors.liquidate)
             send_hauler_to_named_stop(hauler, class.depot_name)
         else
             set_hauler_status(hauler, { "sspp-alert.cargo-not-in-network" }, item_key)
@@ -124,6 +126,7 @@ function main.hauler_set_to_automatic(hauler)
     list_append_or_create(network.to_depot_haulers, hauler.class, train.id)
     hauler.to_depot = ""
     set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
+    set_hauler_color(hauler, e_train_colors.depot)
     send_hauler_to_named_stop(hauler, class.depot_name)
 end
 
@@ -260,6 +263,7 @@ function main.hauler_done_at_fuel_stop(hauler)
     list_append_or_create(network.to_depot_haulers, hauler.class, train.id)
     hauler.to_depot = ""
     set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
+    set_hauler_color(hauler, e_train_colors.depot)
     send_hauler_to_named_stop(hauler, class.depot_name)
 end
 

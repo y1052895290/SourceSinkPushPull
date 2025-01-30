@@ -386,6 +386,7 @@ local function tick_liquidate()
     request_station.total_deliveries = request_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
+    set_hauler_color(hauler, e_train_colors.request)
     send_hauler_to_station(hauler, request_station.stop)
 
     return false
@@ -465,6 +466,7 @@ local function tick_dispatch()
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
+    set_hauler_color(hauler, e_train_colors.provide)
     send_hauler_to_station(hauler, provide_station.stop)
 
     return false
@@ -529,6 +531,7 @@ local function tick_provide_done()
     request_station.total_deliveries = request_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
+    set_hauler_color(hauler, e_train_colors.request)
     send_hauler_to_station(hauler, request_station.stop)
 
     return false
@@ -581,11 +584,13 @@ local function tick_request_done()
             list_append_or_create(network.fuel_haulers, hauler.class, hauler_id)
             hauler.to_fuel = "TRAVEL"
             set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
+            set_hauler_color(hauler, e_train_colors.fuel)
             send_hauler_to_named_stop(hauler, class.fueler_name)
         else
             list_append_or_create(network.to_depot_haulers, hauler.class, hauler_id)
             hauler.to_depot = ""
             set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
+            set_hauler_color(hauler, e_train_colors.depot)
             send_hauler_to_named_stop(hauler, class.depot_name)
         end
     else

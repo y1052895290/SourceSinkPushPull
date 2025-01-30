@@ -496,6 +496,19 @@ function set_hauler_status(hauler, message, item, stop)
     end
 end
 
+---@param hauler Hauler
+---@param color_id TrainColor
+function set_hauler_color(hauler, color_id)
+    if mod_settings.auto_paint_trains then
+        for _, locos in pairs(hauler.train.locomotives) do
+            for _, loco in pairs(locos) do
+                loco.copy_color_from_train_stop = false
+                loco.color = mod_settings.train_colors[color_id]
+            end
+        end
+    end
+end
+
 ---@param train LuaTrain
 ---@param message LocalisedString
 function send_alert_for_train(train, message)
