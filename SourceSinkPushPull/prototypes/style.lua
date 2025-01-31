@@ -271,10 +271,10 @@ styles.sspp_frame_tool_button = { ---@type data.ButtonStyleSpecification
     parent = "frame_button",
     font = "heading-2",
     default_font_color = { 0.9, 0.9, 0.9 },
-    minimal_width = 0,
+    minimal_width = 80,
     height = 24,
-    right_padding = 8,
-    left_padding = 8,
+    right_padding = 6,
+    left_padding = 6,
 }
 
 styles.sspp_hauler_frame = { ---@type data.FrameStyleSpecification
