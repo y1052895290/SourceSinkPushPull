@@ -12,6 +12,38 @@ function gui.caption_with_info(caption)
     return { "", caption, " [img=info]" }
 end
 
+---@param input LuaGuiElement
+---@param max_length integer
+---@return string
+function gui.truncate_input(input, max_length)
+    local text = input.text
+    local length = #text
+    if length > max_length then
+        length = max_length
+        for i = max_length, 1, -1 do
+            local byte = string.byte(text, i)
+            if bit32.extract(byte, 4, 4) == 15 then
+                if i + 3 > max_length then length = i - 1 end
+                break
+            end
+            if bit32.extract(byte, 5, 3) == 7 then
+                if i + 2 > max_length then length = i - 1 end
+                break
+            end
+            if bit32.extract(byte, 6, 2) == 3 then
+                if i + 1 > max_length then length = i - 1 end
+                break
+            end
+            if bit32.extract(byte, 7, 1) == 0 then
+                break
+            end
+        end
+        text = string.sub(text, 1, length)
+        input.text = text
+    end
+    return text
+end
+
 ---@param table LuaGuiElement
 ---@param flow_index integer
 ---@param button_index integer
@@ -75,7 +107,6 @@ function gui.refresh_table(table, from_row, to_row, old_dict, key_remove)
 
     for i = columns, #table_children - 1, columns do
         local key, value = from_row(table_children, i)
-
         if key then
             if new_dict[key] then
                 key, value = nil, nil
@@ -83,7 +114,6 @@ function gui.refresh_table(table, from_row, to_row, old_dict, key_remove)
                 new_dict[key] = value
             end
         end
-
         to_row(table_children, i, key, value)
     end
 
@@ -163,7 +193,7 @@ local function on_gui_opened(event)
         if name == "sspp-stop" or name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
             gui.station_open(event.player_index, entity)
         elseif entity.type == "locomotive" then
-            gui.hauler_opened(event.player_index, entity.train.id)
+            gui.hauler_opened(event.player_index, entity.train)
         end
     end
 end

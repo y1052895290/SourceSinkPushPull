@@ -24,6 +24,7 @@ end }
 
 ---@param event EventData.on_gui_text_changed
 local handle_class_name_changed = { [events.on_gui_text_changed] = function(event)
+    gui.truncate_input(event.element, 199)
     gui.update_network_after_change(event.player_index)
 end }
 
@@ -34,11 +35,13 @@ end }
 
 ---@param event EventData.on_gui_text_changed
 local handle_class_depot_name_changed = { [events.on_gui_text_changed] = function(event)
+    gui.truncate_input(event.element, 199)
     gui.update_network_after_change(event.player_index)
 end }
 
 ---@param event EventData.on_gui_text_changed
 local handle_class_fueler_name_changed = { [events.on_gui_text_changed] = function(event)
+    gui.truncate_input(event.element, 199)
     gui.update_network_after_change(event.player_index)
 end }
 
@@ -65,6 +68,7 @@ end }
 
 ---@param event EventData.on_gui_text_changed
 local handle_item_class_changed = { [events.on_gui_text_changed] = function(event)
+    gui.truncate_input(event.element, 199)
     gui.update_network_after_change(event.player_index)
 end }
 
@@ -299,10 +303,10 @@ local function class_from_row(table_children, i)
     if class_name == "" then return end
 
     local depot_name = table_children[i + 3].text
-    if depot_name == "" or #depot_name > 199 then return end
+    if depot_name == "" then return end
 
     local fueler_name = table_children[i + 4].text
-    if fueler_name == "" or #fueler_name > 199 then return end
+    if fueler_name == "" then return end
 
     return class_name, {
         depot_name = depot_name,

@@ -697,9 +697,7 @@ handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
     local parts = player_gui.parts --[[@as StationParts]]
 
-    local stop_name = string.sub(event.element.text, 1, 199)
-    if event.element.text ~= stop_name then event.element.text = stop_name end
-
+    local stop_name = gui.truncate_input(event.element, 199)
     local has_custom_name = stop_name ~= ""
     player_gui.elements.stop_name_clear_button.enabled = has_custom_name
     write_stop_flag(parts.stop, e_stop_flags.custom_name, has_custom_name)

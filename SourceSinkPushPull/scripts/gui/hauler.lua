@@ -60,8 +60,7 @@ local handle_class_changed = { [events.on_gui_text_changed] = function(event)
         return
     end
 
-    local class_name = event.element.text
-    -- TODO: validate class name
+    local class_name = gui.truncate_input(event.element, 199)
 
     local hauler = storage.haulers[train.id]
     if hauler then
@@ -160,10 +159,9 @@ end }
 --------------------------------------------------------------------------------
 
 ---@param player_id PlayerId
----@param hauler_id HaulerId
-function gui.hauler_opened(player_id, hauler_id)
+---@param train LuaTrain
+function gui.hauler_opened(player_id, train)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
-    local train = game.train_manager.get_train_by_id(hauler_id) --[[@as LuaTrain]]
 
     local network_name = train.front_stock.surface.name
     local manual_mode = train.manual_mode
@@ -201,7 +199,7 @@ function gui.hauler_opened(player_id, hauler_id)
     local player_gui = { network = network_name, train = train, elements = elements }
     storage.player_guis[player_id] = player_gui
 
-    local hauler = storage.haulers[hauler_id]
+    local hauler = storage.haulers[train.id]
     if hauler then
         elements.class_textbox.text = hauler.class
         gui.hauler_status_changed(player_gui)
