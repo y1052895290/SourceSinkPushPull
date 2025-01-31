@@ -1,3 +1,0 @@
-- expanded information/minimaps views
-- investigate how editor extensions does % text boxes
-- move table headers to second tables to simplify indices and allow .clear()
