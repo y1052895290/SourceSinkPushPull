@@ -10,6 +10,15 @@ styles.sspp_stretchable_subheader_frame = { ---@type data.FrameStyleSpecificatio
     horizontally_stretchable = "on",
 }
 
+styles.sspp_subheader_caption_textbox = { ---@type data.TextBoxStyleSpecification
+    type = "textbox_style",
+    parent = "textbox",
+    width = 276,
+    minimal_height = 30,
+    left_padding = 4,
+    font = "heading-2",
+}
+
 --------------------------------------------------------------------------------
 
 styles.sspp_network_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
@@ -58,9 +67,9 @@ styles.sspp_network_class_table = { ---@type data.TableStyleSpecification
     cell_padding = 4,
     column_widths = {
         { column = 1, width = 32 + 4 + 32 + 4 + 32 + 4 + 20 },
-        { column = 2, width = 100 },
-        { column = 3, width = 100 },
-        { column = 4, width = 100 },
+        { column = 2, width = 120 },
+        { column = 3, width = 120 },
+        { column = 4, width = 120 },
         { column = 5, width = 100 },
         { column = 6, width = 32 },
         { column = 7, width = 80 },
@@ -78,9 +87,9 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
     cell_padding = 4,
     column_widths = {
         { column = 1, width = 32 + 4 + 32 + 4 + 32 + 4 + 20 },
-        { column = 2, width = 100 },
-        { column = 3, width = 100 },
-        { column = 4, width = 100 },
+        { column = 2, width = 120 },
+        { column = 3, width = 120 },
+        { column = 4, width = 120 },
         { column = 5, width = 32 },
         { column = 6, width = 60 },
         { column = 7, width = 32 },
@@ -103,9 +112,9 @@ styles.sspp_station_item_table = { ---@type data.TableStyleSpecification
     column_widths = {
         { column = 1, width = 32 - 4 },
         { column = 2, width = 80 },
-        { column = 3, width = 200 },
-        { column = 4, width = 200 },
-        { column = 5, width = 200 },
+        { column = 3, width = 220 },
+        { column = 4, width = 220 },
+        { column = 5, width = 220 },
     },
     odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
@@ -122,16 +131,16 @@ styles.sspp_grid_table = { ---@type data.TableStyleSpecification
 
 --------------------------------------------------------------------------------
 
-styles.sspp_subheader_caption_textbox = { ---@type data.TextBoxStyleSpecification
-    type = "textbox_style",
-    parent = "textbox",
-    width = 276,
-    minimal_height = 30,
-    left_padding = 4,
-    font = "heading-2",
+styles.sspp_vertical_warning_image = { ---@type data.ImageStyleSpecification
+    type = "image_style",
+    parent = "image",
+    size = 24,
+    left_margin = 4,
+    right_margin = 4,
+    stretch_image_to_widget_size = true,
 }
 
-styles.sspp_move_sprite_button = {
+styles.sspp_move_sprite_button = { ---@type data.ButtonStyleSpecification
     type = "button_style",
     parent = "list_box_item",
     width = 32,
@@ -168,7 +177,7 @@ styles.sspp_compact_warning_image = { ---@type data.ImageStyleSpecification
 styles.sspp_station_cell_flow = { ---@type data.VerticalFlowStyleSpecification
     type = "vertical_flow_style",
     parent = "packed_vertical_flow",
-    width = 200,
+    width = 220,
     height = 30 * 4,
     vertical_align = "center",
 }
@@ -199,6 +208,20 @@ styles.sspp_number_textbox = { ---@type data.TextBoxStyleSpecification
     type = "textbox_style",
     parent = "textbox",
     width = 100,
+    horizontal_align = "right",
+}
+
+styles.sspp_wide_name_textbox = { ---@type data.TextBoxStyleSpecification
+    type = "textbox_style",
+    parent = "textbox",
+    width = 120,
+    horizontal_align = "left",
+}
+
+styles.sspp_wide_number_textbox = { ---@type data.TextBoxStyleSpecification
+    type = "textbox_style",
+    parent = "textbox",
+    width = 120,
     horizontal_align = "right",
 }
 
@@ -257,7 +280,7 @@ styles.sspp_frame_tool_button = { ---@type data.ButtonStyleSpecification
 styles.sspp_hauler_frame = { ---@type data.FrameStyleSpecification
     type = "frame_style",
     parent = "frame",
-    width = 224,
+    width = 244,
     height = 108,
     padding = 4,
 }

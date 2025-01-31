@@ -189,14 +189,14 @@ function gui.hauler_opened(player_id, hauler_id)
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = { "sspp-gui.class" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", name = "class_textbox", style = "sspp_name_textbox", icon_selector = true, enabled = manual_mode, handler = handle_class_changed },
+                { type = "textfield", name = "class_textbox", style = "sspp_wide_name_textbox", icon_selector = true, enabled = manual_mode, handler = handle_class_changed },
                 { type = "sprite-button", name = "class_auto_assign_button", style = "sspp_compact_slot_button", sprite = "sspp-refresh-icon", tooltip = { "sspp-gui.hauler-auto-assign-tooltip" }, mouse_button_filter = { "left" }, enabled = manual_mode, handler = handle_class_auto_assign },
             } },
         } },
     })
 
     local resolution, scale = player.display_resolution, player.display_scale
-    window.location = { x = resolution.width - (224 + 12) * scale, y = resolution.height - (108 + 12) * scale }
+    window.location = { x = resolution.width - (244 + 12) * scale, y = resolution.height - (108 + 12) * scale }
 
     local player_gui = { network = network_name, train = train, elements = elements }
     storage.player_guis[player_id] = player_gui
