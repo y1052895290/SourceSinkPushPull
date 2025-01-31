@@ -470,6 +470,26 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param deliveries {[ItemKey]: HaulerId[]}?
+---@param old_stop_name string
+---@param new_stop_name string
+local function rename_haulers_stop(deliveries, old_stop_name, new_stop_name)
+    if deliveries then
+        for _, hauler_ids in pairs(deliveries) do
+            for i = #hauler_ids, 1, -1 do
+                local train = storage.haulers[hauler_ids[i]].train
+                local schedule = train.schedule ---@type TrainSchedule
+                for _, record in pairs(schedule.records) do
+                    if record.station == old_stop_name then record.station = new_stop_name end
+                end
+                train.schedule = schedule
+            end
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+
 ---@param player_id PlayerId
 function gui.update_station_after_change(player_id)
     local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
@@ -507,9 +527,14 @@ function gui.update_station_after_change(player_id)
     end
 
     if station and not read_stop_flag(station.stop, e_stop_flags.custom_name) then
+        local old_stop_name = station.stop.backer_name ---@type string
         local new_stop_name = compute_stop_name(station.provide_items, station.request_items)
-        station.stop.backer_name = new_stop_name
-        player_gui.elements.stop_name_label.caption = new_stop_name
+        if old_stop_name ~= new_stop_name then
+            rename_haulers_stop(station.provide_deliveries, old_stop_name, new_stop_name)
+            rename_haulers_stop(station.request_deliveries, old_stop_name, new_stop_name)
+            station.stop.backer_name = new_stop_name
+            player_gui.elements.stop_name_label.caption = new_stop_name
+        end
     end
 end
 
@@ -650,6 +675,8 @@ local handle_clear_name = { [events.on_gui_click] = function(event)
     local stop_name ---@type string
     if station then
         stop_name = compute_stop_name(station.provide_items, station.request_items)
+        rename_haulers_stop(station.provide_deliveries, station.stop.backer_name, stop_name)
+        rename_haulers_stop(station.request_deliveries, station.stop.backer_name, stop_name)
     else
         stop_name = "[virtual-signal=signal-ghost]"
     end
@@ -677,13 +704,15 @@ handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
     player_gui.elements.stop_name_clear_button.enabled = has_custom_name
     write_stop_flag(parts.stop, e_stop_flags.custom_name, has_custom_name)
 
-    if not has_custom_name then
-        local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
-        if station then
+    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+    if station then
+        if not has_custom_name then
             stop_name = compute_stop_name(station.provide_items, station.request_items)
-        else
-            stop_name = "[virtual-signal=signal-ghost]"
         end
+        rename_haulers_stop(station.provide_deliveries, station.stop.backer_name, stop_name)
+        rename_haulers_stop(station.request_deliveries, station.stop.backer_name, stop_name)
+    elseif not has_custom_name then
+        stop_name = "[virtual-signal=signal-ghost]"
     end
     parts.stop.backer_name = stop_name
 end
