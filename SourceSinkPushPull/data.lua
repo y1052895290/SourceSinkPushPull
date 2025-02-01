@@ -33,6 +33,8 @@ data.extend({
         name = "sspp",
         action = "lua",
         order = "f[sspp]",
+        technology_to_unlock = "sspp-train-system",
+        unavailable_until_unlocked = true,
         icon = "__SourceSinkPushPull__/graphics/shortcut-x56.png",
         icon_size = 56,
         small_icon = "__SourceSinkPushPull__/graphics/shortcut-x24.png",
