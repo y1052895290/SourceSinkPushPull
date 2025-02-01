@@ -188,6 +188,23 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param event EventData.on_lua_shortcut
+local function on_lua_shortcut(event)
+    if event.prototype_name == "sspp" then
+        local player_id = event.player_index
+        local player = game.get_player(player_id) --[[@as LuaPlayer]]
+
+        if player.opened and player.opened.name == "sspp-network" then
+            player.opened = nil
+        else
+            -- TODO: remember some previous state
+            gui.network_open(player_id, player.surface.name, 1)
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+
 ---@param event EventData.on_runtime_mod_setting_changed
 local function on_mod_setting_changed(event)
     populate_mod_settings()
@@ -261,6 +278,8 @@ script.on_event(defines.events.on_surface_imported, on_surface_created)
 script.on_event(defines.events.on_pre_surface_cleared, on_surface_cleared)
 script.on_event(defines.events.on_pre_surface_deleted, on_surface_cleared)
 script.on_event(defines.events.on_surface_renamed, on_surface_renamed)
+
+script.on_event(defines.events.on_lua_shortcut, on_lua_shortcut)
 
 script.on_event(defines.events.on_runtime_mod_setting_changed, on_mod_setting_changed)
 

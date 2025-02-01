@@ -26,3 +26,16 @@ data:extend({
 
 require("prototypes.sprite")
 require("prototypes.style")
+
+data.extend({
+    {
+        type = "shortcut",
+        name = "sspp",
+        action = "lua",
+        order = "f[sspp]",
+        icon = "__SourceSinkPushPull__/graphics/shortcut-x56.png",
+        icon_size = 56,
+        small_icon = "__SourceSinkPushPull__/graphics/shortcut-x24.png",
+        small_icon_size = 24
+    }
+})
