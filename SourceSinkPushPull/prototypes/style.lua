@@ -225,6 +225,14 @@ styles.sspp_wide_number_textbox = { ---@type data.TextBoxStyleSpecification
     horizontal_align = "right",
 }
 
+styles.sspp_json_textbox = { ---@type data.TextBoxStyleSpecification
+    type = "textbox_style",
+    parent = "textbox",
+    width = 200,
+    margin = 8,
+    rich_text_setting = "disabled",
+}
+
 styles.sspp_aligned_switch = { ---@type data.SwitchStyleSpecification
     type = "switch_style",
     parent = "switch",

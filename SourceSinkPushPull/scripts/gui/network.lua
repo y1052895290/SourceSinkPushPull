@@ -686,6 +686,166 @@ end }
 
 --------------------------------------------------------------------------------
 
+---@param event EventData.on_gui_click
+local handle_import_import = { [events.on_gui_click] = function(event)
+    local player_id = event.player_index
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerNetworkGui]]
+
+    do
+        local network = storage.networks[player_gui.network]
+
+        local json = helpers.json_to_table(player_gui.popup_elements.textbox.text) --[[@as table]]
+        if type(json) ~= "table" then goto failure end
+
+        local version = json.sspp_network_version
+        if version ~= 1 then goto failure end
+
+        local classes = json.classes ---@type {[ClassName]: Class}
+        if type(classes) ~= "table" then goto failure end
+
+        local items = json.items ---@type {[ItemKey]: NetworkItem}
+        if type(items) ~= "table" then goto failure end
+
+        for class_name, class in pairs(classes) do
+            if type(class_name) ~= "string" or class_name == "" or #class_name > 199 then goto failure end
+            if type(class) ~= "table" then goto failure end
+
+            local depot_name = class[1]
+            if type(depot_name) ~= "string" or depot_name == "" or #depot_name > 199 then goto failure end
+
+            local fueler_name = class[2]
+            if type(fueler_name) ~= "string" or fueler_name == "" or #fueler_name > 199 then goto failure end
+
+            local bypass_depot = class[3]
+            if type(bypass_depot) ~= "boolean" then goto failure end
+
+            classes[class_name] = { depot_name = depot_name, fueler_name = fueler_name, bypass_depot = bypass_depot }
+        end
+
+        for item_key, item in pairs(items) do
+            if type(item_key) ~= "string" then goto failure end
+
+            if is_item_key_invalid(item_key) then
+                items[item_key] = nil -- not an error, just skip this item
+            else
+                if type(item) ~= "table" then goto failure end
+
+                local class = item[1]
+                if type(class) ~= "string" or class == "" or #class > 199 then goto failure end
+
+                local delivery_size = item[2]
+                if type(delivery_size) ~= "number" or delivery_size < 1 then goto failure end
+
+                local delivery_time = item[3]
+                if type(delivery_time) ~= "number" or delivery_time < 1.0 then goto failure end
+
+                local name, quality = split_item_key(item_key)
+                items[item_key] = { name = name, quality = quality, class = class, delivery_size = delivery_size, delivery_time = delivery_time }
+            end
+        end
+
+        if next(classes) == nil and next(items) == nil then goto failure end
+
+        for class_name, _ in pairs(network.classes) do
+            if not classes[class_name] then class_remove_key(player_gui, class_name) end
+        end
+        local class_table = player_gui.elements.class_table
+        local class_children = class_table.children
+        for i = #class_children, class_table.column_count + 1, -1 do class_children[i].destroy() end
+        network.classes = classes
+        for class_name, class in pairs(classes) do class_init_row(class_table, class_name, class) end
+
+        for item_key, _ in pairs(network.items) do
+            if not items[item_key] then item_remove_key(player_gui, item_key) end
+        end
+        local item_table = player_gui.elements.item_table
+        local item_children = item_table.children
+        for i = #item_children, item_table.column_count + 1, -1 do item_children[i].destroy() end
+        network.items = items
+        for item_key, item in pairs(items) do item_init_row(item_table, item_key, item) end
+
+        return
+    end
+
+    ::failure::
+    game.get_player(player_id).play_sound({ path = "utility/cannot_build" })
+    player_gui.popup_elements.textbox.focus()
+    player_gui.popup_elements.textbox.select_all()
+end }
+
+---@param event EventData.on_gui_click
+local handle_export_export = { [events.on_gui_click] = function(event)
+    local player_id = event.player_index
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerNetworkGui]]
+    local network = storage.networks[player_gui.network]
+
+    local classes = {}
+    for class_name, class in pairs(network.classes) do
+        classes[class_name] = { class.depot_name, class.fueler_name, class.bypass_depot }
+    end
+    local items = {}
+    for item_key, item in pairs(network.items) do
+        items[item_key] = { item.class, item.delivery_size, item.delivery_time }
+    end
+    local json = { sspp_network_version = 1, classes = classes, items = items }
+
+    player_gui.popup_elements.textbox.text = helpers.table_to_json(json)
+    player_gui.popup_elements.textbox.focus()
+    player_gui.popup_elements.textbox.select_all()
+end }
+
+--------------------------------------------------------------------------------
+
+---@param player_id PlayerId
+---@param toggle LuaGuiElement
+---@param caption string
+---@param handler table
+local function import_or_export_toggled(player_id, toggle, caption, handler)
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerNetworkGui]]
+
+    if player_gui.popup_elements then
+        player_gui.popup_elements["sspp-popup"].destroy()
+        player_gui.popup_elements = nil
+        if not toggle.toggled then return end
+    end
+
+    local elements, window = flib_gui.add(game.get_player(player_id).gui.screen, {
+        { type = "frame", name = "sspp-popup", style = "frame", direction = "vertical", children = {
+            { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
+                { type = "textfield", name = "textbox", style = "sspp_json_textbox" },
+            } },
+            { type = "flow", style = "dialog_buttons_horizontal_flow", direction = "horizontal", children = {
+                { type = "button", style = "dialog_button", caption = { caption }, mouse_button_filter = { "left" }, handler = handler },
+                { type = "empty-widget", style = "flib_dialog_footer_drag_handle_no_right", drag_target = "sspp-popup" },
+            } },
+        } },
+    })
+
+    window.bring_to_front()
+    window.force_auto_center()
+
+    player_gui.popup_elements = elements
+end
+
+---@param event EventData.on_gui_click
+local handle_import_toggled = { [events.on_gui_click] = function(event)
+    local player_id = event.player_index
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerNetworkGui]]
+    player_gui.elements.export_toggle.toggled = false
+    import_or_export_toggled(player_id, event.element, "sspp-gui.import-from-string", handle_import_import)
+    if player_gui.popup_elements then player_gui.popup_elements.textbox.focus() end
+end }
+
+---@param event EventData.on_gui_click
+local handle_export_toggled = { [events.on_gui_click] = function(event)
+    local player_id = event.player_index
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerNetworkGui]]
+    player_gui.elements.import_toggle.toggled = false
+    import_or_export_toggled(player_id, event.element, "sspp-gui.export-to-string", handle_export_export)
+end }
+
+--------------------------------------------------------------------------------
+
 ---@param player_id PlayerId
 ---@param network_name NetworkName
 ---@param tab_index integer
@@ -707,6 +867,8 @@ function gui.network_open(player_id, network_name, tab_index)
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-network", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.network-for-surface", localised_name }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
+                { type = "sprite-button", name = "import_toggle", style = "frame_action_button", sprite = "sspp-import-icon", tooltip = { "sspp-gui.import-from-string" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = handle_import_toggled },
+                { type = "sprite-button", name = "export_toggle", style = "frame_action_button", sprite = "sspp-export-icon", tooltip = { "sspp-gui.export-to-string" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = handle_export_toggled },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
@@ -787,10 +949,11 @@ function gui.network_open(player_id, network_name, tab_index)
 end
 
 ---@param player_id PlayerId
----@param window LuaGuiElement
-function gui.network_closed(player_id, window)
-    assert(window.name == "sspp-network")
-    window.destroy()
+function gui.network_closed(player_id)
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerNetworkGui]]
+
+    player_gui.elements["sspp-network"].destroy()
+    if player_gui.popup_elements then player_gui.popup_elements["sspp-popup"].destroy() end
 
     storage.player_guis[player_id] = nil
 end
@@ -820,6 +983,10 @@ function gui.network_add_flib_handlers()
         ["network_add_class"] = handle_add_class[events.on_gui_click],
         ["network_add_item"] = handle_add_item[events.on_gui_click],
         ["network_add_fluid"] = handle_add_fluid[events.on_gui_click],
+        ["network_import_toggled"] = handle_import_toggled[events.on_gui_click],
+        ["network_export_toggled"] = handle_export_toggled[events.on_gui_click],
+        ["network_import_import"] = handle_import_import[events.on_gui_click],
+        ["network_export_export"] = handle_export_export[events.on_gui_click],
         ["network_close_window"] = handle_close_window[events.on_gui_click],
     })
 end

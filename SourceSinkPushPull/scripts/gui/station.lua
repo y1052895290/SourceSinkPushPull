@@ -908,12 +908,10 @@ function gui.station_open(player_id, entity)
 end
 
 ---@param player_id PlayerId
----@param window LuaGuiElement
-function gui.station_closed(player_id, window)
-    assert(window.name == "sspp-station")
-    window.destroy()
-
+function gui.station_closed(player_id)
     local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
+    player_gui.elements["sspp-station"].destroy()
+
     local entity = storage.entities[player_gui.unit_number]
 
     if entity.valid and entity.name ~= "entity-ghost" then

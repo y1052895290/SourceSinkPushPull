@@ -109,7 +109,7 @@ local function try_close_entity_guis(unit_number)
         if player_gui.unit_number then
             ---@cast player_gui PlayerStationGui
             if player_gui.unit_number == unit_number or player_gui.parts and player_gui.parts.ids[unit_number] then
-                gui.station_closed(player_id, player_gui.elements["sspp-station"])
+                gui.station_closed(player_id)
             end
         end
     end

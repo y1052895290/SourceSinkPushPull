@@ -141,6 +141,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public haulers_class ClassName?
 ---@field public haulers_item ItemKey?
 ---@field public stations_item ItemKey?
+---@field public popup_elements {[string]: LuaGuiElement}?
 
 ---@class (exact) PlayerStationGui
 ---@field public network NetworkName

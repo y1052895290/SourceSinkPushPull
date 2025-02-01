@@ -204,7 +204,7 @@ end
 function is_item_key_invalid(item_key)
     local name, quality = split_item_key(item_key)
     if quality then
-        return not prototypes.item[name]
+        return not (prototypes.item[name] and prototypes.quality[quality])
     end
     return not prototypes.fluid[name]
 end

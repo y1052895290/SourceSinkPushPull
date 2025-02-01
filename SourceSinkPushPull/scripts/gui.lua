@@ -202,9 +202,9 @@ end
 local function on_gui_closed(event)
     if event.gui_type == defines.gui_type.custom then
         if event.element.name == "sspp-network" then
-            gui.network_closed(event.player_index, event.element)
+            gui.network_closed(event.player_index)
         elseif event.element.name == "sspp-station" then
-            gui.station_closed(event.player_index, event.element)
+            gui.station_closed(event.player_index)
         end
     elseif event.gui_type == defines.gui_type.entity then
         if event.entity.type == "locomotive" then
