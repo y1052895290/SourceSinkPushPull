@@ -24,6 +24,11 @@ data:extend({
         size = 32, scale = 0.5, flags = { "gui-icon" },
     },
     {
+        type = "sprite", name = "sspp-disable-icon",
+        filename = "__SourceSinkPushPull__/graphics/gui/sspp-disable-icon.png",
+        size = 32, scale = 0.5, flags = { "gui-icon" },
+    },
+    {
         type = "sprite", name = "sspp-export-icon",
         filename = "__SourceSinkPushPull__/graphics/gui/sspp-export-icon.png",
         size = 32, scale = 0.5, flags = { "gui-icon" },

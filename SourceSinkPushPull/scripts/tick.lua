@@ -37,7 +37,6 @@ local function prepare_for_tick_poll()
     storage.poll_stations = list
 
     for station_id, station in pairs(storage.stations) do
-        -- TODO: add on/off switch to station, check it here
         local provide_items = station.provide_items
         if not (provide_items and next(provide_items)) then
             local request_items = station.request_items
@@ -93,6 +92,8 @@ local function tick_poll()
         end
     end
 
+    local enabled = not read_stop_flag(station.stop, e_stop_flags.disable)
+
     if station.provide_items then
         local provide_counts = {} ---@type {[ItemKey]: integer}
         station.provide_counts = provide_counts
@@ -114,19 +115,21 @@ local function tick_poll()
                     hauler_provide_item_key = nil
                 end
 
-                local deliveries = len_or_zero(station.provide_deliveries[item_key])
-                local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
-                if want_deliveries > 0 then
-                    if provide_item.push then
-                        local push_count = count - compute_buffer(network_item, provide_item)
-                        local push_want_deliveries = math.floor(push_count / network_item.delivery_size) - deliveries
-                        if push_want_deliveries > 0 then
-                            list_extend_or_create(network.push_tickets, item_key, station_id, push_want_deliveries)
-                            want_deliveries = want_deliveries - push_want_deliveries
-                        end
-                    end
+                if enabled then
+                    local deliveries = len_or_zero(station.provide_deliveries[item_key])
+                    local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
                     if want_deliveries > 0 then
-                        list_extend_or_create(network.provide_tickets, item_key, station_id, want_deliveries)
+                        if provide_item.push then
+                            local push_count = count - compute_buffer(network_item, provide_item)
+                            local push_want_deliveries = math.floor(push_count / network_item.delivery_size) - deliveries
+                            if push_want_deliveries > 0 then
+                                list_extend_or_create(network.push_tickets, item_key, station_id, push_want_deliveries)
+                                want_deliveries = want_deliveries - push_want_deliveries
+                            end
+                        end
+                        if want_deliveries > 0 then
+                            list_extend_or_create(network.provide_tickets, item_key, station_id, want_deliveries)
+                        end
                     end
                 end
             end
@@ -154,19 +157,21 @@ local function tick_poll()
                     hauler_request_item_key = nil
                 end
 
-                local deliveries = len_or_zero(station.request_deliveries[item_key])
-                local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
-                if want_deliveries > 0 then
-                    if request_item.pull then
-                        local pull_count = count - compute_buffer(network_item, request_item)
-                        local pull_want_deliveries = math.floor(pull_count / network_item.delivery_size) - deliveries
-                        if pull_want_deliveries > 0 then
-                            list_extend_or_create(network.pull_tickets, item_key, station_id, pull_want_deliveries)
-                            want_deliveries = want_deliveries - pull_want_deliveries
-                        end
-                    end
+                if enabled then
+                    local deliveries = len_or_zero(station.request_deliveries[item_key])
+                    local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
                     if want_deliveries > 0 then
-                        list_extend_or_create(network.request_tickets, item_key, station_id, want_deliveries)
+                        if request_item.pull then
+                            local pull_count = count - compute_buffer(network_item, request_item)
+                            local pull_want_deliveries = math.floor(pull_count / network_item.delivery_size) - deliveries
+                            if pull_want_deliveries > 0 then
+                                list_extend_or_create(network.pull_tickets, item_key, station_id, pull_want_deliveries)
+                                want_deliveries = want_deliveries - pull_want_deliveries
+                            end
+                        end
+                        if want_deliveries > 0 then
+                            list_extend_or_create(network.request_tickets, item_key, station_id, want_deliveries)
+                        end
                     end
                 end
             end

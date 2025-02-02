@@ -10,6 +10,12 @@ require("main.hauler")
 local function on_entity_built(event)
     local entity = event.entity or event.created_entity ---@type LuaEntity
 
+    if entity.type == "straight-rail" then
+        main.rail_built(entity, defines.rail_direction.front)
+        main.rail_built(entity, defines.rail_direction.back)
+        return
+    end
+
     local name, ghost_unit_number = entity.name, nil
     if name == "entity-ghost" then
         local tags = entity.tags or {}
@@ -29,6 +35,12 @@ end
 
 local function on_entity_broken(event)
     local entity = event.entity or event.ghost ---@type LuaEntity
+
+    if entity.type == "straight-rail" then
+        main.rail_broken(entity, defines.rail_direction.front)
+        main.rail_broken(entity, defines.rail_direction.back)
+        return
+    end
 
     local name = entity.name
     if name == "entity-ghost" then name = entity.ghost_name end
@@ -232,6 +244,7 @@ local filter_built = {
     { filter = "ghost_name", name = "sspp-general-io" },
     { filter = "ghost_name", name = "sspp-provide-io" },
     { filter = "ghost_name", name = "sspp-request-io" },
+    { filter = "type", type = "straight-rail" },
 }
 local filter_broken = {
     { filter = "name", name = "sspp-stop" },
@@ -242,6 +255,7 @@ local filter_broken = {
     { filter = "ghost_name", name = "sspp-general-io" },
     { filter = "ghost_name", name = "sspp-provide-io" },
     { filter = "ghost_name", name = "sspp-request-io" },
+    { filter = "type", type = "straight-rail" },
     { filter = "rolling-stock" },
 }
 local filter_ghost_broken = {

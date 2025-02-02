@@ -646,7 +646,7 @@ local handle_open_network = { [events.on_gui_click] = function(event)
 end }
 
 ---@param event EventData.on_gui_click
-local handle_toggle_name = { [events.on_gui_click] = function(event)
+local handle_edit_name_toggled = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
     local parts = player_gui.parts --[[@as StationParts]]
 
@@ -727,6 +727,16 @@ handle_name_changed_or_confirmed[events.on_gui_confirmed] = function(event)
     player_gui.elements.stop_name_edit_toggle.toggled = false
 end
 
+---@param event EventData.on_gui_click
+local handle_disable_toggled = { [events.on_gui_click] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local parts = player_gui.parts --[[@as StationParts]]
+
+    local disabled = event.element.toggled
+    event.element.tooltip = { disabled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
+    write_stop_flag(parts.stop, e_stop_flags.disable, disabled)
+end }
+
 ---@param event EventData.on_gui_value_changed
 local handle_limit_changed = { [events.on_gui_value_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
@@ -770,6 +780,8 @@ end }
 ---@param parts StationParts
 ---@return {[string]: LuaGuiElement} elements, LuaGuiElement window
 local function add_gui_complete(player, parts)
+    local is_disabled = read_stop_flag(parts.stop, e_stop_flags.disable)
+    local disable_tooltip = { is_disabled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
     local name = parts.stop.backer_name
     local has_custom_name = read_stop_flag(parts.stop, e_stop_flags.custom_name)
     local limit = parts.stop.trains_limit
@@ -781,6 +793,8 @@ local function add_gui_complete(player, parts)
                 { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
+                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disable_tooltip, auto_toggle = true, toggled = is_disabled, handler = handle_disable_toggled },
+                { type = "empty-widget", style = "empty_widget" },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
@@ -789,7 +803,7 @@ local function add_gui_complete(player, parts)
                         { type = "label", name = "stop_name_label", style = "subheader_caption_label", caption = name },
                         { type = "textfield", name = "stop_name_input", style = "sspp_subheader_caption_textbox", icon_selector = true, text = name, visible = false, handler = handle_name_changed_or_confirmed },
                         { type = "empty-widget", style = "flib_horizontal_pusher" },
-                        { type = "sprite-button", name = "stop_name_edit_toggle", style = "control_settings_section_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.edit-custom-name" }, auto_toggle = true, handler = handle_toggle_name },
+                        { type = "sprite-button", name = "stop_name_edit_toggle", style = "control_settings_section_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.edit-custom-name" }, auto_toggle = true, handler = handle_edit_name_toggled },
                         { type = "sprite-button", name = "stop_name_clear_button", style = "control_settings_section_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.clear-custom-name" }, enabled = has_custom_name, handler = handle_clear_name },
                     } },
                     { type = "tabbed-pane", style = "tabbed_pane", children = {
@@ -933,10 +947,11 @@ function gui.station_add_flib_handlers()
         ["station_item_switch_state_changed"] = handle_item_switch_state_changed[events.on_gui_switch_state_changed],
         ["station_item_text_changed"] = handle_item_text_changed[events.on_gui_text_changed],
         ["station_open_network"] = handle_open_network[events.on_gui_click],
-        ["station_toggle_name"] = handle_toggle_name[events.on_gui_click],
+        ["station_edit_name_toggled"] = handle_edit_name_toggled[events.on_gui_click],
         ["station_clear_name"] = handle_clear_name[events.on_gui_click],
         ["station_name_changed"] = handle_name_changed_or_confirmed[events.on_gui_text_changed],
         ["station_name_confirmed"] = handle_name_changed_or_confirmed[events.on_gui_confirmed],
+        ["station_disable_toggled"] = handle_disable_toggled[events.on_gui_click],
         ["station_limit_changed"] = handle_limit_changed[events.on_gui_value_changed],
         ["station_open_hauler"] = handle_open_hauler[events.on_gui_click],
         ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],

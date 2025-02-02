@@ -869,6 +869,7 @@ function gui.network_open(player_id, network_name, tab_index)
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
                 { type = "sprite-button", name = "import_toggle", style = "frame_action_button", sprite = "sspp-import-icon", tooltip = { "sspp-gui.import-from-string" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = handle_import_toggled },
                 { type = "sprite-button", name = "export_toggle", style = "frame_action_button", sprite = "sspp-export-icon", tooltip = { "sspp-gui.export-to-string" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = handle_export_toggled },
+                { type = "empty-widget", style = "empty_widget" },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
