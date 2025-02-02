@@ -321,6 +321,71 @@ end
 
 --------------------------------------------------------------------------------
 
+local function prepare_for_tick_request_done()
+    local list, length = {}, 0 ---@type NetworkItemKey[]
+    storage.request_done_items = list
+
+    for network_name, network in pairs(storage.networks) do
+        for item_key, station_ids in pairs(network.request_done_tickets) do
+            -- assume there are always enough depots available
+            local haulers_to_send = #station_ids
+            length = extend_network_item_key_list(list, length, network_name, item_key, haulers_to_send)
+        end
+    end
+
+    storage.tick_state = "REQUEST_DONE"
+end
+
+local function tick_request_done()
+    local network_item_key ---@type NetworkItemKey
+    repeat
+        network_item_key = list_pop_random_if_any(storage.request_done_items)
+        if not network_item_key then return true end
+        if not storage.disabled_items[network_item_key] then break end
+    until false
+
+    local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
+    local network = storage.networks[network_name]
+
+    local request_station_id = pop_worst_station(network.request_done_tickets, item_key)
+    local request_station = storage.stations[request_station_id]
+
+    local hauler_id = assert(request_station.hauler)
+    local hauler = storage.haulers[hauler_id]
+
+    list_remove_value_or_destroy(network.request_haulers, item_key, hauler_id)
+    list_remove_value_or_destroy(request_station.request_deliveries, item_key, hauler_id)
+    hauler.to_request = nil
+    request_station.request_minimum_active_count = nil
+    request_station.hauler = nil
+    request_station.total_deliveries = request_station.total_deliveries - 1
+
+    local class = network.classes[hauler.class]
+    if class then
+        if check_if_hauler_needs_fuel(hauler, class) then
+            list_append_or_create(network.fuel_haulers, hauler.class, hauler_id)
+            hauler.to_fuel = "TRAVEL"
+            set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
+            set_hauler_color(hauler, e_train_colors.fuel)
+            send_hauler_to_named_stop(hauler, class.fueler_name)
+        else
+            list_append_or_create(network.to_depot_haulers, hauler.class, hauler_id)
+            hauler.to_depot = ""
+            set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
+            set_hauler_color(hauler, e_train_colors.depot)
+            send_hauler_to_named_stop(hauler, class.depot_name)
+        end
+    else
+        set_hauler_status(hauler, { "sspp-alert.class-not-in-network" })
+        send_alert_for_train(hauler.train, hauler.status)
+        hauler.train.manual_mode = true
+    end
+
+    return false
+end
+
+--------------------------------------------------------------------------------
+
 local function prepare_for_tick_liquidate()
     local list, length = {}, 0 ---@type NetworkItemKey[]
     storage.liquidate_items = list
@@ -384,6 +449,71 @@ local function tick_liquidate()
 
     hauler.to_depot = nil
     hauler.at_depot = nil
+
+    list_append_or_create(network.request_haulers, item_key, hauler_id)
+    list_append_or_create(request_station.request_deliveries, item_key, hauler_id)
+    hauler.to_request = { item = item_key, station = request_station_id, phase = "TRAVEL" }
+    request_station.total_deliveries = request_station.total_deliveries + 1
+
+    set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
+    set_hauler_color(hauler, e_train_colors.request)
+    send_hauler_to_station(hauler, request_station.stop)
+
+    return false
+end
+
+--------------------------------------------------------------------------------
+
+local function prepare_for_tick_provide_done()
+    local list, length = {}, 0 ---@type NetworkItemKey[]
+    storage.provide_done_items = list
+
+    for network_name, network in pairs(storage.networks) do
+        local pull_tickets = network.pull_tickets
+        local request_tickets = network.request_tickets
+
+        for item_key, station_ids in pairs(network.provide_done_tickets) do
+            local pull_count = len_or_zero(pull_tickets[item_key])
+            local request_count = len_or_zero(request_tickets[item_key])
+            local haulers_to_send = math.min(#station_ids, pull_count + request_count)
+
+            length = extend_network_item_key_list(list, length, network_name, item_key, haulers_to_send)
+        end
+    end
+
+    storage.tick_state = "PROVIDE_DONE"
+end
+
+local function tick_provide_done()
+    local network_item_key ---@type NetworkItemKey
+    repeat
+        network_item_key = list_pop_random_if_any(storage.provide_done_items)
+        if not network_item_key then return true end
+        if not storage.disabled_items[network_item_key] then break end
+    until false
+
+    local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
+    local network = storage.networks[network_name]
+
+    local request_station_id = pop_best_station_if_any(network, "pull_tickets", "request_tickets", item_key)
+    if not request_station_id then
+        list_remove_value_all(storage.provide_done_items, network_item_key)
+        return false
+    end
+    local request_station = storage.stations[request_station_id]
+
+    local provide_station_id = pop_worst_station(network.provide_done_tickets, item_key)
+    local provide_station = storage.stations[provide_station_id]
+
+    local hauler_id = assert(provide_station.hauler)
+    local hauler = storage.haulers[hauler_id]
+
+    list_remove_value_or_destroy(network.provide_haulers, item_key, hauler_id)
+    list_remove_value_or_destroy(provide_station.provide_deliveries, item_key, hauler_id)
+    hauler.to_provide = nil
+    provide_station.provide_minimum_active_count = nil
+    provide_station.hauler = nil
+    provide_station.total_deliveries = provide_station.total_deliveries - 1
 
     list_append_or_create(network.request_haulers, item_key, hauler_id)
     list_append_or_create(request_station.request_deliveries, item_key, hauler_id)
@@ -473,136 +603,6 @@ local function tick_dispatch()
     set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
     set_hauler_color(hauler, e_train_colors.provide)
     send_hauler_to_station(hauler, provide_station.stop)
-
-    return false
-end
-
---------------------------------------------------------------------------------
-
-local function prepare_for_tick_provide_done()
-    local list, length = {}, 0 ---@type NetworkItemKey[]
-    storage.provide_done_items = list
-
-    for network_name, network in pairs(storage.networks) do
-        local pull_tickets = network.pull_tickets
-        local request_tickets = network.request_tickets
-
-        for item_key, station_ids in pairs(network.provide_done_tickets) do
-            local pull_count = len_or_zero(pull_tickets[item_key])
-            local request_count = len_or_zero(request_tickets[item_key])
-            local haulers_to_send = math.min(#station_ids, pull_count + request_count)
-
-            length = extend_network_item_key_list(list, length, network_name, item_key, haulers_to_send)
-        end
-    end
-
-    storage.tick_state = "PROVIDE_DONE"
-end
-
-local function tick_provide_done()
-    local network_item_key ---@type NetworkItemKey
-    repeat
-        network_item_key = list_pop_random_if_any(storage.provide_done_items)
-        if not network_item_key then return true end
-        if not storage.disabled_items[network_item_key] then break end
-    until false
-
-    local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
-    local network = storage.networks[network_name]
-
-    local request_station_id = pop_best_station_if_any(network, "pull_tickets", "request_tickets", item_key)
-    if not request_station_id then
-        list_remove_value_all(storage.provide_done_items, network_item_key)
-        return false
-    end
-    local request_station = storage.stations[request_station_id]
-
-    local provide_station_id = pop_worst_station(network.provide_done_tickets, item_key)
-    local provide_station = storage.stations[provide_station_id]
-
-    local hauler_id = assert(provide_station.hauler)
-    local hauler = storage.haulers[hauler_id]
-
-    list_remove_value_or_destroy(network.provide_haulers, item_key, hauler_id)
-    list_remove_value_or_destroy(provide_station.provide_deliveries, item_key, hauler_id)
-    hauler.to_provide = nil
-    provide_station.provide_minimum_active_count = nil
-    provide_station.hauler = nil
-    provide_station.total_deliveries = provide_station.total_deliveries - 1
-
-    list_append_or_create(network.request_haulers, item_key, hauler_id)
-    list_append_or_create(request_station.request_deliveries, item_key, hauler_id)
-    hauler.to_request = { item = item_key, station = request_station_id, phase = "TRAVEL" }
-    request_station.total_deliveries = request_station.total_deliveries + 1
-
-    set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
-    set_hauler_color(hauler, e_train_colors.request)
-    send_hauler_to_station(hauler, request_station.stop)
-
-    return false
-end
-
---------------------------------------------------------------------------------
-
-local function prepare_for_tick_request_done()
-    local list, length = {}, 0 ---@type NetworkItemKey[]
-    storage.request_done_items = list
-
-    for network_name, network in pairs(storage.networks) do
-        for item_key, station_ids in pairs(network.request_done_tickets) do
-            -- assume there are always enough depots available
-            local haulers_to_send = #station_ids
-            length = extend_network_item_key_list(list, length, network_name, item_key, haulers_to_send)
-        end
-    end
-
-    storage.tick_state = "REQUEST_DONE"
-end
-
-local function tick_request_done()
-    local network_item_key ---@type NetworkItemKey
-    repeat
-        network_item_key = list_pop_random_if_any(storage.request_done_items)
-        if not network_item_key then return true end
-        if not storage.disabled_items[network_item_key] then break end
-    until false
-
-    local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
-    local network = storage.networks[network_name]
-
-    local request_station_id = pop_worst_station(network.request_done_tickets, item_key)
-    local request_station = storage.stations[request_station_id]
-
-    local hauler_id = assert(request_station.hauler)
-    local hauler = storage.haulers[hauler_id]
-
-    list_remove_value_or_destroy(network.request_haulers, item_key, hauler_id)
-    list_remove_value_or_destroy(request_station.request_deliveries, item_key, hauler_id)
-    hauler.to_request = nil
-    request_station.request_minimum_active_count = nil
-    request_station.hauler = nil
-    request_station.total_deliveries = request_station.total_deliveries - 1
-
-    local class = network.classes[hauler.class]
-    if class then
-        if check_if_hauler_needs_fuel(hauler, class) then
-            list_append_or_create(network.fuel_haulers, hauler.class, hauler_id)
-            hauler.to_fuel = "TRAVEL"
-            set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
-            set_hauler_color(hauler, e_train_colors.fuel)
-            send_hauler_to_named_stop(hauler, class.fueler_name)
-        else
-            list_append_or_create(network.to_depot_haulers, hauler.class, hauler_id)
-            hauler.to_depot = ""
-            set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
-            set_hauler_color(hauler, e_train_colors.depot)
-            send_hauler_to_named_stop(hauler, class.depot_name)
-        end
-    else
-        set_hauler_status(hauler, { "sspp-alert.class-not-in-network" })
-        send_alert_for_train(hauler.train, hauler.status)
-        hauler.train.manual_mode = true
-    end
 
     return false
 end

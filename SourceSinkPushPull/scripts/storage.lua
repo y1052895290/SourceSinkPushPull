@@ -17,7 +17,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@alias StationId uint
 ---@alias HaulerId uint
 ---@alias PlayerId uint
----@alias TickState "INITIAL"|"POLL"|"LIQUIDATE"|"DISPATCH"|"PROVIDE_DONE"|"REQUEST_DONE"
+---@alias TickState "INITIAL"|"POLL"|"REQUEST_DONE"|"LIQUIDATE"|"PROVIDE_DONE"|"DISPATCH"
 ---@alias HaulerPhase "TRAVEL"|"TRANSFER"|"DONE"
 ---@alias PlayerGui PlayerNetworkGui|PlayerStationGui|PlayerHaulerGui
 
