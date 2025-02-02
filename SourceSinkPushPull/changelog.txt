@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.11
+Date: 2025-02-02
+  Features:
+    - Networks can now be exported to and imported from strings, for transfer between saves.
+    - Added a toolbar button to open the network window from anyway.
+    - Stations can now be disabled, which prevents new deliveries. Useful when making changes.
+  Bugfixes:
+    - Fixed potential crashes when an SSPP train stop has no connected rail.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.10
 Date: 2025-01-31
   Features:
