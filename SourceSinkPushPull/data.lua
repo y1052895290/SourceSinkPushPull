@@ -5,7 +5,6 @@ flib = require("__flib__.data-util")
 require("prototypes.entity")
 require("prototypes.item")
 require("prototypes.technology")
-require("prototypes.sprite")
 
 data:extend({
     stop_entity,
@@ -26,6 +25,7 @@ data:extend({
 
 require("prototypes.sprite")
 require("prototypes.style")
+require("prototypes.signal")
 
 data.extend({
     {

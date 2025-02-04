@@ -6,6 +6,25 @@ local cwi = gui.caption_with_info
 
 --------------------------------------------------------------------------------
 
+---@param flow LuaGuiElement
+---@param active_mode ItemMode
+local function set_active_mode_button(flow, active_mode)
+    for index, button in pairs(flow.children) do
+        button.toggled = index == active_mode
+    end
+end
+
+---@param flow LuaGuiElement
+---@return ItemMode active_mode
+local function get_active_mode_button(flow)
+    for index, button in pairs(flow.children) do
+        if button.toggled then return index end
+    end
+    error()
+end
+
+--------------------------------------------------------------------------------
+
 ---@param event EventData.on_gui_click
 local handle_item_move = { [events.on_gui_click] = function(event)
     local flow = event.element.parent.parent --[[@as LuaGuiElement]]
@@ -30,8 +49,9 @@ local handle_item_text_changed = { [events.on_gui_text_changed] = function(event
     gui.update_station_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_switch_state_changed
-local handle_item_switch_state_changed = { [events.on_gui_switch_state_changed] = function(event)
+---@param event EventData.on_gui_click
+local handle_item_mode_click = { [events.on_gui_click] = function(event)
+    set_active_mode_button(event.element.parent, event.element.get_index_in_parent())
     gui.update_station_after_change(event.player_index)
 end }
 
@@ -50,19 +70,6 @@ local function make_property_flow(caption, tooltip, def)
             { type = "label", style = "bold_label", caption = caption_ls, tooltip = tooltip_ls },
             { type = "empty-widget", style = "flib_horizontal_pusher" },
             def,
-        },
-    } --[[@as flib.GuiElemDef]]
-end
-
----@param def flib.GuiElemDef
----@return flib.GuiElemDef
-local function make_center_flow(def)
-    return {
-        type = "flow", style = "sspp_station_property_flow", direction = "horizontal",
-        children = {
-            { type = "empty-widget", style = "flib_horizontal_pusher" },
-            def,
-            { type = "empty-widget", style = "flib_horizontal_pusher" },
         },
     } --[[@as flib.GuiElemDef]]
 end
@@ -92,10 +99,17 @@ local function add_new_provide_row(provide_table, elem_type)
             }),
         } },
         { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
-            make_center_flow({
-                type = "switch", style = "sspp_aligned_switch",
-                left_label_caption = { "sspp-gui.source" }, right_label_caption = { "sspp-gui.push" }, tooltip = { "sspp-gui.provide-mode-tooltip" },
-                switch_state = "left", handler = handle_item_switch_state_changed,
+            make_property_flow("sspp-gui.mode", "sspp-gui.provide-mode-tooltip", {
+                type = "flow", style = "horizontal_flow", direction = "horizontal",
+                children = {
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-1", tooltip = { "sspp-gui.provide-mode-tooltip-1" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-2", tooltip = { "sspp-gui.provide-mode-tooltip-2" }, toggled = true, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-3", tooltip = { "sspp-gui.provide-mode-tooltip-3" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-4", tooltip = { "sspp-gui.provide-mode-tooltip-4" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-5", tooltip = { "sspp-gui.provide-mode-tooltip-5" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-6", tooltip = { "sspp-gui.provide-mode-tooltip-6" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.provide-mode-tooltip-dynamic" }, handler = handle_item_mode_click },
+                },
             }),
             make_property_flow("sspp-gui.throughput", "sspp-gui.provide-throughput-tooltip", {
                 type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true,
@@ -146,10 +160,17 @@ local function add_new_request_row(request_table, elem_type)
             }),
         } },
         { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
-            make_center_flow({
-                type = "switch", style = "sspp_aligned_switch",
-                left_label_caption = { "sspp-gui.sink" }, right_label_caption = { "sspp-gui.pull" }, tooltip = { "sspp-gui.request-mode-tooltip" },
-                switch_state = "left", handler = handle_item_switch_state_changed,
+            make_property_flow("sspp-gui.mode", "sspp-gui.request-mode-tooltip", {
+                type = "flow", style = "horizontal_flow", direction = "horizontal",
+                children = {
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-1", tooltip = { "sspp-gui.request-mode-tooltip-1" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-2", tooltip = { "sspp-gui.request-mode-tooltip-2" }, toggled = true, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-3", tooltip = { "sspp-gui.request-mode-tooltip-3" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-4", tooltip = { "sspp-gui.request-mode-tooltip-4" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-5", tooltip = { "sspp-gui.request-mode-tooltip-5" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-6", tooltip = { "sspp-gui.request-mode-tooltip-6" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.request-mode-tooltip-dynamic" }, handler = handle_item_mode_click },
+                },
             }),
             make_property_flow("sspp-gui.throughput", "sspp-gui.request-throughput-tooltip", {
                 type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true,
@@ -203,7 +224,7 @@ handle_provide_copy[events.on_gui_click] = function(event)
     gui.insert_newly_added_row(table, j)
 
     local table_children = table.children
-    table_children[j + 4].children[1].children[2].switch_state = table_children[i + 4].children[1].children[2].switch_state
+    set_active_mode_button(table_children[j + 4].children[1].children[3], get_active_mode_button(table_children[i + 4].children[1].children[3]))
     table_children[j + 4].children[2].children[3].text = table_children[i + 4].children[2].children[3].text
     table_children[j + 4].children[3].children[3].text = table_children[i + 4].children[3].children[3].text
     table_children[j + 4].children[4].children[3].text = table_children[i + 4].children[4].children[3].text
@@ -222,7 +243,7 @@ handle_request_copy[events.on_gui_click] = function(event)
     gui.insert_newly_added_row(table, j)
 
     local table_children = table.children
-    table_children[j + 4].children[1].children[2].switch_state = table_children[i + 4].children[1].children[2].switch_state
+    set_active_mode_button(table_children[j + 4].children[1].children[3], get_active_mode_button(table_children[i + 4].children[1].children[3]))
     table_children[j + 4].children[2].children[3].text = table_children[i + 4].children[2].children[3].text
     table_children[j + 4].children[3].children[3].text = table_children[i + 4].children[3].children[3].text
 end
@@ -272,7 +293,7 @@ local function provide_init_row(network_items, provide_table, item_key, item)
         provide_to_row_statistics(table_children, i, network_item, item)
     end
 
-    table_children[i + 4].children[1].children[2].switch_state = item.push and "right" or "left"
+    set_active_mode_button(table_children[i + 4].children[1].children[3], item.mode)
     table_children[i + 4].children[2].children[3].text = tostring(item.throughput)
     table_children[i + 4].children[3].children[3].text = tostring(item.latency)
     table_children[i + 4].children[4].children[3].text = tostring(item.granularity)
@@ -300,7 +321,7 @@ local function provide_from_row(table_children, i)
     if not granularity or granularity < 1 then return item_key end
 
     return item_key, {
-        push = table_children[i + 4].children[1].children[2].switch_state == "right",
+        mode = get_active_mode_button(table_children[i + 4].children[1].children[3]),
         throughput = throughput,
         latency = latency,
         granularity = granularity,
@@ -345,9 +366,6 @@ local function provide_remove_key(player_gui, item_key)
     local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
 
     set_haulers_to_manual(station.provide_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
-
-    -- if item_key == player_gui.haulers_item then clear_grid_and_header(player_gui) end
-    -- if item_key == player_gui.stations_item then clear_grid_and_header(player_gui) end
 end
 
 --------------------------------------------------------------------------------
@@ -395,7 +413,7 @@ local function request_init_row(network_items, request_table, item_key, item)
         request_to_row_statistics(table_children, i, network_item, item)
     end
 
-    table_children[i + 4].children[1].children[2].switch_state = item.pull and "right" or "left"
+    set_active_mode_button(table_children[i + 4].children[1].children[3], item.mode)
     table_children[i + 4].children[2].children[3].text = tostring(item.throughput)
     table_children[i + 4].children[3].children[3].text = tostring(item.latency)
 
@@ -419,7 +437,7 @@ local function request_from_row(table_children, i)
     if not latency then return item_key end
 
     return item_key, {
-        pull = table_children[i + 4].children[1].children[2].switch_state == "right",
+        mode = get_active_mode_button(table_children[i + 4].children[1].children[3]),
         throughput = throughput,
         latency = latency,
     } --[[@as RequestItem]]
@@ -463,9 +481,6 @@ local function request_remove_key(player_gui, item_key)
     local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
 
     set_haulers_to_manual(station.request_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
-
-    -- if item_key == player_gui.haulers_item then clear_grid_and_header(player_gui) end
-    -- if item_key == player_gui.stations_item then clear_grid_and_header(player_gui) end
 end
 
 --------------------------------------------------------------------------------
@@ -555,7 +570,6 @@ function gui.station_poll_finished(player_gui)
     if not station then return end
 
     local elements = player_gui.elements
-    local network_items = storage.networks[player_gui.network].items
 
     local grid_table = elements.grid_table
     local grid_children = grid_table.children
@@ -566,15 +580,26 @@ function gui.station_poll_finished(player_gui)
         local provide_table = elements.provide_table
         local columns, table_children = provide_table.column_count, provide_table.children
 
+        local dynamic_index = -1 -- zero based
         for i = columns, #table_children - 1, columns do
             if table_children[i + 1].children[2].sprite == "" then
                 local _, quality, item_key = gui.extract_elem_value_fields(table_children[i + 2].elem_value)
+                local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
 
-                local network_item = network_items[item_key]
-                if network_item then
-                    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+                local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.provide-mode-tooltip-dynamic" }
+                if dynamic_button.toggled then
+                    dynamic_index = dynamic_index + 1
+                    dynamic_sprite = "virtual-signal/sspp-signal-" .. tostring(dynamic_index)
+                    local provide_mode = station.provide_modes[item_key]
+                    if provide_mode then
+                        dynamic_tooltip = { "sspp-gui.fmt-dynamic-mode-active-tooltip", dynamic_tooltip, provide_mode }
+                    end
+                end
+                dynamic_button.sprite, dynamic_button.tooltip = dynamic_sprite, dynamic_tooltip
 
-                    table_children[i + 5].children[2].children[3].caption = { fmt_items_or_units, station.provide_counts[item_key] }
+                local provide_count = station.provide_counts[item_key]
+                if provide_count then
+                    table_children[i + 5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", provide_count }
                 end
             end
         end
@@ -600,15 +625,26 @@ function gui.station_poll_finished(player_gui)
         local request_table = elements.request_table
         local columns, table_children = request_table.column_count, request_table.children
 
+        local dynamic_index = -1 -- zero based
         for i = columns, #table_children - 1, columns do
             if table_children[i + 1].children[2].sprite == "" then
                 local _, quality, item_key = gui.extract_elem_value_fields(table_children[i + 2].elem_value)
+                local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
 
-                local network_item = network_items[item_key]
-                if network_item then
-                    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+                local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.request-mode-tooltip-dynamic" }
+                if dynamic_button.toggled then
+                    dynamic_index = dynamic_index + 1
+                    dynamic_sprite = "virtual-signal/sspp-signal-" .. tostring(dynamic_index)
+                    local request_mode = station.request_modes[item_key]
+                    if request_mode then
+                        dynamic_tooltip = { "sspp-gui.fmt-dynamic-mode-active-tooltip", dynamic_tooltip, request_mode }
+                    end
+                end
+                dynamic_button.sprite, dynamic_button.tooltip = dynamic_sprite, dynamic_tooltip
 
-                    table_children[i + 5].children[2].children[3].caption = { fmt_items_or_units, station.request_counts[item_key] }
+                local request_count = station.request_counts[item_key]
+                if request_count then
+                    table_children[i + 5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", request_count }
                 end
             end
         end
@@ -944,8 +980,8 @@ function gui.station_add_flib_handlers()
         ["station_provide_copy"] = handle_provide_copy[events.on_gui_click],
         ["station_request_copy"] = handle_request_copy[events.on_gui_click],
         ["station_item_elem_changed"] = handle_item_elem_changed[events.on_gui_elem_changed],
-        ["station_item_switch_state_changed"] = handle_item_switch_state_changed[events.on_gui_switch_state_changed],
         ["station_item_text_changed"] = handle_item_text_changed[events.on_gui_text_changed],
+        ["station_item_mode_click"] = handle_item_mode_click[events.on_gui_click],
         ["station_open_network"] = handle_open_network[events.on_gui_click],
         ["station_edit_name_toggled"] = handle_edit_name_toggled[events.on_gui_click],
         ["station_clear_name"] = handle_clear_name[events.on_gui_click],

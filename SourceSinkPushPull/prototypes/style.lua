@@ -149,6 +149,14 @@ styles.sspp_move_sprite_button = { ---@type data.ButtonStyleSpecification
     invert_colors_of_picture_when_hovered_or_toggled = true,
 }
 
+styles.sspp_item_mode_sprite_button = { ---@type data.ButtonStyleSpecification
+    type = "button_style",
+    parent = "control_settings_section_button",
+    width = 20,
+    padding = 0,
+    left_margin = -4,
+}
+
 styles.sspp_compact_slot_button = { ---@type data.ButtonStyleSpecification
     type = "button_style",
     parent = "slot_button",

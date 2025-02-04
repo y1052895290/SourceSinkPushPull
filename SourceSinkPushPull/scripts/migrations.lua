@@ -134,6 +134,26 @@ local migrations = {
             end
         end
     end,
+    ["0.3.12"] = function()
+        for _, station in pairs(storage.stations) do
+            if station.provide_items then
+                for _, item in pairs(station.provide_items) do
+                    if item.mode == nil then
+                        item.mode = item.push and 5 or 2
+                        item.push = nil
+                    end
+                end
+            end
+            if station.request_items then
+                for _, item in pairs(station.request_items) do
+                    if item.mode == nil then
+                        item.mode = item.pull and 5 or 2
+                        item.pull = nil
+                    end
+                end
+            end
+        end
+    end,
 }
 
 --------------------------------------------------------------------------------

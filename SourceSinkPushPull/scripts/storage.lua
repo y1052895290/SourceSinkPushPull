@@ -14,6 +14,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@alias ClassName string
 ---@alias ItemKey string
 ---@alias NetworkItemKey string
+---@alias ItemMode 1|2|3|4|5|6|7
 ---@alias StationId uint
 ---@alias HaulerId uint
 ---@alias PlayerId uint
@@ -86,6 +87,8 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public request_items {[ItemKey]: RequestItem}?
 ---@field public provide_counts {[ItemKey]: integer}?
 ---@field public request_counts {[ItemKey]: integer}?
+---@field public provide_modes {[ItemKey]: ItemMode}?
+---@field public request_modes {[ItemKey]: ItemMode}?
 ---@field public provide_minimum_active_count integer?
 ---@field public request_minimum_active_count integer?
 ---@field public provide_deliveries {[ItemKey]: HaulerId[]}?
@@ -96,13 +99,13 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public hauler HaulerId?
 
 ---@class (exact) ProvideItem
----@field public push boolean
+---@field public mode ItemMode
 ---@field public throughput number
 ---@field public latency number
 ---@field public granularity integer
 
 ---@class (exact) RequestItem
----@field public pull boolean
+---@field public mode ItemMode
 ---@field public throughput number
 ---@field public latency number
 

@@ -2,18 +2,6 @@
 
 --------------------------------------------------------------------------------
 
----@param object {[string]: table}
----@param key string
----@return table
-function get_or_create_table(object, key)
-    local table = object[key]
-    if not table then
-        table = {}
-        object[key] = table
-    end
-    return table
-end
-
 ---@generic T
 ---@param list T[]?
 function len_or_zero(list)
@@ -137,56 +125,6 @@ function list_remove_value_or_destroy(object, key, value)
     error("value not found")
 end
 
---- Pop a random item or return nil if the list is empty.
----@generic T
----@param list T[]
----@return T?
-function list_pop_random_if_any(list)
-    local length = #list
-
-    if length > 1 then
-        local index = math.random(length)
-        local result = list[index]
-        list[index] = list[length]
-        list[length] = nil
-        return result
-    end
-
-    if length > 0 then
-        local result = list[1]
-        list[1] = nil
-        return result
-    end
-
-    return nil
-end
-
---- Pop a random item from a list, then delete the list if it became empty.
----@generic T
----@param object {[string]: T[]}
----@param key string
----@return T
-function list_pop_random_or_destroy(object, key)
-    local list = object[key]
-    local length = #list
-
-    if length > 1 then
-        local index = math.random(length)
-        local result = list[index]
-        list[index] = list[length]
-        list[length] = nil
-        return result
-    end
-
-    if length > 0 then
-        local result = list[1]
-        object[key] = nil
-        return result
-    end
-
-    error("empty list")
-end
-
 --------------------------------------------------------------------------------
 
 ---@param item_key string
@@ -243,7 +181,8 @@ function compute_storage_needed(network_item, station_item)
     local buffer = math.max(round, throughput * latency)
     result = math.ceil(result / round) * round
     buffer = math.ceil(buffer / round) * round
-    if station_item.push or station_item.pull then buffer = buffer + buffer end
+    -- double the buffer if using any push or pull mode (dynamic counts as push or pull here)
+    if station_item.mode > 3 then buffer = buffer + buffer end
     return result + buffer
 end
 
@@ -404,8 +343,11 @@ function combinator_description_to_provide_items(provide_io)
         -- list_index was removed in 0.3.5
         local offset = #json_item - 4
 
-        local push = json_item[1 + offset]
-        if type(push) ~= "boolean" then push = false end
+        local mode = json_item[1 + offset]
+        if type(mode) ~= "integer" then
+            -- changed from boolean to integer in 0.3.12
+            mode = (mode == true) and 5 or 2
+        end
 
         local throughput = json_item[2 + offset]
         if type(throughput) ~= "number" then throughput = 0.0 end
@@ -416,7 +358,7 @@ function combinator_description_to_provide_items(provide_io)
         local granularity = json_item[4 + offset]
         if type(granularity) ~= "number" then granularity = 1 end
 
-        items[item_key] = { push = push, throughput = throughput, latency = latency, granularity = granularity }
+        items[item_key] = { mode = mode, throughput = throughput, latency = latency, granularity = granularity }
 
         ::continue::
     end
@@ -429,7 +371,7 @@ end
 function provide_items_to_combinator_description(provide_items)
     local json = {}
     for item_key, item in pairs(provide_items) do
-        json[item_key] = { item.push, item.throughput, item.latency, item.granularity }
+        json[item_key] = { item.mode, item.throughput, item.latency, item.granularity }
     end
     return helpers.table_to_json(json)
 end
@@ -449,8 +391,11 @@ function combinator_description_to_request_items(request_io)
         -- list_index was removed in 0.3.5
         local offset = #json_item - 3
 
-        local pull = json_item[1 + offset]
-        if type(pull) ~= "boolean" then pull = false end
+        local mode = json_item[1 + offset]
+        if type(mode) ~= "number" then
+            -- changed from boolean to integer in 0.3.12
+            mode = (mode == true) and 5 or 2
+        end
 
         local throughput = json_item[2 + offset]
         if type(throughput) ~= "number" then throughput = 0.0 end
@@ -458,7 +403,7 @@ function combinator_description_to_request_items(request_io)
         local latency = json_item[3 + offset]
         if type(latency) ~= "number" then latency = 30.0 end
 
-        items[item_key] = { pull = pull, throughput = throughput, latency = latency }
+        items[item_key] = { mode = mode, throughput = throughput, latency = latency }
 
         ::continue::
     end
@@ -471,7 +416,7 @@ end
 function request_items_to_combinator_description(request_items)
     local json = {}
     for item_key, item in pairs(request_items) do
-        json[item_key] = { item.pull, item.throughput, item.latency }
+        json[item_key] = { item.mode, item.throughput, item.latency }
     end
     return helpers.table_to_json(json)
 end
