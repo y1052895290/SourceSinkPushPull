@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.12
+Date: 2025-02-05
+  Features:
+    - In addition to push or pull, station items can now be set to low or high priority.
+    - Station item modes can now also be set dynamically via signals.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.11
 Date: 2025-02-02
   Features:
