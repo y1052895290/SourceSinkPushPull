@@ -152,7 +152,7 @@ styles.sspp_move_sprite_button = { ---@type data.ButtonStyleSpecification
 styles.sspp_item_mode_sprite_button = { ---@type data.ButtonStyleSpecification
     type = "button_style",
     parent = "control_settings_section_button",
-    width = 20,
+    width = 18,
     padding = 0,
     left_margin = -4,
 }

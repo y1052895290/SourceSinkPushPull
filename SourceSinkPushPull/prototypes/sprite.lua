@@ -83,63 +83,63 @@ data:extend({
     {
         type = "sprite", name = "sspp-provide-mode-1",
         filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/1.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-provide-mode-2",
         filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/2.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-provide-mode-3",
         filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/3.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-provide-mode-4",
         filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/4.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-provide-mode-5",
         filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/5.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-provide-mode-6",
         filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/6.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
 
     -- request mode icons ------------------------------------------------------
     {
         type = "sprite", name = "sspp-request-mode-1",
         filename = "__SourceSinkPushPull__/graphics/gui/request-mode/1.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-request-mode-2",
         filename = "__SourceSinkPushPull__/graphics/gui/request-mode/2.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-request-mode-3",
         filename = "__SourceSinkPushPull__/graphics/gui/request-mode/3.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-request-mode-4",
         filename = "__SourceSinkPushPull__/graphics/gui/request-mode/4.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-request-mode-5",
         filename = "__SourceSinkPushPull__/graphics/gui/request-mode/5.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
     {
         type = "sprite", name = "sspp-request-mode-6",
         filename = "__SourceSinkPushPull__/graphics/gui/request-mode/6.png",
-        size = { 24, 32 }, scale = 0.5, flags = { "gui-icon" },
+        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
     },
 })
