@@ -35,7 +35,7 @@ A *station* is, unsurprisingly, where cargo will actually be provided from or re
 The combinators should all be placed within 2 tiles of the train stop. Once the components are all placed correctly, you can open the station configuration window by clicking on any of them.
 
 From here, for each item/fluid you want to provide or request, you must define a few things:
-- Source/Push or Sink/Pull: If set to push or pull, this station will be able to trigger new deliveries. Items/fluids from source stations will **never** be sent to sink stations.
+- Mode: Controls which stations this station may provide or request to. If set to a push or pull mode, this station will be able to trigger new deliveries. Items/fluids from source stations will **never** be sent to sink stations.
 - Throughput: The maximum rate of inflow or outflow of this item/fluid that this station should handle, per second.
 - Latency: Extra time in seconds the station should support between deliveries. This accounts for load/unload time, congestion, etc.
 - Granularity (provide only): The smallest amount of this item/fluid that can be loaded at a time. This is to prevent overfilling and items/fluids getting stuck.
@@ -49,15 +49,11 @@ You will need to plug in a few wires, but most setups won't need any extra logic
 For those looking to do more advanced setups, the exact inputs/outputs of each combinator are as follows:
 - General In: The contents of this station. Used to decide if new deliveries are needed.
 - General Out: Nothing, but reserved for future utility information.
-- Provide In: The contents of the stopped train. Connected automatically.
+- Provide In: The contents of the stopped train (connected automatically). Control signals for setting provide modes (optional).
 - Provide Out: The counts of all items/fluids that still need to be loaded.
-- Request In: The contents of the stopped train. Connected automatically.
+- Request In: The contents of the stopped train (connected automatically). Control signals for setting request modes (optional).
 - Request Out: The counts of all items/fluids that still need to be unloaded.
 
 ## Depots and Fuelers
 
 In SSPP, a *depot* or *fueler* is simply a vanilla train stop with the appropriate name. Depots **must** be configured with a train limit of one, as trains waiting behind others may still be tasked with new deliveries. Fuelers **must** be configured with no train limit, unless you have as many of them as you have trains, as SSPP expects a fueler to always be available.
-
-## FAQ
-
-TODO
