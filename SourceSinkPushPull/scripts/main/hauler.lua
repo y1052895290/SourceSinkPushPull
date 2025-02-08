@@ -299,7 +299,24 @@ function main.train_broken(old_train_id, new_train)
         main.hauler_disabled_or_destroyed(old_train_id, hauler)
         storage.haulers[old_train_id] = nil
         if new_train then
-            storage.haulers[new_train.id] = { train = new_train, network = new_train.front_stock.surface.name, class = hauler.class }
+            storage.haulers[new_train.id] = {
+                train = new_train,
+                network = new_train.front_stock.surface.name,
+                class = hauler.class,
+                status = { "sspp-gui.not-configured" },
+            }
+        end
+    end
+    for player_id, player_gui in pairs(storage.player_guis) do
+        if player_gui.train_id then
+            ---@cast player_gui PlayerHaulerGui
+            if player_gui.train_id == old_train_id then
+                if new_train then
+                    player_gui.train_id, player_gui.train = new_train.id, new_train
+                else
+                    gui.hauler_closed(player_id)
+                end
+            end
         end
     end
 end

@@ -162,7 +162,7 @@ function gui.on_poll_finished()
     for _, player_gui in pairs(storage.player_guis) do
         if player_gui.unit_number then
             gui.station_poll_finished(player_gui --[[@as PlayerStationGui]])
-        elseif player_gui.train then
+        elseif player_gui.train_id then
             -- gui.hauler_poll_finished(player_gui --[[@as PlayerHaulerGui]])
         else
             gui.network_poll_finished(player_gui --[[@as PlayerNetworkGui]])
@@ -173,8 +173,8 @@ end
 ---@param hauler_id HaulerId
 function gui.on_manual_mode_changed(hauler_id)
     for _, player_gui in pairs(storage.player_guis) do
-        if player_gui.train then
-            if player_gui.train.id == hauler_id then
+        if player_gui.train_id then
+            if player_gui.train_id == hauler_id then
                 player_gui.elements.class_textbox.enabled = player_gui.train.manual_mode
                 player_gui.elements.class_auto_assign_button.enabled = player_gui.train.manual_mode
             end

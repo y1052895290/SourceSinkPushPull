@@ -50,7 +50,9 @@ local function on_entity_broken(event)
     elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
         main.comb_broken(entity.unit_number, entity)
     elseif entity.train then
-        main.train_broken(entity.train.id, nil)
+        if #entity.train.carriages == 1 then
+            main.train_broken(entity.train.id, nil)
+        end
     end
 end
 

@@ -432,9 +432,9 @@ function set_hauler_status(hauler, message, item, stop)
     hauler.status_item = item
     hauler.status_stop = stop
     for _, player_gui in pairs(storage.player_guis) do
-        if player_gui.train then
+        if player_gui.train_id then
             ---@cast player_gui PlayerHaulerGui
-            if player_gui.train.id == hauler.train.id then
+            if player_gui.train_id == hauler.train.id then
                 gui.hauler_status_changed(player_gui)
             end
         end

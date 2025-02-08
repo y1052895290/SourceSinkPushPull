@@ -8,8 +8,7 @@ local events = defines.events
 ---@param player_gui PlayerHaulerGui
 function gui.hauler_status_changed(player_gui)
     local elements = player_gui.elements
-    local train = player_gui.train
-    local hauler = storage.haulers[train.id]
+    local hauler = storage.haulers[player_gui.train_id]
 
     elements.status_label.caption = hauler.status
     if hauler.status_item then
@@ -40,7 +39,7 @@ local handle_stop_clicked = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local player_gui = storage.player_guis[player_id] --[[@as PlayerHaulerGui]]
 
-    local hauler = storage.haulers[player_gui.train.id]
+    local hauler = storage.haulers[player_gui.train_id]
     if hauler and hauler.status_stop and hauler.status_stop.valid then
         game.get_player(player_id).centered_on = hauler.status_stop
     end
@@ -49,30 +48,31 @@ end }
 ---@param event EventData.on_gui_text_changed
 local handle_class_changed = { [events.on_gui_text_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerHaulerGui]]
-    local train = player_gui.train
+    local train_id, train = player_gui.train_id, player_gui.train
 
     -- disabling textboxes doesn't disable the icon selector, so hope that the user doesn't do that
     -- assert(train.manual_mode, "class name changed when not manual")
     -- update: a user did this, guess I should handle it properly until the api bug gets fixed
     if not train.manual_mode then
-        local hauler = storage.haulers[train.id]
+        local hauler = storage.haulers[train_id]
         event.element.text = hauler and hauler.class or ""
         return
     end
 
     local class_name = gui.truncate_input(event.element, 199)
 
-    local hauler = storage.haulers[train.id]
+    local hauler = storage.haulers[train_id]
     if hauler then
         if class_name ~= "" then
             hauler.class = class_name
         else
-            storage.haulers[train.id] = nil
+            storage.haulers[train_id] = nil
         end
     elseif class_name ~= "" then
-        storage.haulers[train.id] = {
-            train = train,
+        storage.haulers[train_id] = {
             network = player_gui.network,
+            train_id = train_id,
+            train = train,
             class = class_name,
         }
     end
@@ -89,13 +89,13 @@ end
 ---@param event EventData.on_gui_click
 local handle_class_auto_assign = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerHaulerGui]]
-    local new_train = player_gui.train
-    local new_hauler_id = new_train.id
+    local network_name = player_gui.network
+    local train_id, train = player_gui.train_id, player_gui.train
 
-    local new_carriage_names, new_length = {}, 0 ---@type string[], integer
-    for _, carriage in pairs(new_train.carriages) do
-        new_length = new_length + 1
-        new_carriage_names[new_length] = map_carriage_name(carriage)
+    local train_carriage_names, train_length = {}, 0 ---@type string[], integer
+    for _, carriage in pairs(train.carriages) do
+        train_length = train_length + 1
+        train_carriage_names[train_length] = map_carriage_name(carriage)
     end
 
     local matching_class ---@type ClassName?
@@ -103,19 +103,20 @@ local handle_class_auto_assign = { [events.on_gui_click] = function(event)
 
     -- first, try to find a class that already has an identical train
     for hauler_id, hauler in pairs(storage.haulers) do
-        local class_name = hauler.class
+        if hauler.network == network_name and hauler_id ~= train_id then
+            local class_name = hauler.class
+            if class_name == matching_class then goto continue end
 
-        if class_name ~= matching_class and hauler_id ~= new_hauler_id then
             local carriages = hauler.train.carriages
             local length = #carriages
 
-            if length == new_length then
+            if length == train_length then
                 for i = 1, length do
-                    if map_carriage_name(carriages[i]) ~= new_carriage_names[i] then goto continue end
+                    if map_carriage_name(carriages[i]) ~= train_carriage_names[i] then goto continue end
                 end
                 if matching_class then
                     -- TODO: show this in the widget rather than sending an alert
-                    send_alert_for_train(new_train, { "sspp-alert.auto-assign-multiple-classes" })
+                    send_alert_for_train(train, { "sspp-alert.auto-assign-multiple-classes" })
                     return
                 end
                 matching_class = class_name
@@ -129,11 +130,11 @@ local handle_class_auto_assign = { [events.on_gui_click] = function(event)
 
     -- second, try to find a newly added class with no trains
     if not matching_class then
-        for class_name, _ in pairs(storage.networks[player_gui.network].classes) do
+        for class_name, _ in pairs(storage.networks[network_name].classes) do
             if not classes_with_haulers[class_name] then
                 if matching_class then
                     -- TODO: show this in the widget rather than sending an alert
-                    send_alert_for_train(new_train, { "sspp-alert.auto-assign-multiple-classes" })
+                    send_alert_for_train(train, { "sspp-alert.auto-assign-multiple-classes" })
                     return
                 end
                 matching_class = class_name
@@ -142,18 +143,19 @@ local handle_class_auto_assign = { [events.on_gui_click] = function(event)
     end
 
     if not matching_class then
-        send_alert_for_train(new_train, { "sspp-alert.auto-assign-no-class" })
+        send_alert_for_train(train, { "sspp-alert.auto-assign-no-class" })
         return
     end
 
-    storage.haulers[new_hauler_id] = {
-        train = new_train,
-        network = player_gui.network,
+    storage.haulers[train_id] = {
+        train = train,
+        network = network_name,
         class = matching_class,
+        status = { "sspp-gui.not-configured" },
     }
     player_gui.elements.class_textbox.text = matching_class
 
-    new_train.manual_mode = false
+    train.manual_mode = false
 end }
 
 --------------------------------------------------------------------------------
@@ -196,7 +198,7 @@ function gui.hauler_opened(player_id, train)
     local resolution, scale = player.display_resolution, player.display_scale
     window.location = { x = resolution.width - (244 + 12) * scale, y = resolution.height - (108 + 12) * scale }
 
-    local player_gui = { network = network_name, train = train, elements = elements }
+    local player_gui = { network = network_name, train_id = train.id, train = train, elements = elements }
     storage.player_guis[player_id] = player_gui
 
     local hauler = storage.haulers[train.id]

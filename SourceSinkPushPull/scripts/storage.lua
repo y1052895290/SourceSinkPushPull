@@ -154,6 +154,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 
 ---@class (exact) PlayerHaulerGui
 ---@field public network NetworkName
+---@field public train_id uint
 ---@field public train LuaTrain
 ---@field public elements {[string]: LuaGuiElement}
 
