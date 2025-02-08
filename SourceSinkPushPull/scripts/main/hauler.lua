@@ -279,10 +279,12 @@ function main.hauler_arrived_at_depot_stop(hauler)
     if item_key == "" then
         list_remove_value_or_destroy(network.to_depot_haulers, class_name, hauler_id)
         list_append_or_create(network.at_depot_haulers, class_name, hauler_id)
+        set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })
     else
         ---@cast item_key ItemKey
         list_remove_value_or_destroy(network.to_depot_liquidate_haulers, item_key, hauler_id)
         list_append_or_create(network.at_depot_liquidate_haulers, item_key, hauler_id)
+        set_hauler_status(hauler, { "sspp-alert.waiting-for-request" }, item_key)
     end
 
     hauler.to_depot = nil
