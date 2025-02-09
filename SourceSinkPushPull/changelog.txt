@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.15
+Date: 2025-02-09
+  Bugfixes:
+    - Fixed provide mode being shown as the default value when re-opening a station gui.
+    - Fixed provide mode getting reset when pasting a provide io blueprint.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.14
 Date: 2025-02-08
   Bugfixes:
