@@ -344,7 +344,7 @@ function combinator_description_to_provide_items(provide_io)
         local offset = #json_item - 4
 
         local mode = json_item[1 + offset]
-        if type(mode) ~= "integer" then
+        if type(mode) ~= "number" then
             -- changed from boolean to integer in 0.3.12
             mode = (mode == true) and 5 or 2
         end
