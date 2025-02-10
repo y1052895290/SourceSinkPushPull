@@ -328,39 +328,52 @@ function clear_arithmetic_control_behavior(comb)
     cb.parameters = nil
 end
 
+--------------------------------------------------------------------------------
+
 ---@param provide_io LuaEntity
 ---@return {[ItemKey]: ProvideItem}
 function combinator_description_to_provide_items(provide_io)
-    local json_string = provide_io.combinator_description
-    if json_string == "" then return {} end
+    local description = provide_io.combinator_description
 
-    local json = helpers.json_to_table(json_string) --[[@as table]]
+    local version, lines = string.match(description, "P([%d]+)(.*)")
     local items = {} ---@type {[ItemKey]: ProvideItem}
 
-    for item_key, json_item in pairs(json) do
-        if is_item_key_invalid(item_key) then goto continue end
-
-        -- list_index was removed in 0.3.5
-        local offset = #json_item - 4
-
-        local mode = json_item[1 + offset]
-        if type(mode) ~= "number" then
-            -- changed from boolean to integer in 0.3.12
-            mode = (mode == true) and 5 or 2
+    if version == "1" then
+        for item_key, mode, throughput, latency, granularity in string.gmatch(lines, "\n(%g+) ([1234567]) ([%d%.]+) ([%d%.]+) (%d+)") do
+            if not is_item_key_invalid(item_key) then
+                mode, throughput, latency, granularity = tonumber(mode), tonumber(throughput), tonumber(latency), tonumber(granularity)
+                if mode and throughput and latency and granularity then
+                    items[item_key] = { mode = mode, throughput = throughput, latency = latency, granularity = granularity }
+                end
+            end
         end
+        return items
+    end
 
-        local throughput = json_item[2 + offset]
-        if type(throughput) ~= "number" then throughput = 0.0 end
+    local json = helpers.json_to_table(description) --[[@as table?]]
+    if json then
+        for item_key, json_item in pairs(json) do
+            if is_item_key_invalid(item_key) then goto continue end
 
-        local latency = json_item[3 + offset]
-        if type(latency) ~= "number" then latency = 30.0 end
+            local mode = json_item[1]
+            if type(mode) ~= "number" then
+                -- changed from boolean to integer in 0.3.12
+                mode = (mode == true) and 5 or 2
+            end
 
-        local granularity = json_item[4 + offset]
-        if type(granularity) ~= "number" then granularity = 1 end
+            local throughput = json_item[2]
+            if type(throughput) ~= "number" then throughput = 0.0 end
 
-        items[item_key] = { mode = mode, throughput = throughput, latency = latency, granularity = granularity }
+            local latency = json_item[3]
+            if type(latency) ~= "number" then latency = 30.0 end
 
-        ::continue::
+            local granularity = json_item[4]
+            if type(granularity) ~= "number" then granularity = 1 end
+
+            items[item_key] = { mode = mode, throughput = throughput, latency = latency, granularity = granularity }
+
+            ::continue::
+        end
     end
 
     return items
@@ -369,43 +382,57 @@ end
 ---@param provide_items {[ItemKey]: ProvideItem}
 ---@return string
 function provide_items_to_combinator_description(provide_items)
-    local json = {}
+    local result = "P1"
     for item_key, item in pairs(provide_items) do
-        json[item_key] = { item.mode, item.throughput, item.latency, item.granularity }
+        result = result .. string.format(
+            "\n%s %u %s %s %u",
+            item_key, item.mode, tostring(item.throughput), tostring(item.latency), item.granularity
+        )
     end
-    return helpers.table_to_json(json)
+    return result
 end
 
 ---@param request_io LuaEntity
 ---@return {[ItemKey]: RequestItem}
 function combinator_description_to_request_items(request_io)
-    local json_string = request_io.combinator_description
-    if json_string == "" then return {} end
+    local description = request_io.combinator_description
 
-    local json = helpers.json_to_table(json_string) --[[@as table]]
+    local version, lines = string.match(description, "R([%d]+)(.*)")
     local items = {} ---@type {[ItemKey]: RequestItem}
 
-    for item_key, json_item in pairs(json) do
-        if is_item_key_invalid(item_key) then goto continue end
-
-        -- list_index was removed in 0.3.5
-        local offset = #json_item - 3
-
-        local mode = json_item[1 + offset]
-        if type(mode) ~= "number" then
-            -- changed from boolean to integer in 0.3.12
-            mode = (mode == true) and 5 or 2
+    if version == "1" then
+        for item_key, mode, throughput, latency in string.gmatch(lines, "\n(%g+) ([1234567]) ([%d%.]+) ([%d%.]+)") do
+            if not is_item_key_invalid(item_key) then
+                mode, throughput, latency = tonumber(mode), tonumber(throughput), tonumber(latency)
+                if mode and throughput and latency then
+                    items[item_key] = { mode = mode, throughput = throughput, latency = latency }
+                end
+            end
         end
+        return items
+    end
 
-        local throughput = json_item[2 + offset]
-        if type(throughput) ~= "number" then throughput = 0.0 end
+    local json = helpers.json_to_table(description) --[[@as table?]]
+    if json then
+        for item_key, json_item in pairs(json) do
+            if is_item_key_invalid(item_key) then goto continue end
 
-        local latency = json_item[3 + offset]
-        if type(latency) ~= "number" then latency = 30.0 end
+            local mode = json_item[1]
+            if type(mode) ~= "number" then
+                -- changed from boolean to integer in 0.3.12
+                mode = (mode == true) and 5 or 2
+            end
 
-        items[item_key] = { mode = mode, throughput = throughput, latency = latency }
+            local throughput = json_item[2]
+            if type(throughput) ~= "number" then throughput = 0.0 end
 
-        ::continue::
+            local latency = json_item[3]
+            if type(latency) ~= "number" then latency = 30.0 end
+
+            items[item_key] = { mode = mode, throughput = throughput, latency = latency }
+
+            ::continue::
+        end
     end
 
     return items
@@ -414,11 +441,14 @@ end
 ---@param request_items {[ItemKey]: RequestItem}
 ---@return string
 function request_items_to_combinator_description(request_items)
-    local json = {}
+    local result = "R1"
     for item_key, item in pairs(request_items) do
-        json[item_key] = { item.mode, item.throughput, item.latency }
+        result = result .. string.format(
+            "\n%s %u %s %s",
+            item_key, item.mode, tostring(item.throughput), tostring(item.latency)
+        )
     end
-    return helpers.table_to_json(json)
+    return result
 end
 
 --------------------------------------------------------------------------------
