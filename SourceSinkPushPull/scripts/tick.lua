@@ -580,13 +580,14 @@ local function prepare_for_tick_dispatch()
 
             if push_count > 0 then
                 local request_total = pull_count + len_or_zero(request_tickets[item_key])
-                haulers_to_send = math.min(push_count, request_total)
+                local provide_hauler_count = len_or_zero(provide_haulers[item_key])
+                haulers_to_send = math.max(haulers_to_send, math.min(push_count, request_total - provide_hauler_count))
             end
 
             if pull_count > 0 then
-                local real_pull_count = pull_count - len_or_zero(provide_haulers[item_key])
                 local provide_total = push_count + len_or_zero(provide_tickets[item_key])
-                haulers_to_send = math.max(haulers_to_send, math.min(real_pull_count, provide_total))
+                local provide_hauler_count = len_or_zero(provide_haulers[item_key])
+                haulers_to_send = math.max(haulers_to_send, math.min(provide_total, pull_count - provide_hauler_count))
             end
 
             length = extend_network_item_key_list(list, length, network_name, item_key, haulers_to_send)

@@ -490,7 +490,10 @@ function gui.network_poll_finished(player_gui)
                 local request_total = len_or_zero(request_haulers[item_key])
                 local liquidate_total = len_or_zero(to_depot_liquidate_haulers[item_key]) + len_or_zero(at_depot_liquidate_haulers[item_key])
 
-                table_children[i + 6].caption = { "sspp-gui.fmt-item-demand", len_or_zero(push_tickets[item_key]), len_or_zero(pull_tickets[item_key]) }
+                local push_demand = len_or_zero(push_tickets[item_key])
+                local pull_demand = math.max(0, len_or_zero(pull_tickets[item_key]) - provide_total)
+
+                table_children[i + 6].caption = { "sspp-gui.fmt-item-demand", push_demand, pull_demand }
                 table_children[i + 8].caption = { "sspp-gui.fmt-item-haulers", provide_total, request_total, liquidate_total }
 
                 local class_name = table_children[i + 2].text
