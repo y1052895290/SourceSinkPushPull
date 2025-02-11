@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.16
+Date: 2025-02-11
+  Changes:
+    - The demand column in the network item table now subtracts the number of trains at providers from the pull count.
+    - The value should now be more useful (if it isn't zero, you need more supply).
+  Bugfixes:
+    - Fixed potential issues with stations with many items with non-integer throughput or latency values.
+    - Fixed extra trains being dispatched when push demand was greater than request demand.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.15
 Date: 2025-02-09
   Bugfixes:
