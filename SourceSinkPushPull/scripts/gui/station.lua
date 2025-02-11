@@ -891,7 +891,7 @@ local function add_gui_complete(player, parts)
                         no_provide or { type = "sprite-button", name = "grid_provide_toggle", style = "control_settings_section_button", sprite = "virtual-signal/up-arrow", tooltip = { "sspp-gui.grid-haulers-provide-tooltip" }, auto_toggle = true, toggled = true },
                         no_request or { type = "sprite-button", name = "grid_request_toggle", style = "control_settings_section_button", sprite = "virtual-signal/down-arrow", tooltip = { "sspp-gui.grid-haulers-request-tooltip" }, auto_toggle = true, toggled = true },
                     } },
-                    { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", vertical_scroll_policy = "always", children = {
+                    { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", vertical_scroll_policy = "never", children = {
                         { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
                     } },
                 } },
