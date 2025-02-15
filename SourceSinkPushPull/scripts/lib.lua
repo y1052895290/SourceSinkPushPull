@@ -284,7 +284,7 @@ function compute_stop_name(provide_items, request_items)
         return "[color=red]⬇" .. request_string .. "[/color]"
     end
 
-    return "[virtual-signal=signal-ghost]"
+    return "[entity=entity-ghost]"
 end
 
 --------------------------------------------------------------------------------

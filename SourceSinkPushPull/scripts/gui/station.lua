@@ -714,7 +714,7 @@ local handle_clear_name = { [events.on_gui_click] = function(event)
         rename_haulers_stop(station.provide_deliveries, station.stop.backer_name, stop_name)
         rename_haulers_stop(station.request_deliveries, station.stop.backer_name, stop_name)
     else
-        stop_name = "[virtual-signal=signal-ghost]"
+        stop_name = "[entity=entity-ghost]"
     end
     parts.stop.backer_name = stop_name
     player_gui.elements.stop_name_label.caption = stop_name
@@ -746,7 +746,7 @@ handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
         rename_haulers_stop(station.provide_deliveries, station.stop.backer_name, stop_name)
         rename_haulers_stop(station.request_deliveries, station.stop.backer_name, stop_name)
     elseif not has_custom_name then
-        stop_name = "[virtual-signal=signal-ghost]"
+        stop_name = "[entity=entity-ghost]"
     end
     parts.stop.backer_name = stop_name
 end
