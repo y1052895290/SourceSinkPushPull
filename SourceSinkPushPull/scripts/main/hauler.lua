@@ -43,7 +43,7 @@ function main.hauler_disabled_or_destroyed(hauler_id, hauler)
 
     if hauler.to_depot then
         if hauler.to_depot ~= "" then
-            list_remove_value_or_destroy(network.to_depot_liquidate_haulers, hauler.class, hauler_id)
+            list_remove_value_or_destroy(network.to_depot_liquidate_haulers, hauler.to_depot, hauler_id)
             storage.disabled_items[hauler.network .. ":" .. hauler.to_depot] = true
         else
             list_remove_value_or_destroy(network.to_depot_haulers, hauler.class, hauler_id)
@@ -52,7 +52,7 @@ function main.hauler_disabled_or_destroyed(hauler_id, hauler)
 
     if hauler.at_depot then
         if hauler.at_depot ~= "" then
-            list_remove_value_or_destroy(network.at_depot_liquidate_haulers, hauler.class, hauler_id)
+            list_remove_value_or_destroy(network.at_depot_liquidate_haulers, hauler.at_depot, hauler_id)
             storage.disabled_items[hauler.network .. ":" .. hauler.at_depot] = true
         else
             list_remove_value_or_destroy(network.at_depot_haulers, hauler.class, hauler_id)
