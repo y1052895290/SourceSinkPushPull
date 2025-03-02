@@ -803,6 +803,15 @@ local handle_add_request_fluid = { [events.on_gui_click] = function(event)
 end }
 
 ---@param event EventData.on_gui_click
+local handle_view_on_map = { [events.on_gui_click] = function(event)
+    local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
+    local stop = storage.player_guis[event.player_index].parts.stop --[[@as LuaEntity]]
+
+    player.opened = nil
+    player.centered_on = stop
+end }
+
+---@param event EventData.on_gui_click
 local handle_close_window = { [events.on_gui_click] = function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
     assert(player.opened.name == "sspp-station")
@@ -828,8 +837,9 @@ local function add_gui_complete(player, parts)
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
-                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
-                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disable_tooltip, auto_toggle = true, toggled = is_disabled, handler = handle_disable_toggled },
+                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disable_tooltip, mouse_button_filter = { "left" }, auto_toggle = true, toggled = is_disabled, handler = handle_disable_toggled },
+                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-map-icon", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = handle_view_on_map },
+                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = handle_open_network },
                 { type = "empty-widget", style = "empty_widget" },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
@@ -908,7 +918,6 @@ local function add_gui_incomplete(player)
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.incomplete-station" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
-                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close_window },
             } },
             { type = "label", style = "info_label", caption = { "sspp-gui.incomplete-station-message" } },
@@ -994,6 +1003,7 @@ function gui.station_add_flib_handlers()
         ["station_add_provide_fluid"] = handle_add_provide_fluid[events.on_gui_click],
         ["station_add_request_item"] = handle_add_request_item[events.on_gui_click],
         ["station_add_request_fluid"] = handle_add_request_fluid[events.on_gui_click],
+        ["station_view_on_map"] = handle_view_on_map[events.on_gui_click],
         ["station_close_window"] = handle_close_window[events.on_gui_click],
     })
 end

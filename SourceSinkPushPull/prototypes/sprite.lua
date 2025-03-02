@@ -49,6 +49,11 @@ data:extend({
         size = 32, scale = 0.5, flags = { "gui-icon" },
     },
     {
+        type = "sprite", name = "sspp-map-icon",
+        filename = "__SourceSinkPushPull__/graphics/gui/sspp-map-icon.png",
+        size = 32, scale = 0.5, flags = { "gui-icon" },
+    },
+    {
         type = "sprite", name = "sspp-move-down-icon",
         filename = "__SourceSinkPushPull__/graphics/gui/sspp-move-down-icon.png",
         size = 32, scale = 0.5, flags = { "gui-icon" },

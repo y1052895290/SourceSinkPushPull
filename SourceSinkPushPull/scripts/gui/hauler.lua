@@ -35,7 +35,7 @@ local handle_open_network = { [events.on_gui_click] = function(event)
 end }
 
 ---@param event EventData.on_gui_click
-local handle_stop_clicked = { [events.on_gui_click] = function(event)
+local handle_view_on_map = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local player_gui = storage.player_guis[player_id] --[[@as PlayerHaulerGui]]
 
@@ -178,13 +178,13 @@ function gui.hauler_opened(player_id, train)
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.sspp" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, mouse_button_filter = { "left" }, handler = handle_open_network },
+                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = handle_open_network },
             } },
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", name = "status_label", style = "label" },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
                 { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal", enabled = false },
-                { type = "sprite-button", name = "stop_button", style = "sspp_compact_slot_button", sprite = "item/train-stop", mouse_button_filter = { "left" }, handler = handle_stop_clicked },
+                { type = "sprite-button", name = "stop_button", style = "sspp_compact_slot_button", sprite = "item/train-stop", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = handle_view_on_map },
             } },
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = { "sspp-gui.class" } },
@@ -225,7 +225,7 @@ end
 function gui.hauler_add_flib_handlers()
     flib_gui.add_handlers({
         ["hauler_open_network"] = handle_open_network[events.on_gui_click],
-        ["hauler_stop_clicked"] = handle_stop_clicked[events.on_gui_click],
+        ["hauler_view_on_map"] = handle_view_on_map[events.on_gui_click],
         ["hauler_class_changed"] = handle_class_changed[events.on_gui_text_changed],
         ["hauler_class_auto_assign"] = handle_class_auto_assign[events.on_gui_click],
     })
