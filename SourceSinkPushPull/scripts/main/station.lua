@@ -146,7 +146,7 @@ local function try_destroy_station(stop)
     end
 
     if not read_stop_flag(stop, e_stop_flags.custom_name) then
-        stop.backer_name = "[entity=entity-ghost]"
+        stop.backer_name = "[virtual-signal=signal-ghost]"
     end
 end
 
@@ -160,7 +160,7 @@ function main.stop_built(stop, ghost_unit_number)
     end
 
     if not read_stop_flag(stop, e_stop_flags.custom_name) then
-        stop.backer_name = "[entity=entity-ghost]"
+        stop.backer_name = "[virtual-signal=signal-ghost]"
     end
     if stop.trains_limit > 10 or stop.trains_limit < 1 then
         stop.trains_limit = 10
