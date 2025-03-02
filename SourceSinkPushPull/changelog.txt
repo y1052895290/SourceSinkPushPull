@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.17
+Date: 2025-03-02
+  Features:
+    - Added a "view on map" button to the station gui title bar.
+    - Added a custom icon for the SSPP train stop item.
+  Changes:
+    - Slightly improved icons for the SSPP IO combinators.
+    - Various minor GUI tweaks.
+  Bugfixes:
+    - Fixed crash when destroying a train that is waiting for liquidation.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.16
 Date: 2025-02-11
   Changes:
