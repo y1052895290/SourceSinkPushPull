@@ -482,7 +482,7 @@ function gui.network_poll_finished(player_gui)
         local columns = item_table.column_count
         local table_children = item_table.children
 
-        for i = columns, #table_children - 1, columns do
+        for i = 0, #table_children - 1, columns do
             if table_children[i + 1].children[4].sprite == "" then
                 local _, _, item_key = gui.extract_elem_value_fields(table_children[i + 1].children[3].elem_value)
 
@@ -515,7 +515,7 @@ function gui.network_poll_finished(player_gui)
         local columns = class_table.column_count
         local table_children = class_table.children
 
-        for i = columns, #table_children - 1, columns do
+        for i = 0, #table_children - 1, columns do
             if table_children[i + 1].children[4].sprite == "" then
                 local class_name = table_children[i + 2].text
                 local class = classes[class_name]
@@ -754,7 +754,7 @@ local handle_import_import = { [events.on_gui_click] = function(event)
         end
         local class_table = player_gui.elements.class_table
         local class_children = class_table.children
-        for i = #class_children, class_table.column_count + 1, -1 do class_children[i].destroy() end
+        for i = #class_children, 1, -1 do class_children[i].destroy() end
         network.classes = classes
         for class_name, class in pairs(classes) do class_init_row(class_table, class_name, class) end
 
@@ -763,7 +763,7 @@ local handle_import_import = { [events.on_gui_click] = function(event)
         end
         local item_table = player_gui.elements.item_table
         local item_children = item_table.children
-        for i = #item_children, item_table.column_count + 1, -1 do item_children[i].destroy() end
+        for i = #item_children, 1, -1 do item_children[i].destroy() end
         network.items = items
         for item_key, item in pairs(items) do item_init_row(item_table, item_key, item) end
 
@@ -881,8 +881,8 @@ function gui.network_open(player_id, network_name, tab_index)
                         ---@diagnostic disable-next-line: missing-fields
                         {
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.classes" } },
-                            content = { type = "scroll-pane", style = "sspp_network_left_scroll_pane", direction = "vertical", children = {
-                                { type = "table", name = "class_table", style = "sspp_network_class_table", column_count = 7, children = {
+                            content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
+                                { type = "table", style = "sspp_network_class_header", column_count = 7, children = {
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.name" }), tooltip = { "sspp-gui.class-name-tooltip" } },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.depot-name" }), tooltip = { "sspp-gui.class-depot-name-tooltip" } },
@@ -891,16 +891,19 @@ function gui.network_open(player_id, network_name, tab_index)
                                     { type = "label", style = "bold_label", caption = " [item=locomotive]" },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.available" }), tooltip = { "sspp-gui.class-available-tooltip" } },
                                 } },
-                                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-class" }, mouse_button_filter = { "left" }, handler = handle_add_class },
+                                { type = "scroll-pane", style = "sspp_network_scroll_pane", direction = "vertical", children = {
+                                    { type = "table", name = "class_table", style = "sspp_network_class_table", column_count = 7 },
+                                    { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-class" }, mouse_button_filter = { "left" }, handler = handle_add_class },
+                                    } },
                                 } },
                             } },
                         },
                         ---@diagnostic disable-next-line: missing-fields
                         {
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.items-fluids" } },
-                            content = { type = "scroll-pane", style = "sspp_network_left_scroll_pane", direction = "vertical", children = {
-                                { type = "table", name = "item_table", style = "sspp_network_item_table", column_count = 8, children = {
+                            content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
+                                { type = "table", style = "sspp_network_item_header", column_count = 8, children = {
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
@@ -910,9 +913,12 @@ function gui.network_open(player_id, network_name, tab_index)
                                     { type = "label", style = "bold_label", caption = " [item=locomotive]" },
                                     { type = "label", style = "bold_label", caption = "[virtual-signal=up-arrow][virtual-signal=down-arrow][virtual-signal=signal-skull]", tooltip = { "sspp-gui.item-haulers-tooltip" } },
                                 } },
-                                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_item },
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_fluid },
+                                { type = "scroll-pane", style = "sspp_network_scroll_pane", direction = "vertical", children = {
+                                    { type = "table", name = "item_table", style = "sspp_network_item_table", column_count = 8 },
+                                    { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_item },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_fluid },
+                                    } },
                                 } },
                             } },
                         },

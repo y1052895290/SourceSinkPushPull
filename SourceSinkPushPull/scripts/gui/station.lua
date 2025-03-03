@@ -199,7 +199,7 @@ end
 ---@return boolean success
 local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
     local table = storage.player_guis[player_id].elements[table_name]
-    if #table.children <= table.column_count * 10 then
+    if #table.children < table.column_count * 10 then
         inner(table, elem_type)
         return true
     else
@@ -581,7 +581,7 @@ function gui.station_poll_finished(player_gui)
         local columns, table_children = provide_table.column_count, provide_table.children
 
         local dynamic_index = -1 -- zero based
-        for i = columns, #table_children - 1, columns do
+        for i = 0, #table_children - 1, columns do
             if table_children[i + 1].children[2].sprite == "" then
                 local _, quality, item_key = gui.extract_elem_value_fields(table_children[i + 2].elem_value)
                 local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
@@ -626,7 +626,7 @@ function gui.station_poll_finished(player_gui)
         local columns, table_children = request_table.column_count, request_table.children
 
         local dynamic_index = -1 -- zero based
-        for i = columns, #table_children - 1, columns do
+        for i = 0, #table_children - 1, columns do
             if table_children[i + 1].children[2].sprite == "" then
                 local _, quality, item_key = gui.extract_elem_value_fields(table_children[i + 2].elem_value)
                 local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
@@ -857,17 +857,20 @@ local function add_gui_complete(player, parts)
                             ---@type flib.GuiElemDef
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.provide" } },
                             ---@type flib.GuiElemDef
-                            content = { type = "scroll-pane", style = "sspp_station_left_scroll_pane", direction = "vertical", children = {
-                                { type = "table", name = "provide_table", style = "sspp_station_item_table", column_count = 5, children = {
+                            content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
+                                { type = "table", style = "sspp_station_item_header", column_count = 5, children = {
                                     { type = "empty-widget" },
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.network-settings" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.station-settings" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.statistics" } },
                                 } },
-                                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_add_provide_item },
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_add_provide_fluid },
+                                { type = "scroll-pane", style = "sspp_station_scroll_pane", direction = "vertical", children = {
+                                    { type = "table", name = "provide_table", style = "sspp_station_item_table", column_count = 5 },
+                                    { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_add_provide_item },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_add_provide_fluid },
+                                    } },
                                 } },
                             } },
                         },
@@ -875,17 +878,20 @@ local function add_gui_complete(player, parts)
                             ---@type flib.GuiElemDef
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.request" } },
                             ---@type flib.GuiElemDef
-                            content = { type = "scroll-pane", style = "sspp_station_left_scroll_pane", direction = "vertical", children = {
-                                { type = "table", name = "request_table", style = "sspp_station_item_table", column_count = 5, children = {
+                            content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
+                                { type = "table", style = "sspp_station_item_header", column_count = 5, children = {
                                     { type = "empty-widget" },
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.network-settings" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.station-settings" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.statistics" } },
                                 } },
-                                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_request_item },
-                                    { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_request_fluid },
+                                { type = "scroll-pane", style = "sspp_station_scroll_pane", direction = "vertical", children = {
+                                    { type = "table", name = "request_table", style = "sspp_station_item_table", column_count = 5 },
+                                    { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_request_item },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_request_fluid },
+                                    } },
                                 } },
                             } },
                         },

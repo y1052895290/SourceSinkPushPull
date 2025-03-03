@@ -105,7 +105,7 @@ function gui.refresh_table(table, from_row, to_row, old_dict, key_remove)
 
     local new_dict = {}
 
-    for i = columns, #table_children - 1, columns do
+    for i = 0, #table_children - 1, columns do
         local key, value = from_row(table_children, i)
         if key then
             if new_dict[key] then

@@ -19,23 +19,15 @@ styles.sspp_subheader_caption_textbox = { ---@type data.TextBoxStyleSpecificatio
     font = "heading-2",
 }
 
---------------------------------------------------------------------------------
-
-styles.sspp_network_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
-    type = "scroll_pane_style",
-    parent = "deep_scroll_pane",
-    left_margin = 8,
-    right_margin = 8,
-    bottom_margin = 4,
-    padding = 0,
-    vertical_flow_style = {
-        type = "vertical_flow_style",
-        vertical_spacing = 0,
-    },
-    height = 28 + 36 * 15 + 36,
+styles.sspp_tab_content_flow = { ---@type data.VerticalFlowStyleSpecification
+    type = "vertical_flow_style",
+    parent = "vertical_flow",
+    top_margin = -8,
 }
 
-styles.sspp_station_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
+--------------------------------------------------------------------------------
+
+styles.sspp_network_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
     type = "scroll_pane_style",
     parent = "deep_scroll_pane",
     left_margin = 8,
@@ -46,7 +38,21 @@ styles.sspp_station_left_scroll_pane = { ---@type data.ScrollPaneStyleSpecificat
         type = "vertical_flow_style",
         vertical_spacing = 0,
     },
-    height = 32 + (120 + 12) * 4 + 36,
+    height = 36 * 15 + 36,
+}
+
+styles.sspp_station_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
+    type = "scroll_pane_style",
+    parent = "deep_scroll_pane",
+    left_margin = 8,
+    right_margin = 8,
+    bottom_margin = 4,
+    padding = 0,
+    vertical_flow_style = {
+        type = "vertical_flow_style",
+        vertical_spacing = 0,
+    },
+    height = 132 * 4 + 36,
 }
 
 styles.sspp_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
@@ -59,11 +65,11 @@ styles.sspp_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
 
 --------------------------------------------------------------------------------
 
-styles.sspp_network_class_table = { ---@type data.TableStyleSpecification
+styles.sspp_network_class_header = { ---@type data.TableStyleSpecification
     type = "table_style",
     parent = "table",
-    left_padding = 4,
-    right_padding = 4,
+    left_padding = 12,
+    right_padding = 12,
     cell_padding = 4,
     column_widths = {
         { column = 1, width = 32 + 4 + 32 + 4 + 32 + 4 + 20 },
@@ -74,16 +80,24 @@ styles.sspp_network_class_table = { ---@type data.TableStyleSpecification
         { column = 6, width = 32 },
         { column = 7, width = 80 },
     },
-    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
     vertical_spacing = 0,
 }
 
-styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
+styles.sspp_network_class_table = { ---@type data.TableStyleSpecification
     type = "table_style",
-    parent = "table",
+    parent = "sspp_network_class_header",
+    width = 764,
     left_padding = 4,
     right_padding = 4,
+    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
+}
+
+styles.sspp_network_item_header = { ---@type data.TableStyleSpecification
+    type = "table_style",
+    parent = "table",
+    left_padding = 12,
+    right_padding = 12,
     cell_padding = 4,
     column_widths = {
         { column = 1, width = 32 + 4 + 32 + 4 + 32 + 4 + 20 },
@@ -95,20 +109,28 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
         { column = 7, width = 32 },
         { column = 8, width = 80 },
     },
-    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
     vertical_spacing = 0,
 }
 
-styles.sspp_station_item_table = { ---@type data.TableStyleSpecification
+styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
+    type = "table_style",
+    parent = "sspp_network_item_header",
+    width = 764,
+    left_padding = 4,
+    right_padding = 4,
+    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
+}
+
+styles.sspp_station_item_header = { ---@type data.TableStyleSpecification
     type = "table_style",
     parent = "table",
-    left_padding = 6,
-    right_padding = 6,
+    left_padding = 14,
+    right_padding = 14,
     left_cell_padding = 8,
     right_cell_padding = 8,
-    top_cell_padding = 6,
-    bottom_cell_padding = 6,
+    top_cell_padding = 4,
+    bottom_cell_padding = 4,
     column_widths = {
         { column = 1, width = 32 - 4 },
         { column = 2, width = 80 },
@@ -116,9 +138,19 @@ styles.sspp_station_item_table = { ---@type data.TableStyleSpecification
         { column = 4, width = 220 },
         { column = 5, width = 220 },
     },
-    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
     horizontal_spacing = 0,
     vertical_spacing = 0,
+}
+
+styles.sspp_station_item_table = { ---@type data.TableStyleSpecification
+    type = "table_style",
+    parent = "sspp_station_item_header",
+    width = 860,
+    left_padding = 6,
+    right_padding = 6,
+    top_cell_padding = 6,
+    bottom_cell_padding = 6,
+    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
 }
 
 styles.sspp_grid_table = { ---@type data.TableStyleSpecification
