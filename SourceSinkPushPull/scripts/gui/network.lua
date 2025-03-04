@@ -473,6 +473,7 @@ function gui.network_poll_finished(player_gui)
         local push_tickets = network.push_tickets
         local pull_tickets = network.pull_tickets
 
+        local bufferless_haulers = network.bufferless_haulers
         local provide_haulers = network.provide_haulers
         local request_haulers = network.request_haulers
         local to_depot_liquidate_haulers = network.to_depot_liquidate_haulers
@@ -492,6 +493,9 @@ function gui.network_poll_finished(player_gui)
 
                 local push_demand = len_or_zero(push_tickets[item_key])
                 local pull_demand = math.max(0, len_or_zero(pull_tickets[item_key]) - provide_total)
+
+                -- haulers being used as buffers are not subtracted from pull demand, but they are included in totals
+                provide_total = provide_total + len_or_zero(bufferless_haulers[item_key])
 
                 table_children[i + 6].caption = { "sspp-gui.fmt-item-demand", push_demand, pull_demand }
                 table_children[i + 8].caption = { "sspp-gui.fmt-item-haulers", provide_total, request_total, liquidate_total }

@@ -23,6 +23,26 @@ local function get_active_mode_button(flow)
     error()
 end
 
+---@param elements {[string]: LuaGuiElement}
+---@return integer row_count
+local function get_total_rows(elements)
+    local total_rows = 0
+    local provide_table = elements.provide_table
+    local request_table = elements.request_table
+    if provide_table then total_rows = total_rows + #provide_table.children / provide_table.column_count end
+    if request_table then total_rows = total_rows + #request_table.children / request_table.column_count end
+    return total_rows
+end
+
+---@param elements {[string]: LuaGuiElement}
+---@param visible boolean
+local function set_bufferless_toggles_visible(elements, visible)
+    local provide_bufferless_toggle = elements.provide_bufferless_toggle
+    local request_bufferless_toggle = elements.request_bufferless_toggle
+    if provide_bufferless_toggle then provide_bufferless_toggle.visible = visible end
+    if request_bufferless_toggle then request_bufferless_toggle.visible = visible end
+end
+
 --------------------------------------------------------------------------------
 
 ---@param event EventData.on_gui_click
@@ -39,7 +59,9 @@ local handle_request_copy = {} -- defined later
 ---@param event EventData.on_gui_elem_changed
 local handle_item_elem_changed = { [events.on_gui_elem_changed] = function(event)
     if not event.element.elem_value then
+        local elements = storage.player_guis[event.player_index].elements
         gui.delete_row(event.element.parent, event.element.get_index_in_parent() - 1)
+        set_bufferless_toggles_visible(elements, get_total_rows(elements) <= 1)
     end
     gui.update_station_after_change(event.player_index)
 end }
@@ -198,15 +220,23 @@ end
 ---@param elem_type string
 ---@return boolean success
 local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
-    local table = storage.player_guis[player_id].elements[table_name]
-    if #table.children < table.column_count * 10 then
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
+    local table = player_gui.elements[table_name]
+
+    if read_stop_flag(player_gui.parts.stop, e_stop_flags.bufferless) then
+        if get_total_rows(player_gui.elements) == 0 then
+            inner(table, elem_type)
+            return true
+        end
+    elseif #table.children < table.column_count * 10 then
         inner(table, elem_type)
+        set_bufferless_toggles_visible(player_gui.elements, get_total_rows(player_gui.elements) <= 1)
         return true
-    else
-        local player = game.get_player(player_id) --[[@as LuaPlayer]]
-        player.play_sound({ path = "utility/cannot_build" })
-        return false
     end
+
+    local player = game.get_player(player_id) --[[@as LuaPlayer]]
+    player.play_sound({ path = "utility/cannot_build" })
+    return false
 end
 
 --------------------------------------------------------------------------------
@@ -783,6 +813,30 @@ local handle_limit_changed = { [events.on_gui_value_changed] = function(event)
 end }
 
 ---@param event EventData.on_gui_click
+local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local parts = player_gui.parts --[[@as StationParts]]
+
+    local bufferless = not event.element.toggled
+    local caption = cwi({ bufferless and "sspp-gui.bufferless" or "sspp-gui.buffered" })
+
+    local provide_toggle = player_gui.elements.provide_bufferless_toggle
+    local request_toggle = player_gui.elements.request_bufferless_toggle
+    if provide_toggle then
+        provide_toggle.toggled = bufferless
+        provide_toggle.caption = caption
+        provide_toggle.tooltip = { bufferless and "sspp-gui.provide-bufferless-tooltip" or "sspp-gui.provide-buffered-tooltip" }
+    end
+    if request_toggle then
+        request_toggle.toggled = bufferless
+        request_toggle.caption = caption
+        request_toggle.tooltip = { bufferless and "sspp-gui.request-bufferless-tooltip" or "sspp-gui.request-buffered-tooltip" }
+    end
+
+    write_stop_flag(parts.stop, e_stop_flags.bufferless, bufferless)
+end }
+
+---@param event EventData.on_gui_click
 local handle_add_provide_item = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "item-with-quality")
 end }
@@ -830,6 +884,10 @@ local function add_gui_complete(player, parts)
     local name = parts.stop.backer_name
     local has_custom_name = read_stop_flag(parts.stop, e_stop_flags.custom_name)
     local limit = parts.stop.trains_limit
+    local is_bufferless = read_stop_flag(parts.stop, e_stop_flags.bufferless)
+    local bufferless_caption = cwi({ is_bufferless and "sspp-gui.bufferless" or "sspp-gui.buffered" })
+    local provide_bufferless_tooltip = { is_bufferless and "sspp-gui.provide-bufferless-tooltip" or "sspp-gui.provide-buffered-tooltip" }
+    local request_bufferless_tooltip = { is_bufferless and "sspp-gui.request-bufferless-tooltip" or "sspp-gui.request-buffered-tooltip" }
     local no_provide = not parts.provide_io and {}
     local no_request = not parts.request_io and {}
     return flib_gui.add(player.gui.screen, {
@@ -871,6 +929,8 @@ local function add_gui_complete(player, parts)
                                         { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_add_provide_item },
                                         { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_add_provide_fluid },
                                     } },
+                                    { type = "empty-widget", style = "flib_vertical_pusher" },
+                                    { type = "button", name = "provide_bufferless_toggle", style = "train_schedule_add_station_button", caption = bufferless_caption, tooltip = provide_bufferless_tooltip, toggled = is_bufferless, handler = handle_bufferless_toggled },
                                 } },
                             } },
                         },
@@ -892,6 +952,8 @@ local function add_gui_complete(player, parts)
                                         { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_request_item },
                                         { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_request_fluid },
                                     } },
+                                    { type = "empty-widget", style = "flib_vertical_pusher" },
+                                    { type = "button", name = "request_bufferless_toggle", style = "train_schedule_add_station_button", caption = bufferless_caption, tooltip = request_bufferless_tooltip, toggled = is_bufferless, handler = handle_bufferless_toggled },
                                 } },
                             } },
                         },
@@ -955,18 +1017,19 @@ function gui.station_open(player_id, entity)
 
     if parts then
         local network_items = storage.networks[network_name].items
-        if parts.provide_io then
-            local provide_table = elements.provide_table
+        local provide_table = elements.provide_table
+        local request_table = elements.request_table
+        if provide_table then
             for item_key, item in pairs(combinator_description_to_provide_items(parts.provide_io)) do
                 provide_init_row(network_items, provide_table, item_key, item)
             end
         end
-        if parts.request_io then
-            local request_table = elements.request_table
+        if request_table then
             for item_key, item in pairs(combinator_description_to_request_items(parts.request_io)) do
                 request_init_row(network_items, request_table, item_key, item)
             end
         end
+        set_bufferless_toggles_visible(elements, get_total_rows(elements) <= 1)
     end
 
     player.opened = window
@@ -1003,6 +1066,7 @@ function gui.station_add_flib_handlers()
         ["station_name_changed"] = handle_name_changed_or_confirmed[events.on_gui_text_changed],
         ["station_name_confirmed"] = handle_name_changed_or_confirmed[events.on_gui_confirmed],
         ["station_disable_toggled"] = handle_disable_toggled[events.on_gui_click],
+        ["station_bufferless_toggled"] = handle_bufferless_toggled[events.on_gui_click],
         ["station_limit_changed"] = handle_limit_changed[events.on_gui_value_changed],
         ["station_open_hauler"] = handle_open_hauler[events.on_gui_click],
         ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],

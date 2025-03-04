@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 
 ---@enum StopFlag
-e_stop_flags = { custom_name = 1, disable = 2 }
+e_stop_flags = { custom_name = 1, disable = 2, bufferless = 4 }
 
 ---@enum TrainColor
 e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 }
@@ -18,8 +18,8 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@alias StationId uint
 ---@alias HaulerId uint
 ---@alias PlayerId uint
----@alias TickState "INITIAL"|"POLL"|"REQUEST_DONE"|"LIQUIDATE"|"PROVIDE_DONE"|"DISPATCH"
----@alias HaulerPhase "TRAVEL"|"TRANSFER"|"DONE"
+---@alias TickState "INITIAL"|"POLL"|"REQUEST_DONE"|"LIQUIDATE"|"PROVIDE_DONE"|"DISPATCH"|"BUFFERLESS_DISPATCH"
+---@alias HaulerPhase "TRAVEL"|"TRANSFER"|"PENDING"|"DONE"
 ---@alias PlayerGui PlayerNetworkGui|PlayerStationGui|PlayerHaulerGui
 
 ---@class (exact) SourceSinkPushPull.Storage
@@ -34,6 +34,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public poll_stations StationId[]
 ---@field public liquidate_items NetworkItemKey[]
 ---@field public dispatch_items NetworkItemKey[]
+---@field public bufferless_dispatch_items NetworkItemKey[]
 ---@field public provide_done_items NetworkItemKey[]
 ---@field public request_done_items NetworkItemKey[]
 ---@field public disabled_items {[NetworkItemKey]: true?}
@@ -49,6 +50,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public surface LuaSurface
 ---@field public classes {[ClassName]: Class}
 ---@field public items {[ItemKey]: NetworkItem}
+---@field public bufferless_haulers {[ItemKey]: HaulerId[]}
 ---@field public provide_haulers {[ItemKey]: HaulerId[]}
 ---@field public request_haulers {[ItemKey]: HaulerId[]}
 ---@field public fuel_haulers {[ClassName]: HaulerId[]}
@@ -62,6 +64,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public request_tickets {[ItemKey]: StationId[]}
 ---@field public provide_done_tickets {[ItemKey]: StationId[]}
 ---@field public request_done_tickets {[ItemKey]: StationId[]}
+---@field public bufferless_tickets {[ItemKey]: StationId[]}
 
 ---@class (exact) Class
 ---@field public depot_name string
@@ -180,6 +183,7 @@ function init_storage()
     storage.poll_stations = {}
     storage.liquidate_items = {}
     storage.dispatch_items = {}
+    storage.bufferless_dispatch_items = {}
     storage.provide_done_items = {}
     storage.request_done_items = {}
     storage.disabled_items = {}
@@ -191,6 +195,7 @@ function init_network(surface)
         surface = surface,
         classes = {},
         items = {},
+        bufferless_haulers = {},
         provide_haulers = {},
         request_haulers = {},
         fuel_haulers = {},
@@ -198,6 +203,7 @@ function init_network(surface)
         at_depot_haulers = {},
         to_depot_liquidate_haulers = {},
         at_depot_liquidate_haulers = {},
+        bufferless_tickets = {},
         push_tickets = {},
         provide_tickets = {},
         pull_tickets = {},
