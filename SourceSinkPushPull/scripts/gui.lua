@@ -51,7 +51,7 @@ function gui.move_row(table, flow_index, button_index)
     local columns = table.column_count
     local i = flow_index - 1
     local j = i + (button_index * 2 - 3) * columns
-    if j >= columns and j + columns <= #table.children then
+    if j >= 0 and j + columns <= #table.children then
         for c = 1, columns do
             table.swap_children(i + c, j + c)
         end
