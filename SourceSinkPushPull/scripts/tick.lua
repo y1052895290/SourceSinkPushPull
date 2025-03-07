@@ -29,7 +29,7 @@ local function prepare_for_tick_poll()
         network.request_tickets = {}
         network.provide_done_tickets = {}
         network.request_done_tickets = {}
-        network.bufferless_tickets = {}
+        network.buffer_tickets = {}
     end
 
     storage.disabled_items = {}
@@ -56,17 +56,17 @@ end
 ---@param network_items {[ItemKey]: NetworkItem}
 ---@param station_items {[ItemKey]: ProvideItem|RequestItem}?
 ---@param station_deliveries {[ItemKey]: HaulerId[]}?
----@param subtract boolean
+---@param trains_limit_for_subtract integer?
 ---@return {[ItemKey]: integer}? counts
-local function poll_item_counts_bufferless(network_items, station_items, station_deliveries, subtract)
+local function poll_item_counts_bufferless(network_items, station_items, station_deliveries, trains_limit_for_subtract)
     if not station_items then return nil end
     ---@cast station_deliveries {[ItemKey]: HaulerId[]}
 
     local haulers = storage.haulers
     local item_counts = {} ---@type {[ItemKey]: integer}
 
-    -- NOTE: bufferless stations will have only one item, we just use a loop for consistency
-    for item_key, station_item in pairs(station_items) do
+    -- bufferless stations will have only one item, we just use a loop for consistency
+    for item_key, _ in pairs(station_items) do
         local network_item = network_items[item_key]
         if network_item then
             local deliveries = station_deliveries[item_key]
@@ -77,8 +77,8 @@ local function poll_item_counts_bufferless(network_items, station_items, station
                     count = count + get_train_item_count(haulers[hauler_id].train, name, quality)
                 end
             end
-            if subtract then
-                count = compute_storage_needed(network_item, station_item) - count
+            if trains_limit_for_subtract then
+                count = network_item.delivery_size * trains_limit_for_subtract - count
             end
             item_counts[item_key] = count
         end
@@ -90,7 +90,7 @@ end
 ---@param network_items {[ItemKey]: NetworkItem}
 ---@param station_items {[ItemKey]: ProvideItem|RequestItem}?
 ---@param general_io LuaEntity
----@param subtract boolean
+---@param subtract true?
 ---@return {[ItemKey]: integer}? counts
 local function poll_item_counts_buffered(network_items, station_items, general_io, subtract)
     if not station_items then return nil end
@@ -165,24 +165,24 @@ local function tick_poll()
 
     -- handle the active hauler finishing being loaded or unloaded
 
-    local hauler_provide_item_key, hauler_request_item_key ---@type ItemKey?, ItemKey?
+    local hauler_buffer_item_key, hauler_provide_item_key, hauler_request_item_key ---@type ItemKey?, ItemKey?, ItemKey?
 
     local hauler_id = station.hauler
     if hauler_id then
         local hauler = storage.haulers[hauler_id]
         if hauler.to_provide then
             if hauler.to_provide.phase == "DONE" then
-                list_append_or_create(network.provide_done_tickets, hauler.to_provide.item, station_id)
-                if buffered then
+                if hauler.to_provide.buffer then
+                    hauler_buffer_item_key = hauler.to_provide.item
+                else
                     hauler_provide_item_key = hauler.to_provide.item
+                    list_append_or_create(network.provide_done_tickets, hauler_provide_item_key, station_id)
                 end
-            elseif hauler.to_provide.phase == "PENDING" then
-                hauler_provide_item_key = hauler.to_provide.item
             end
         else
             if hauler.to_request.phase == "DONE" then
-                list_append_or_create(network.request_done_tickets, hauler.to_request.item, station_id)
                 hauler_request_item_key = hauler.to_request.item
+                list_append_or_create(network.request_done_tickets, hauler_request_item_key, station_id)
             end
         end
     end
@@ -191,45 +191,50 @@ local function tick_poll()
 
     local provide_counts, request_counts ---@type {[ItemKey]: integer}?, {[ItemKey]: integer}?
 
+    local network_items = network.items
+    local provide_items, request_items = station.provide_items, station.request_items
+
     if buffered then
-        provide_counts = poll_item_counts_buffered(network.items, station.provide_items, station.general_io, false)
-        request_counts = poll_item_counts_buffered(network.items, station.request_items, station.general_io, true)
+        provide_counts = poll_item_counts_buffered(network_items, provide_items, station.general_io)
+        request_counts = poll_item_counts_buffered(network_items, request_items, station.general_io, true)
     else
-        provide_counts = poll_item_counts_bufferless(network.items, station.provide_items, station.provide_deliveries, false)
-        request_counts = poll_item_counts_bufferless(network.items, station.request_items, station.request_deliveries, true)
+        provide_counts = poll_item_counts_bufferless(network_items, provide_items, station.provide_deliveries)
+        request_counts = poll_item_counts_bufferless(network_items, request_items, station.request_deliveries, station.stop.trains_limit)
     end
 
-    local provide_modes = poll_item_modes(network.items, station.provide_items, station.provide_io)
-    local request_modes = poll_item_modes(network.items, station.request_items, station.request_io)
-
     station.provide_counts, station.request_counts = provide_counts, request_counts
+
+    local provide_modes = poll_item_modes(network_items, provide_items, station.provide_io)
+    local request_modes = poll_item_modes(network_items, request_items, station.request_io)
+
     station.provide_modes, station.request_modes = provide_modes, request_modes
 
     -- create tickets for any new deliveries that we could accommodate
 
-    if station.provide_items then
+    if provide_items then
         ---@cast provide_counts {[ItemKey]: integer}
         ---@cast provide_modes {[ItemKey]: ItemMode}
 
-        for item_key, provide_item in pairs(station.provide_items) do
-            local network_item = network.items[item_key]
+        for item_key, provide_item in pairs(provide_items) do
+            local network_item = network_items[item_key]
             if network_item then
                 local count, mode = provide_counts[item_key], provide_modes[item_key]
 
                 if hauler_provide_item_key == item_key then
-                    if buffered then
-                        local minimum_count = station.provide_minimum_active_count ---@type integer
-                        if minimum_count > count then
-                            count = minimum_count
-                        elseif minimum_count < count then
-                            station.provide_minimum_active_count = count
-                        end
-                    elseif mode > 3 then
+                    local minimum_count = station.provide_minimum_active_count ---@type integer
+                    if minimum_count > count then
+                        count = minimum_count
+                    elseif minimum_count < count then
+                        station.provide_minimum_active_count = count
+                    end
+                    hauler_provide_item_key = nil
+                elseif hauler_buffer_item_key == item_key then
+                    if mode > 3 then
                         list_extend_or_create(network.push_tickets, item_key, station_id, 1)
                     else
                         list_extend_or_create(network.provide_tickets, item_key, station_id, 1)
                     end
-                    hauler_provide_item_key = nil
+                    hauler_buffer_item_key = nil
                 end
 
                 if enabled and mode > 0 and mode < 7 then
@@ -250,12 +255,9 @@ local function tick_poll()
                             end
                         end
                     else
-                        -- TODO: throughput for bufferless providers should be calculated automatically from the station train limit
-                        local ethereal_count = compute_storage_needed(network_item, provide_item)
-                        local deliveries = len_or_zero(station.provide_deliveries[item_key])
-                        local want_deliveries = math.floor(ethereal_count / network_item.delivery_size) - deliveries
+                        local want_deliveries = station.stop.trains_limit - station.total_deliveries
                         if want_deliveries > 0 then
-                            list_extend_or_create(network.bufferless_tickets, item_key, station_id, want_deliveries)
+                            list_extend_or_create(network.buffer_tickets, item_key, station_id, want_deliveries)
                         end
                     end
                 end
@@ -263,12 +265,12 @@ local function tick_poll()
         end
     end
 
-    if station.request_items then
+    if request_items then
         ---@cast request_counts {[ItemKey]: integer}
         ---@cast request_modes {[ItemKey]: ItemMode}
 
-        for item_key, request_item in pairs(station.request_items) do
-            local network_item = network.items[item_key]
+        for item_key, request_item in pairs(request_items) do
+            local network_item = network_items[item_key]
             if network_item then
                 local count, mode = request_counts[item_key], request_modes[item_key]
 
@@ -283,19 +285,30 @@ local function tick_poll()
                 end
 
                 if enabled and mode > 0 and mode < 7 then
-                    local deliveries = len_or_zero(station.request_deliveries[item_key])
-                    local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
-                    if want_deliveries > 0 then
-                        if mode > 3 then
-                            local pull_count = count - compute_buffer(network_item, request_item)
-                            local pull_want_deliveries = math.floor(pull_count / network_item.delivery_size) - deliveries
-                            if pull_want_deliveries > 0 then
-                                list_extend_or_create(network.pull_tickets, item_key, station_id, pull_want_deliveries)
-                                want_deliveries = want_deliveries - pull_want_deliveries
+                    if buffered then
+                        local deliveries = len_or_zero(station.request_deliveries[item_key])
+                        local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
+                        if want_deliveries > 0 then
+                            if mode > 3 then
+                                local pull_count = count - compute_buffer(network_item, request_item)
+                                local pull_want_deliveries = math.floor(pull_count / network_item.delivery_size) - deliveries
+                                if pull_want_deliveries > 0 then
+                                    list_extend_or_create(network.pull_tickets, item_key, station_id, pull_want_deliveries)
+                                    want_deliveries = want_deliveries - pull_want_deliveries
+                                end
+                            end
+                            if want_deliveries > 0 then
+                                list_extend_or_create(network.request_tickets, item_key, station_id, want_deliveries)
                             end
                         end
+                    else
+                        local want_deliveries = station.stop.trains_limit - station.total_deliveries
                         if want_deliveries > 0 then
-                            list_extend_or_create(network.request_tickets, item_key, station_id, want_deliveries)
+                            if mode > 3 then
+                                list_extend_or_create(network.pull_tickets, item_key, station_id, 1)
+                            else
+                                list_extend_or_create(network.request_tickets, item_key, station_id, 1)
+                            end
                         end
                     end
                 end
@@ -303,7 +316,7 @@ local function tick_poll()
         end
     end
 
-    if hauler_provide_item_key or hauler_request_item_key then
+    if hauler_buffer_item_key or hauler_provide_item_key or hauler_request_item_key then
         error("station assigned to incorrect hauler")
     end
 
@@ -334,72 +347,81 @@ local function pop_network_item_key_if_any(list)
     return nil
 end
 
----@param network Network
----@param first_dict_name "at_depot_haulers"|"at_depot_liquidate_haulers"
----@param second_dict_name "to_depot_haulers"|"to_depot_liquidate_haulers"
----@param class_name ClassName
----@param liquidate_item_key ItemKey?
----@return HaulerId?
-local function pop_best_hauler_if_any(network, first_dict_name, second_dict_name, class_name, liquidate_item_key)
-    local key_or_name = liquidate_item_key or class_name
-
-    local dict = network[first_dict_name] ---@type {[ItemKey]: StationId[]}
-    if not dict[key_or_name] then
-        dict = network[second_dict_name]
-        if not dict[key_or_name] then return nil end
-        if not network.classes[class_name].bypass_depot then return nil end
+---@param dict {[string]: uint[]}
+---@param key string
+---@param list uint[]
+---@param index integer
+---@return uint
+local function extract_id(dict, key, list, index)
+    local length, id = #list, list[index]
+    if length == 1 then
+        dict[key] = nil
+    else
+        list[index] = list[length]
+        list[length] = nil
     end
-
-    local list = dict[key_or_name]
-    local length = #list
-
-    if length > 0 then
-        local index = math.random(length)
-        local hauler_id = list[index]
-
-        if length == 1 then
-            dict[key_or_name] = nil
-        else
-            list[index] = list[length]
-            list[length] = nil
-        end
-
-        return hauler_id
-    end
-
-    return nil
+    return id
 end
 
 ---@param network Network
----@param first_dict_name "push_tickets"|"pull_tickets"|"bufferless_tickets"
----@param second_dict_name "provide_tickets"|"request_tickets"|"bufferless_tickets"
----@param mode_dict_name "provide_modes"|"request_modes"
 ---@param item_key ItemKey
----@return StationId?
-local function pop_best_target_station_if_any(network, first_dict_name, second_dict_name, mode_dict_name, item_key)
-    local stations = storage.stations
-
-    local dict = network[first_dict_name] ---@type {[ItemKey]: StationId[]}
-    if not dict[item_key] then
-        dict = network[second_dict_name]
+---@return HaulerId?
+local function pop_best_liquidate_hauler_if_any(network, item_key)
+    local dict = network.at_depot_liquidate_haulers
+    local list = dict[item_key]
+    if not list then
+        if network.classes[network.items[item_key].class].bypass_depot then
+            dict = network.to_depot_liquidate_haulers
+            list = dict[item_key]
+        end
+        if not list then return nil end
     end
 
-    local list = dict[item_key]
-    local length = #list
+    return extract_id(dict, item_key, list, math.random(#list))
+end
+
+---@param network Network
+---@param item_key ItemKey
+---@return HaulerId?
+local function pop_best_dispatch_hauler_if_any(network, item_key)
+    local class_name = network.items[item_key].class
+
+    local dict = network.at_depot_haulers
+    local list = dict[class_name]
+    if not list then
+        if network.classes[class_name].bypass_depot then
+            dict = network.to_depot_haulers
+            list = dict[class_name]
+        end
+        if not list then return nil end
+    end
+
+    return extract_id(dict, class_name, list, math.random(#list))
+end
+
+
+---@param first_dict {[ItemKey]: StationId[]}
+---@param second_dict {[ItemKey]: StationId[]}
+---@param item_key ItemKey
+---@param get_mode_and_score fun(station: Station, item_key: ItemKey): mode: ItemMode, score: number
+---@return StationId?
+local function pop_best_station_if_any(first_dict, second_dict, item_key, get_mode_and_score)
+    local dict, list = first_dict, first_dict[item_key]
+    if not list then dict, list = second_dict, second_dict[item_key] end
+
+    local stations = storage.stations
 
     local index_list, index_length ---@type integer[], integer
-    local best_item_mode, best_under_limit = 0, -10
+    local best_mode, best_score = 0, -10.0
 
     for index, station_id in pairs(list) do
-        local station = stations[station_id]
-        local item_mode = station[mode_dict_name][item_key]
-        if item_mode >= best_item_mode then
-            local under_limit = station.stop.trains_limit - station.total_deliveries
-            if item_mode > best_item_mode or under_limit > best_under_limit then
+        local mode, score = get_mode_and_score(stations[station_id], item_key)
+        if mode >= best_mode then
+            if mode > best_mode or score > best_score then
                 index_list, index_length = {}, 0
-                best_item_mode, best_under_limit = item_mode, under_limit
+                best_mode, best_score = mode, score
             end
-            if under_limit > 0 then
+            if score >= best_score and score > 0.0 then
                 index_length = index_length + 1
                 index_list[index_length] = index
             end
@@ -407,17 +429,7 @@ local function pop_best_target_station_if_any(network, first_dict_name, second_d
     end
 
     if index_length > 0 then
-        local index = index_list[math.random(index_length)]
-        local station_id = list[index]
-
-        if length == 1 then
-            dict[item_key] = nil
-        else
-            list[index] = list[length]
-            list[length] = nil
-        end
-
-        return station_id
+        return extract_id(dict, item_key, list, index_list[math.random(index_length)])
     end
 
     return nil
@@ -425,38 +437,70 @@ end
 
 ---@param dict {[ItemKey]: StationId[]}
 ---@param item_key ItemKey
+---@param get_mode_and_score fun(station: Station, item_key: ItemKey): mode: ItemMode, score: number
 ---@return StationId
-local function pop_best_origin_station(dict, item_key)
-    local stations = storage.stations
-
-    local list = dict[item_key]
-    local length = #list
+local function pop_best_station(dict, item_key, get_mode_and_score)
+    local stations, list = storage.stations, dict[item_key]
 
     local index_list, index_length ---@type integer[], integer
-    local best_over_limit = -10
+    local best_mode, best_score = 0, -10.0
 
     for index, station_id in pairs(list) do
-        local station = stations[station_id]
-        local over_limit = station.total_deliveries - station.stop.trains_limit
-        if over_limit > best_over_limit then
-            index_list, index_length = {}, 0
-            best_over_limit = over_limit
+        local mode, score = get_mode_and_score(stations[station_id], item_key)
+        if mode >= best_mode then
+            if mode > best_mode or score > best_score then
+                index_list, index_length = {}, 0
+                best_mode, best_score = mode, score
+            end
+            if score >= best_score then
+                index_length = index_length + 1
+                index_list[index_length] = index
+            end
         end
-        index_length = index_length + 1
-        index_list[index_length] = index
     end
 
-    local index = index_list[math.random(index_length)]
-    local station_id = list[index]
+    return extract_id(dict, item_key, list, index_list[math.random(index_length)])
+end
 
-    if length == 1 then
-        dict[item_key] = nil
-    else
-        list[index] = list[length]
-        list[length] = nil
-    end
+--------------------------------------------------------------------------------
 
-    return station_id
+---@param station Station
+---@param item_key ItemKey
+---@return ItemMode, number
+local function get_done_mode_and_score(station, item_key)
+    local stop = station.stop
+    local limit = stop.trains_limit
+    local score = 1.0 - (limit - station.total_deliveries) / limit -- fullness
+    return 1, score -- mode is not relevant here
+end
+
+---@param station Station
+---@param item_key ItemKey
+---@return ItemMode, number
+local function get_request_mode_and_score(station, item_key)
+    local limit = station.stop.trains_limit
+    local score = (limit - station.total_deliveries) / limit -- emptyness
+    return station.request_modes[item_key], score
+end
+
+---@param station Station
+---@param item_key ItemKey
+---@return ItemMode, number
+local function get_provide_mode_and_score(station, item_key)
+    local stop = station.stop
+    local limit = stop.trains_limit
+    local score = (limit - station.total_deliveries) / limit -- emptyness
+    if read_stop_flag(stop, e_stop_flags.bufferless) then score = 1.0 - score end -- fullness
+    return station.provide_modes[item_key], score
+end
+
+---@param station Station
+---@param item_key ItemKey
+---@return ItemMode, number
+local function get_buffer_mode_and_score(station, item_key)
+    local limit = station.stop.trains_limit
+    local score = (limit - station.total_deliveries) / limit -- emptyness
+    return station.provide_modes[item_key], score
 end
 
 --------------------------------------------------------------------------------
@@ -483,7 +527,7 @@ local function tick_request_done()
     local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
     local network = storage.networks[network_name]
 
-    local request_station_id = pop_best_origin_station(network.request_done_tickets, item_key)
+    local request_station_id = pop_best_station(network.request_done_tickets, item_key, get_done_mode_and_score)
     local request_station = storage.stations[request_station_id]
 
     local hauler_id = request_station.hauler ---@type HaulerId
@@ -562,15 +606,13 @@ local function tick_liquidate()
     local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
     local network = storage.networks[network_name]
 
-    local request_station_id = pop_best_target_station_if_any(network, "pull_tickets", "request_tickets", "request_modes", item_key)
+    local request_station_id = pop_best_station_if_any(network.pull_tickets, network.request_tickets, item_key, get_request_mode_and_score)
     if not request_station_id then
         list_remove_value_all(storage.liquidate_items, network_item_key)
         return false
     end
 
-    local class_name = network.items[item_key].class
-
-    local hauler_id = pop_best_hauler_if_any(network, "at_depot_liquidate_haulers", "to_depot_liquidate_haulers", class_name, item_key)
+    local hauler_id = pop_best_liquidate_hauler_if_any(network, item_key)
     if not hauler_id then
         list_remove_value_all(storage.liquidate_items, network_item_key)
         return false
@@ -623,14 +665,14 @@ local function tick_provide_done()
     local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
     local network = storage.networks[network_name]
 
-    local request_station_id = pop_best_target_station_if_any(network, "pull_tickets", "request_tickets", "request_modes", item_key)
+    local request_station_id = pop_best_station_if_any(network.pull_tickets, network.request_tickets, item_key, get_request_mode_and_score)
     if not request_station_id then
         list_remove_value_all(storage.provide_done_items, network_item_key)
         return false
     end
     local request_station = storage.stations[request_station_id]
 
-    local provide_station_id = pop_best_origin_station(network.provide_done_tickets, item_key)
+    local provide_station_id = pop_best_station(network.provide_done_tickets, item_key, get_done_mode_and_score)
     local provide_station = storage.stations[provide_station_id]
 
     local hauler_id = provide_station.hauler ---@type HaulerId
@@ -700,7 +742,7 @@ local function tick_dispatch()
     local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
     local network = storage.networks[network_name]
 
-    local provide_station_id = pop_best_target_station_if_any(network, "push_tickets", "provide_tickets", "provide_modes", item_key)
+    local provide_station_id = pop_best_station_if_any(network.push_tickets, network.provide_tickets, item_key, get_provide_mode_and_score)
     if not provide_station_id then
         list_remove_value_all(storage.dispatch_items, network_item_key)
         return false
@@ -708,17 +750,17 @@ local function tick_dispatch()
     local provide_station = storage.stations[provide_station_id]
 
     if read_stop_flag(provide_station.stop, e_stop_flags.bufferless) then
-        -- will be sent to a requester in the next cycle
         local hauler_id = provide_station.hauler --[[@as HaulerId]]
-        storage.haulers[hauler_id].to_provide.phase = "DONE"
-        list_remove_value_or_destroy(network.bufferless_haulers, item_key, hauler_id)
+
+        -- will allow the creation of a PROVIDE_DONE ticket in the next cycle
+        storage.haulers[hauler_id].to_provide.buffer = nil
+
+        list_remove_value_or_destroy(network.buffer_haulers, item_key, hauler_id)
         list_append_or_create(network.provide_haulers, item_key, hauler_id)
         return false
     end
 
-    local class_name = network.items[item_key].class
-
-    local hauler_id = pop_best_hauler_if_any(network, "at_depot_haulers", "to_depot_haulers", class_name)
+    local hauler_id = pop_best_dispatch_hauler_if_any(network, item_key)
     if not hauler_id then
         list_remove_value_all(storage.dispatch_items, network_item_key)
         return false
@@ -730,7 +772,7 @@ local function tick_dispatch()
 
     list_append_or_create(network.provide_haulers, item_key, hauler_id)
     list_append_or_create(provide_station.provide_deliveries, item_key, hauler_id)
-    hauler.to_provide = { item = item_key, station = provide_station_id, phase = "TRAVEL" }
+    hauler.to_provide = { item = item_key, station = provide_station_id, phase = "TRAVEL", buffer = nil }
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
@@ -742,51 +784,43 @@ end
 
 --------------------------------------------------------------------------------
 
-local function prepare_for_tick_bufferless_dispatch()
+local function prepare_for_tick_buffer()
     local list, length = {}, 0 ---@type NetworkItemKey[]
-    storage.bufferless_dispatch_items = list
+    storage.buffer_items = list
 
     for network_name, network in pairs(storage.networks) do
-        for item_key, station_ids in pairs(network.bufferless_tickets) do
+        for item_key, station_ids in pairs(network.buffer_tickets) do
             local haulers_to_send = #station_ids
             length = extend_network_item_key_list(list, length, network_name, item_key, haulers_to_send)
         end
     end
 
-    storage.tick_state = "BUFFERLESS_DISPATCH"
+    storage.tick_state = "BUFFER"
 end
 
-local function tick_bufferless_dispatch()
-    local network_item_key = pop_network_item_key_if_any(storage.bufferless_dispatch_items)
+local function tick_buffer()
+    local network_item_key = pop_network_item_key_if_any(storage.buffer_items)
     if not network_item_key then return true end
 
     local network_name, item_key = string.match(network_item_key, "(.-):(.+)")
     local network = storage.networks[network_name]
 
-    -- TODO: passing bufferless_tickets twice is weird, the function needs a better signature
-    local provide_station_id = pop_best_target_station_if_any(network, "bufferless_tickets", "bufferless_tickets", "provide_modes", item_key)
-    if not provide_station_id then
-        list_remove_value_all(storage.bufferless_dispatch_items, network_item_key)
-        return false
-    end
-
-    local class_name = network.items[item_key].class
-
-    local hauler_id = pop_best_hauler_if_any(network, "at_depot_haulers", "to_depot_haulers", class_name)
-    if not hauler_id then
-        list_remove_value_all(storage.bufferless_dispatch_items, network_item_key)
-        return false
-    end
-
+    local provide_station_id = pop_best_station(network.buffer_tickets, item_key, get_buffer_mode_and_score)
     local provide_station = storage.stations[provide_station_id]
+
+    local hauler_id = pop_best_dispatch_hauler_if_any(network, item_key)
+    if not hauler_id then
+        list_remove_value_all(storage.buffer_items, network_item_key)
+        return false
+    end
     local hauler = storage.haulers[hauler_id]
 
     hauler.to_depot = nil
     hauler.at_depot = nil
 
-    list_append_or_create(network.bufferless_haulers, item_key, hauler_id)
+    list_append_or_create(network.buffer_haulers, item_key, hauler_id)
     list_append_or_create(provide_station.provide_deliveries, item_key, hauler_id)
-    hauler.to_provide = { item = item_key, station = provide_station_id, phase = "TRAVEL" }
+    hauler.to_provide = { item = item_key, station = provide_station_id, phase = "TRAVEL", buffer = true }
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
     set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
@@ -823,10 +857,10 @@ function on_tick()
         end
     elseif tick_state == "DISPATCH" then
         if tick_dispatch() then
-            prepare_for_tick_bufferless_dispatch()
+            prepare_for_tick_buffer()
         end
-    elseif tick_state == "BUFFERLESS_DISPATCH" then
-        if tick_bufferless_dispatch() then
+    elseif tick_state == "BUFFER" then
+        if tick_buffer() then
             prepare_for_tick_poll()
         end
     elseif tick_state == "INITIAL" then

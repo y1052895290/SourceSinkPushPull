@@ -7,15 +7,7 @@ local cwi = gui.caption_with_info
 --------------------------------------------------------------------------------
 
 ---@param flow LuaGuiElement
----@param active_mode ItemMode
-local function set_active_mode_button(flow, active_mode)
-    for index, button in pairs(flow.children) do
-        button.toggled = index == active_mode
-    end
-end
-
----@param flow LuaGuiElement
----@return ItemMode active_mode
+---@return ItemMode mode
 local function get_active_mode_button(flow)
     for index, button in pairs(flow.children) do
         if button.toggled then return index end
@@ -23,24 +15,38 @@ local function get_active_mode_button(flow)
     error()
 end
 
----@param elements {[string]: LuaGuiElement}
----@return integer row_count
-local function get_total_rows(elements)
-    local total_rows = 0
-    local provide_table = elements.provide_table
-    local request_table = elements.request_table
-    if provide_table then total_rows = total_rows + #provide_table.children / provide_table.column_count end
-    if request_table then total_rows = total_rows + #request_table.children / request_table.column_count end
-    return total_rows
+---@param flow LuaGuiElement
+---@param mode ItemMode
+local function set_active_mode_button(flow, mode)
+    for index, button in pairs(flow.children) do
+        button.toggled = index == mode
+    end
 end
 
 ---@param elements {[string]: LuaGuiElement}
----@param visible boolean
-local function set_bufferless_toggles_visible(elements, visible)
-    local provide_bufferless_toggle = elements.provide_bufferless_toggle
-    local request_bufferless_toggle = elements.request_bufferless_toggle
-    if provide_bufferless_toggle then provide_bufferless_toggle.visible = visible end
-    if request_bufferless_toggle then request_bufferless_toggle.visible = visible end
+---@return integer rows
+local function get_total_rows(elements)
+    local provide_table, request_table = elements.provide_table, elements.request_table
+    local rows = 0
+    if provide_table then rows = rows + #provide_table.children / provide_table.column_count end
+    if request_table then rows = rows + #request_table.children / request_table.column_count end
+    return rows
+end
+
+---@param table LuaGuiElement
+---@param enabled boolean
+function set_buffer_settings_enabled(table, enabled)
+    local table_children = table.children
+    for i = 0, #table_children - 1, table.column_count do
+        table_children[i + 4].children[2].children[3].enabled = enabled
+        table_children[i + 4].children[3].children[3].enabled = enabled
+        table_children[i + 5].children[1].children[3].enabled = enabled
+        if not enabled then
+            -- these values don't matter for bufferless stations, but they still need to be valid
+            if not tonumber(table_children[i + 4].children[2].children[3].text) then table_children[i + 4].children[2].children[3].text = "0" end
+            if not tonumber(table_children[i + 4].children[3].children[3].text) then table_children[i + 4].children[3].children[3].text = "30" end
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -59,9 +65,7 @@ local handle_request_copy = {} -- defined later
 ---@param event EventData.on_gui_elem_changed
 local handle_item_elem_changed = { [events.on_gui_elem_changed] = function(event)
     if not event.element.elem_value then
-        local elements = storage.player_guis[event.player_index].elements
         gui.delete_row(event.element.parent, event.element.get_index_in_parent() - 1)
-        set_bufferless_toggles_visible(elements, get_total_rows(elements) <= 1)
     end
     gui.update_station_after_change(event.player_index)
 end }
@@ -226,16 +230,16 @@ local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
     if read_stop_flag(player_gui.parts.stop, e_stop_flags.bufferless) then
         if get_total_rows(player_gui.elements) == 0 then
             inner(table, elem_type)
+            set_buffer_settings_enabled(table, false)
+            gui.update_station_after_change(player_id)
             return true
         end
     elseif #table.children < table.column_count * 10 then
         inner(table, elem_type)
-        set_bufferless_toggles_visible(player_gui.elements, get_total_rows(player_gui.elements) <= 1)
         return true
     end
 
-    local player = game.get_player(player_id) --[[@as LuaPlayer]]
-    player.play_sound({ path = "utility/cannot_build" })
+    game.get_player(player_id).play_sound({ path = "utility/cannot_build" })
     return false
 end
 
@@ -634,19 +638,17 @@ function gui.station_poll_finished(player_gui)
             end
         end
 
-        if elements.grid_provide_toggle.toggled then
-            for item_key, hauler_ids in pairs(station.provide_deliveries) do
-                local name, quality = split_item_key(item_key)
-                local icon = make_item_icon(name, quality)
+        for item_key, hauler_ids in pairs(station.provide_deliveries) do
+            local name, quality = split_item_key(item_key)
+            local icon = make_item_icon(name, quality)
 
-                for _, hauler_id in pairs(hauler_ids) do
-                    new_length = new_length + 1
-                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
-                    local train = storage.haulers[hauler_id].train
-                    minimap.children[2].caption = "[img=virtual-signal/up-arrow]"
-                    minimap.children[3].caption = tostring(get_train_item_count(train, name, quality)) .. icon
-                    minimap.entity = train.front_stock
-                end
+            for _, hauler_id in pairs(hauler_ids) do
+                new_length = new_length + 1
+                local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
+                local train = storage.haulers[hauler_id].train
+                minimap.children[2].caption = "[img=virtual-signal/up-arrow]"
+                minimap.children[3].caption = tostring(get_train_item_count(train, name, quality)) .. icon
+                minimap.entity = train.front_stock
             end
         end
     end
@@ -679,19 +681,17 @@ function gui.station_poll_finished(player_gui)
             end
         end
 
-        if elements.grid_request_toggle.toggled then
-            for item_key, hauler_ids in pairs(station.request_deliveries) do
-                local name, quality = split_item_key(item_key)
-                local icon = make_item_icon(name, quality)
+        for item_key, hauler_ids in pairs(station.request_deliveries) do
+            local name, quality = split_item_key(item_key)
+            local icon = make_item_icon(name, quality)
 
-                for _, hauler_id in pairs(hauler_ids) do
-                    new_length = new_length + 1
-                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
-                    local train = storage.haulers[hauler_id].train
-                    minimap.children[2].caption = "[img=virtual-signal/down-arrow]"
-                    minimap.children[3].caption = tostring(get_train_item_count(train, name, quality)) .. icon
-                    minimap.entity = train.front_stock
-                end
+            for _, hauler_id in pairs(hauler_ids) do
+                new_length = new_length + 1
+                local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
+                local train = storage.haulers[hauler_id].train
+                minimap.children[2].caption = "[img=virtual-signal/down-arrow]"
+                minimap.children[3].caption = tostring(get_train_item_count(train, name, quality)) .. icon
+                minimap.entity = train.front_stock
             end
         end
     end
@@ -798,9 +798,9 @@ local handle_disable_toggled = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
     local parts = player_gui.parts --[[@as StationParts]]
 
-    local disabled = event.element.toggled
-    event.element.tooltip = { disabled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
-    write_stop_flag(parts.stop, e_stop_flags.disable, disabled)
+    local toggled = event.element.toggled
+    event.element.tooltip = { toggled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
+    write_stop_flag(parts.stop, e_stop_flags.disable, toggled)
 end }
 
 ---@param event EventData.on_gui_value_changed
@@ -817,23 +817,45 @@ local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
     local parts = player_gui.parts --[[@as StationParts]]
 
-    local bufferless = not event.element.toggled
-    local caption = cwi({ bufferless and "sspp-gui.bufferless" or "sspp-gui.buffered" })
+    local toggled = event.element.toggled
+    local total_rows = get_total_rows(player_gui.elements)
 
-    local provide_toggle = player_gui.elements.provide_bufferless_toggle
-    local request_toggle = player_gui.elements.request_bufferless_toggle
-    if provide_toggle then
-        provide_toggle.toggled = bufferless
-        provide_toggle.caption = caption
-        provide_toggle.tooltip = { bufferless and "sspp-gui.provide-bufferless-tooltip" or "sspp-gui.provide-buffered-tooltip" }
-    end
-    if request_toggle then
-        request_toggle.toggled = bufferless
-        request_toggle.caption = caption
-        request_toggle.tooltip = { bufferless and "sspp-gui.request-bufferless-tooltip" or "sspp-gui.request-buffered-tooltip" }
+    if toggled and total_rows > 1 then
+        event.element.toggled = false
+        game.get_player(event.player_index).play_sound({ path = "utility/cannot_build" })
+        return
     end
 
-    write_stop_flag(parts.stop, e_stop_flags.bufferless, bufferless)
+    event.element.tooltip = { toggled and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
+    write_stop_flag(parts.stop, e_stop_flags.bufferless, toggled)
+
+    if total_rows > 0 then
+        local provide_table, request_table = player_gui.elements.provide_table, player_gui.elements.request_table
+        if provide_table then set_buffer_settings_enabled(provide_table, not toggled) end
+        if request_table then set_buffer_settings_enabled(request_table, not toggled) end
+
+        if not toggled then
+            local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+            if station then
+                local provide_deliveries = station.provide_deliveries
+                if provide_deliveries then
+                    for item_key, hauler_ids in pairs(provide_deliveries) do
+                        for _, hauler_id in pairs(hauler_ids) do
+                            local to_provide = storage.haulers[hauler_id].to_provide --[[@as HaulerToStation]]
+                            if to_provide.buffer then
+                                local network = storage.networks[station.network]
+                                to_provide.buffer = nil
+                                list_remove_value_or_destroy(network.buffer_haulers, item_key, hauler_id)
+                                list_append_or_create(network.provide_haulers, item_key, hauler_id)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        gui.update_station_after_change(event.player_index)
+    end
 end }
 
 ---@param event EventData.on_gui_click
@@ -885,9 +907,7 @@ local function add_gui_complete(player, parts)
     local has_custom_name = read_stop_flag(parts.stop, e_stop_flags.custom_name)
     local limit = parts.stop.trains_limit
     local is_bufferless = read_stop_flag(parts.stop, e_stop_flags.bufferless)
-    local bufferless_caption = cwi({ is_bufferless and "sspp-gui.bufferless" or "sspp-gui.buffered" })
-    local provide_bufferless_tooltip = { is_bufferless and "sspp-gui.provide-bufferless-tooltip" or "sspp-gui.provide-buffered-tooltip" }
-    local request_bufferless_tooltip = { is_bufferless and "sspp-gui.request-bufferless-tooltip" or "sspp-gui.request-buffered-tooltip" }
+    local bufferless_tooltip = { is_bufferless and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
     local no_provide = not parts.provide_io and {}
     local no_request = not parts.request_io and {}
     return flib_gui.add(player.gui.screen, {
@@ -929,8 +949,6 @@ local function add_gui_complete(player, parts)
                                         { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_add_provide_item },
                                         { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_add_provide_fluid },
                                     } },
-                                    { type = "empty-widget", style = "flib_vertical_pusher" },
-                                    { type = "button", name = "provide_bufferless_toggle", style = "train_schedule_add_station_button", caption = bufferless_caption, tooltip = provide_bufferless_tooltip, toggled = is_bufferless, handler = handle_bufferless_toggled },
                                 } },
                             } },
                         },
@@ -952,8 +970,6 @@ local function add_gui_complete(player, parts)
                                         { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_request_item },
                                         { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_request_fluid },
                                     } },
-                                    { type = "empty-widget", style = "flib_vertical_pusher" },
-                                    { type = "button", name = "request_bufferless_toggle", style = "train_schedule_add_station_button", caption = bufferless_caption, tooltip = request_bufferless_tooltip, toggled = is_bufferless, handler = handle_bufferless_toggled },
                                 } },
                             } },
                         },
@@ -966,8 +982,7 @@ local function add_gui_complete(player, parts)
                         { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.limit" }), tooltip = { "sspp-gui.station-limit-tooltip" } },
                         { type = "slider", style = "notched_slider", minimum_value = 1, maximum_value = 10, value = limit, handler = handle_limit_changed },
                         { type = "label", name = "limit_value", style = "sspp_station_limit_value", caption = tostring(limit) },
-                        no_provide or { type = "sprite-button", name = "grid_provide_toggle", style = "control_settings_section_button", sprite = "virtual-signal/up-arrow", tooltip = { "sspp-gui.grid-haulers-provide-tooltip" }, auto_toggle = true, toggled = true },
-                        no_request or { type = "sprite-button", name = "grid_request_toggle", style = "control_settings_section_button", sprite = "virtual-signal/down-arrow", tooltip = { "sspp-gui.grid-haulers-request-tooltip" }, auto_toggle = true, toggled = true },
+                        { type = "sprite-button", name = "bufferless_toggle", style = "control_settings_section_button", sprite = "sspp-bufferless-icon", tooltip = bufferless_tooltip, auto_toggle = true, toggled = is_bufferless, handler = handle_bufferless_toggled },
                     } },
                     { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", vertical_scroll_policy = "never", children = {
                         { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
@@ -1016,20 +1031,21 @@ function gui.station_open(player_id, entity)
     storage.player_guis[player_id] = { network = network_name, unit_number = unit_number, parts = parts, elements = elements }
 
     if parts then
+        local provide_table, request_table = elements.provide_table, elements.request_table
         local network_items = storage.networks[network_name].items
-        local provide_table = elements.provide_table
-        local request_table = elements.request_table
+        local buffered = not read_stop_flag(parts.stop, e_stop_flags.bufferless)
         if provide_table then
             for item_key, item in pairs(combinator_description_to_provide_items(parts.provide_io)) do
                 provide_init_row(network_items, provide_table, item_key, item)
             end
+            set_buffer_settings_enabled(provide_table, buffered)
         end
         if request_table then
             for item_key, item in pairs(combinator_description_to_request_items(parts.request_io)) do
                 request_init_row(network_items, request_table, item_key, item)
             end
+            set_buffer_settings_enabled(request_table, buffered)
         end
-        set_bufferless_toggles_visible(elements, get_total_rows(elements) <= 1)
     end
 
     player.opened = window

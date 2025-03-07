@@ -156,8 +156,8 @@ local migrations = {
     end,
     ["0.3.18"] = function()
         for _, network in pairs(storage.networks) do
-            if not network.bufferless_haulers then
-                network.bufferless_haulers = {}
+            if not network.buffer_haulers then
+                network.buffer_haulers = {}
             end
         end
     end,

@@ -4,6 +4,7 @@
 
 function main.reboot()
     for _, network in pairs(storage.networks) do
+        network.buffer_haulers = {}
         network.provide_haulers = {}
         network.request_haulers = {}
         network.fuel_haulers = {}

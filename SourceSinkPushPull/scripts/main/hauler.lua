@@ -17,8 +17,8 @@ function main.hauler_disabled_or_destroyed(hauler_id, hauler)
             station.provide_minimum_active_count = nil
             station.hauler = nil
         end
-        if read_stop_flag(station.stop, e_stop_flags.bufferless) and hauler.to_provide.phase ~= "DONE" then
-            list_remove_value_or_destroy(network.bufferless_haulers, item_key, hauler_id)
+        if hauler.to_provide.buffer then
+            list_remove_value_or_destroy(network.buffer_haulers, item_key, hauler_id)
         else
             list_remove_value_or_destroy(network.provide_haulers, item_key, hauler_id)
         end
@@ -226,7 +226,7 @@ end
 ---@param hauler Hauler
 function main.hauler_done_at_provide_station(hauler)
     local station = storage.stations[hauler.to_provide.station]
-    hauler.to_provide.phase = read_stop_flag(station.stop, e_stop_flags.bufferless) and "PENDING" or "DONE"
+    hauler.to_provide.phase = "DONE"
     clear_arithmetic_control_behavior(station.provide_io)
     clear_hidden_comb_control_behaviors(station.provide_hidden_combs)
     set_hauler_status(hauler, { "sspp-alert.waiting-for-request" }, hauler.status_item, hauler.status_stop)

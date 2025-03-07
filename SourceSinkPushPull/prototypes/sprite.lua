@@ -4,6 +4,11 @@
 
 data:extend({
     {
+        type = "sprite", name = "sspp-bufferless-icon",
+        filename = "__SourceSinkPushPull__/graphics/gui/sspp-bufferless-icon.png",
+        size = 32, scale = 0.5, flags = { "gui-icon" },
+    },
+    {
         type = "sprite", name = "sspp-bypass-icon",
         filename = "__SourceSinkPushPull__/graphics/gui/sspp-bypass-icon.png",
         size = 32, scale = 0.5, flags = { "gui-icon" },
