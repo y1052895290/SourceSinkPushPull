@@ -606,11 +606,8 @@ function gui.network_poll_finished(player_gui)
                 if request_enabled and hauler.to_request and hauler.to_request.item == haulers_item_key then
                     state_icon = "[img=virtual-signal/down-arrow]"
                 end
-                if liquidate_enabled then
-                    local item_key = hauler.to_depot or hauler.at_depot
-                    if item_key and item_key ~= "" then
-                        state_icon = "[img=virtual-signal/signal-skull]"
-                    end
+                if liquidate_enabled and (hauler.to_depot or hauler.at_depot) == haulers_item_key then
+                    state_icon = "[img=virtual-signal/signal-skull]"
                 end
                 if state_icon then
                     new_length = new_length + 1
