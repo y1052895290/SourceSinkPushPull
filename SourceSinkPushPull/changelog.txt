@@ -1,4 +1,16 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.18
+Date: 2025-03-08
+  Features:
+    - Support for bufferless stations. Not just requesters, but providers too!
+    - Bufferless stations require no storage at the station.
+    - The toggle button is in the top-right, next to the train limit.
+  Changes:
+    - GUI table headers no longer scroll with the table, ensuring they are always visible.
+    - Station prioritisation based on remaining capacity is now more sensible when mixing different train limits.
+  Bugfixes:
+    - Fixed liquidate trains not being filtered by item in the network minimap grid.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.17
 Date: 2025-03-02
   Features:
