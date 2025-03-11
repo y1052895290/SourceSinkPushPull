@@ -163,7 +163,7 @@ local function tick_poll()
     local enabled = not read_stop_flag(station.stop, e_stop_flags.disable)
     local buffered = not read_stop_flag(station.stop, e_stop_flags.bufferless)
 
-    -- handle the active hauler finishing being loaded or unloaded
+    -- handle checking and updating the active hauler if we have one
 
     local hauler_buffer_item_key, hauler_provide_item_key, hauler_request_item_key ---@type ItemKey?, ItemKey?, ItemKey?
 
@@ -171,7 +171,11 @@ local function tick_poll()
     if hauler_id then
         local hauler = storage.haulers[hauler_id]
         if hauler.to_provide then
-            if hauler.to_provide.phase == "DONE" then
+            if check_if_hauler_loaded_wrong_cargo(hauler, hauler.to_provide) then
+                set_hauler_status(hauler, { "sspp-alert.loaded-wrong-cargo" })
+                send_alert_for_train(hauler.train, hauler.status)
+                hauler.train.manual_mode = true
+            elseif hauler.to_provide.phase == "DONE" then
                 if hauler.to_provide.buffer then
                     hauler_buffer_item_key = hauler.to_provide.item
                 else
@@ -180,7 +184,11 @@ local function tick_poll()
                 end
             end
         else
-            if hauler.to_request.phase == "DONE" then
+            if check_if_hauler_loaded_wrong_cargo(hauler, hauler.to_request) then
+                set_hauler_status(hauler, { "sspp-alert.loaded-wrong-cargo" })
+                send_alert_for_train(hauler.train, hauler.status)
+                hauler.train.manual_mode = true
+            elseif hauler.to_request.phase == "DONE" then
                 hauler_request_item_key = hauler.to_request.item
                 list_append_or_create(network.request_done_tickets, hauler_request_item_key, station_id)
             end

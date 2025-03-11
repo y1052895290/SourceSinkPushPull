@@ -558,6 +558,23 @@ function check_if_hauler_needs_fuel(hauler, class)
     return false
 end
 
+---@param hauler Hauler
+---@param hauler_to_station HaulerToStation
+---@return boolean
+function check_if_hauler_loaded_wrong_cargo(hauler, hauler_to_station)
+    local train = hauler.train
+
+    for _, item in pairs(train.get_contents()) do
+        if item.name .. ":" .. (item.quality or "normal") ~= hauler_to_station.item then return true end
+    end
+
+    for fluid, _ in pairs(train.get_fluid_contents()) do
+        if fluid ~= hauler_to_station.item then return true end
+    end
+
+    return false
+end
+
 --------------------------------------------------------------------------------
 
 ---@param entity LuaEntity
