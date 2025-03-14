@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.19
+Date: 2025-03-15
+  Features:
+    - Added a mod setting for the default train limit (only affects newly created stops).
+    - Trains will now alert and lock if they detect that have been loaded with the wrong item or fluid.
+  Bugfixes:
+    - Fixed new train stops sometimes copying their train limit from another stop.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.18
 Date: 2025-03-08
   Features:
