@@ -231,5 +231,6 @@ function populate_mod_settings()
         [e_train_colors.request] = get_rgb_setting("sspp-request-color"),
         [e_train_colors.liquidate] = get_rgb_setting("sspp-liquidate-color"),
     }
+    mod_settings.default_train_limit = settings.global["sspp-default-train-limit"].value --[[@as integer]]
     mod_settings.stations_per_tick = settings.global["sspp-stations-per-tick"].value --[[@as integer]]
 end

@@ -52,8 +52,18 @@ data:extend({
     ---@type data.ModIntSettingPrototype
     {
         type = "int-setting",
+        name = "sspp-default-train-limit",
+        order = "da",
+        setting_type = "runtime-global",
+        default_value = 10,
+        minimum_value = 1,
+        maximum_value = 10,
+    },
+    ---@type data.ModIntSettingPrototype
+    {
+        type = "int-setting",
         name = "sspp-stations-per-tick",
-        order = "ca",
+        order = "da",
         setting_type = "runtime-global",
         default_value = 2,
         minimum_value = 1,
