@@ -219,6 +219,8 @@ local function tick_poll()
 
     -- create tickets for any new deliveries that we could accommodate
 
+    local network_classes = network.classes
+
     if provide_items then
         ---@cast provide_counts {[ItemKey]: integer}
         ---@cast provide_modes {[ItemKey]: ItemMode}
@@ -245,7 +247,7 @@ local function tick_poll()
                     hauler_buffer_item_key = nil
                 end
 
-                if enabled and mode > 0 and mode < 7 then
+                if enabled and mode > 0 and mode < 7 and network_classes[network_item.class] then
                     if buffered then
                         local deliveries = len_or_zero(station.provide_deliveries[item_key])
                         local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
@@ -292,7 +294,7 @@ local function tick_poll()
                     hauler_request_item_key = nil
                 end
 
-                if enabled and mode > 0 and mode < 7 then
+                if enabled and mode > 0 and mode < 7 and network_classes[network_item.class] then
                     if buffered then
                         local deliveries = len_or_zero(station.request_deliveries[item_key])
                         local want_deliveries = math.floor(count / network_item.delivery_size) - deliveries
