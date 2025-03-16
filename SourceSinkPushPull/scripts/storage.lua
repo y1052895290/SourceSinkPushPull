@@ -42,6 +42,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@class (exact) SourceSinkPushPull.ModSettings
 ---@field public auto_paint_trains boolean?
 ---@field public train_colors {[TrainColor]: Color}?
+---@field public default_train_limit integer?
 ---@field public stations_per_tick integer?
 
 --------------------------------------------------------------------------------
