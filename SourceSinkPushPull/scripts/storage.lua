@@ -18,6 +18,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@alias StationId uint
 ---@alias HaulerId uint
 ---@alias PlayerId uint
+---@alias JobIndex integer
 ---@alias TickState "INITIAL"|"POLL"|"REQUEST_DONE"|"LIQUIDATE"|"PROVIDE_DONE"|"DISPATCH"|"BUFFER"
 ---@alias HaulerPhase "TRAVEL"|"TRANSFER"|"DONE"
 ---@alias PlayerGui PlayerNetworkGui|PlayerStationGui|PlayerHaulerGui
@@ -51,6 +52,8 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public surface LuaSurface
 ---@field public classes {[ClassName]: Class}
 ---@field public items {[ItemKey]: NetworkItem}
+---@field public job_index_counter JobIndex
+---@field public jobs {[JobIndex]: Job}
 ---@field public buffer_haulers {[ItemKey]: HaulerId[]}
 ---@field public provide_haulers {[ItemKey]: HaulerId[]}
 ---@field public request_haulers {[ItemKey]: HaulerId[]}
@@ -78,6 +81,19 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public class ClassName
 ---@field public delivery_size integer
 ---@field public delivery_time number
+
+---@class (exact) Job
+---@field public hauler HaulerId
+---@field public tick MapTick
+---@field public item ItemKey?
+---@field public provide_station StationId?
+---@field public target_count integer?
+---@field public provide_arrive_tick MapTick?
+---@field public provide_done_tick MapTick?
+---@field public request_station StationId?
+---@field public real_count integer?
+---@field public request_arrive_tick MapTick?
+---@field public request_done_tick MapTick?
 
 --------------------------------------------------------------------------------
 
@@ -124,6 +140,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public to_fuel HaulerPhase?
 ---@field public to_depot (""|ItemKey)?
 ---@field public at_depot (""|ItemKey)?
+---@field public job JobIndex?
 ---@field public status LocalisedString
 ---@field public status_item ItemKey?
 ---@field public status_stop LuaEntity?
@@ -146,6 +163,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@class (exact) PlayerNetworkGui
 ---@field public network NetworkName
 ---@field public elements {[string]: LuaGuiElement}
+---@field public history_indices JobIndex[]
 ---@field public haulers_class ClassName?
 ---@field public haulers_item ItemKey?
 ---@field public stations_item ItemKey?
@@ -197,6 +215,8 @@ function init_network(surface)
         surface = surface,
         classes = {},
         items = {},
+        job_index_counter = 0,
+        jobs = {},
         buffer_haulers = {},
         provide_haulers = {},
         request_haulers = {},

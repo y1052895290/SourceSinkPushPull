@@ -24,6 +24,12 @@ function gui.hauler_status_changed(player_gui)
     elements.stop_button.enabled = hauler.status_stop ~= nil
 end
 
+---@param player_gui PlayerHaulerGui
+function gui.hauler_manual_mode_changed(player_gui)
+    player_gui.elements.class_textbox.enabled = player_gui.train.manual_mode
+    player_gui.elements.class_auto_assign_button.enabled = player_gui.train.manual_mode
+end
+
 --------------------------------------------------------------------------------
 
 ---@param event EventData.on_gui_click
@@ -183,7 +189,7 @@ function gui.hauler_opened(player_id, train)
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", name = "status_label", style = "label" },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal", enabled = false },
+                { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal" },
                 { type = "sprite-button", name = "stop_button", style = "sspp_compact_slot_button", sprite = "item/sspp-stop", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = handle_view_on_map },
             } },
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
@@ -194,6 +200,7 @@ function gui.hauler_opened(player_id, train)
             } },
         } },
     })
+    elements.item_button.locked = true -- https://forums.factorio.com/viewtopic.php?t=127562
 
     local resolution, scale = player.display_resolution, player.display_scale
     window.location = { x = resolution.width - (244 + 12) * scale, y = resolution.height - (108 + 12) * scale }

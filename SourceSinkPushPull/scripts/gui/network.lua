@@ -1,6 +1,7 @@
 -- SSPP by jagoly
 
 local flib_gui = require("__flib__.gui")
+local flib_format = require("__flib__.format")
 local events = defines.events
 local cwi = gui.caption_with_info
 
@@ -459,6 +460,124 @@ end }
 local handle_open_station = { [events.on_gui_click] = function(event)
     game.get_player(event.player_index).opened = event.element.parent.entity
 end }
+
+--------------------------------------------------------------------------------
+
+---@param action_lines flib.GuiElemDef[]
+---@param caption LocalisedString
+local function append_action_line(action_lines, caption)
+    action_lines[#action_lines+1] = { type = "label", style = "sspp_history_action_label", caption = caption }
+end
+
+---@param duration_lines flib.GuiElemDef[]
+---@param first_tick MapTick
+---@param last_tick_or_in_progress MapTick|boolean
+local function append_duration_line(duration_lines, first_tick, last_tick_or_in_progress)
+    local caption ---@type LocalisedString
+    if last_tick_or_in_progress == true then
+        caption = "(active)"
+    elseif last_tick_or_in_progress == false then
+        caption = "(aborted)"
+    else
+        caption = string.format("%.1f seconds", (last_tick_or_in_progress - first_tick) / 60.0)
+    end
+    duration_lines[#duration_lines+1] = { type = "label", style = "label", caption = caption }
+end
+
+---@param history_table LuaGuiElement
+---@param row_index integer
+---@param job_index JobIndex
+---@param job Job
+local function insert_history_row(history_table, row_index, job_index, job)
+    local action_lines = {} ---@type flib.GuiElemDef[]
+    local duration_lines = {} ---@type flib.GuiElemDef[]
+    local summary_lines = {} ---@type flib.GuiElemDef[]
+
+    local hauler = storage.haulers[job.hauler]
+    local in_progress = hauler ~= nil and hauler.job == job_index
+
+    summary_lines[#summary_lines+1] = { type = "label", style = "label", caption = string.format("Started at %s", flib_format.time(job.tick, true)) }
+
+    if job.provide_station then
+        local station = storage.stations[job.provide_station]
+        append_action_line(action_lines, string.format("Travel to [color=green]pick up[/color] at %s", station and station.stop.backer_name or "[color=blue]destroyed station[/color]"))
+        append_duration_line(duration_lines, job.tick, job.provide_arrive_tick or in_progress)
+        if job.target_count then
+            append_action_line(action_lines, string.format("Transfer [font=default-bold]%d[/font] cargo to train", job.target_count))
+            append_duration_line(duration_lines, job.provide_arrive_tick, job.provide_done_tick or in_progress)
+        end
+    end
+    if job.request_station then
+        local station = storage.stations[job.request_station]
+        append_action_line(action_lines, string.format("Travel to [color=red]drop off[/color] at %s", station and station.stop.backer_name or "[color=blue]destroyed station[/color]"))
+        append_duration_line(duration_lines, job.provide_done_tick or job.tick, job.request_arrive_tick or in_progress)
+        if job.real_count then
+            append_action_line(action_lines, string.format("Transfer [font=default-bold]%d[/font] cargo to station", job.real_count))
+            append_duration_line(duration_lines, job.request_arrive_tick, job.request_done_tick or in_progress)
+            if job.request_done_tick then
+                summary_lines[#summary_lines+1] = { type = "label", style = "label", caption = string.format("Finished at %s", flib_format.time(job.request_done_tick, true)) }
+                summary_lines[#summary_lines+1] = { type = "label", style = "label", caption = string.format("Total duration was %d seconds", math.ceil((job.request_done_tick - job.tick) / 60.0)) }
+            end
+        end
+    end
+
+    local name, quality = split_item_key(job.item)
+    local signal = { name = name, quality = quality, type = quality and "item" or "fluid" }
+
+    local elements, _ = flib_gui.add(history_table, {
+        { type = "flow", index = row_index * 4 - 3, style = "vertical_flow", direction = "vertical", children = {
+            { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "item/locomotive", handler = handle_open_hauler },
+            { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal", signal = signal },
+        } },
+        { type = "flow", index = row_index * 4 - 2, style = "sspp_history_cell_flow", direction = "vertical", children = action_lines },
+        { type = "flow", index = row_index * 4 - 1, style = "sspp_history_cell_flow", direction = "vertical", children = duration_lines },
+        { type = "flow", index = row_index * 4 - 0, style = "sspp_history_cell_flow", direction = "vertical", children = summary_lines },
+    })
+    elements.item_button.locked = true -- https://forums.factorio.com/viewtopic.php?t=127562
+end
+
+--------------------------------------------------------------------------------
+
+---@param player_gui PlayerNetworkGui
+function gui.network_job_created(player_gui, job_index)
+    insert_history_row(player_gui.elements.history_table, 1, job_index, storage.networks[player_gui.network].jobs[job_index])
+    table.insert(player_gui.history_indices, 1, job_index)
+end
+
+---@param player_gui PlayerNetworkGui
+function gui.network_job_removed(player_gui, job_index)
+    local history_indices = player_gui.history_indices
+    for row_index = 1, #history_indices do
+        if history_indices[row_index] == job_index then
+            local table_children = player_gui.elements.history_table.children
+            table_children[row_index * 4 - 0].destroy()
+            table_children[row_index * 4 - 1].destroy()
+            table_children[row_index * 4 - 2].destroy()
+            table_children[row_index * 4 - 3].destroy()
+            table.remove(history_indices, row_index)
+            return
+        end
+    end
+    error("job missing from table")
+end
+
+---@param player_gui PlayerNetworkGui
+function gui.network_job_updated(player_gui, job_index)
+    local history_indices = player_gui.history_indices
+    for row_index = 1, #history_indices do
+        if history_indices[row_index] == job_index then
+            local history_table = player_gui.elements.history_table
+            local history_children = history_table.children
+            history_children[row_index * 4 - 0].destroy()
+            history_children[row_index * 4 - 1].destroy()
+            history_children[row_index * 4 - 2].destroy()
+            history_children[row_index * 4 - 3].destroy()
+            insert_history_row(history_table, row_index, job_index, storage.networks[player_gui.network].jobs[job_index])
+            return
+        end
+    end
+    error("job missing from table")
+end
 
 --------------------------------------------------------------------------------
 
@@ -923,6 +1042,21 @@ function gui.network_open(player_id, network_name, tab_index)
                                 } },
                             } },
                         },
+                        ---@diagnostic disable-next-line: missing-fields
+                        {
+                            tab = { type = "tab", style = "tab", caption = { "sspp-gui.history" } },
+                            content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
+                                { type = "table", style = "sspp_network_history_header", column_count = 4, children = {
+                                    { type = "empty-widget" },
+                                    { type = "label", style = "bold_label", caption = { "sspp-gui.action" } },
+                                    { type = "label", style = "bold_label", caption = { "sspp-gui.duration" } },
+                                    { type = "label", style = "bold_label", caption = { "sspp-gui.summary" } },
+                                } },
+                                { type = "scroll-pane", style = "sspp_network_scroll_pane", direction = "vertical", children = {
+                                    { type = "table", name = "history_table", style = "sspp_network_history_table", column_count = 4 },
+                                } },
+                            } },
+                        },
                     } },
                 } },
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
@@ -947,7 +1081,8 @@ function gui.network_open(player_id, network_name, tab_index)
     elements.tabbed_pane.selected_tab_index = tab_index
     window.force_auto_center()
 
-    local player_gui = { network = network_name, elements = elements }
+    local history_indices = {} ---@type JobIndex[]
+    local player_gui = { network = network_name, elements = elements, history_indices = history_indices }
     storage.player_guis[player_id] = player_gui
 
     local class_table = elements.class_table
@@ -955,6 +1090,12 @@ function gui.network_open(player_id, network_name, tab_index)
 
     local item_table = elements.item_table
     for item_key, item in pairs(network.items) do item_init_row(item_table, item_key, item) end
+
+    local history_table = elements.history_table
+    for job_index, job in pairs(network.jobs) do
+        insert_history_row(history_table, 1, job_index, job)
+        table.insert(history_indices, 1, job_index)
+    end
 
     player.opened = window
 end

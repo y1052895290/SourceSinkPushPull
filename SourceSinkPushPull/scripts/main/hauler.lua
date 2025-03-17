@@ -76,6 +76,13 @@ function main.hauler_set_to_manual(hauler)
     hauler.to_depot = nil
     hauler.at_depot = nil
 
+    local job_index = hauler.job
+    if job_index then
+        -- TODO: could actually set an "abort time" value
+        hauler.job = nil
+        gui.on_job_updated(hauler.network, job_index)
+    end
+
     hauler.train.schedule = nil
 end
 
@@ -149,9 +156,16 @@ function main.hauler_arrived_at_provide_station(hauler)
         return
     end
 
+    local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
     local item_key = hauler.to_provide.item
-    local network_item = storage.networks[hauler.network].items[item_key]
+    local network = storage.networks[network_name]
+    local job = network.jobs[job_index]
+    local network_item = network.items[item_key]
     local name, quality = network_item.name, network_item.quality
+
+    job.target_count = network_item.delivery_size
+    job.provide_arrive_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
 
     local provide_item = station.provide_items[item_key]
     local constant = compute_load_target(network_item, provide_item)
@@ -195,9 +209,16 @@ function main.hauler_arrived_at_request_station(hauler)
         return
     end
 
+    local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
     local item_key = hauler.to_request.item
-    local network_item = storage.networks[hauler.network].items[item_key]
+    local network = storage.networks[network_name]
+    local job = network.jobs[job_index]
+    local network_item = network.items[item_key]
     local name, quality = network_item.name, network_item.quality
+
+    job.real_count = get_train_item_count(train, name, quality)
+    job.request_arrive_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
 
     local signal, wait_conditions ---@type SignalID, WaitCondition[]
     if quality then
@@ -225,20 +246,33 @@ end
 
 ---@param hauler Hauler
 function main.hauler_done_at_provide_station(hauler)
+    local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
     local station = storage.stations[hauler.to_provide.station]
-    hauler.to_provide.phase = "DONE"
+
+    storage.networks[network_name].jobs[job_index].provide_done_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
+
     clear_arithmetic_control_behavior(station.provide_io)
     clear_hidden_comb_control_behaviors(station.provide_hidden_combs)
+
+    hauler.to_provide.phase = "DONE"
     set_hauler_status(hauler, { "sspp-alert.waiting-for-request" }, hauler.status_item, hauler.status_stop)
     hauler.train.schedule = { current = 1, records = { { rail = station.stop.connected_rail } } }
 end
 
 ---@param hauler Hauler
 function main.hauler_done_at_request_station(hauler)
+    local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
     local station = storage.stations[hauler.to_request.station]
-    hauler.to_request.phase = "DONE"
+
+    storage.networks[network_name].jobs[job_index].request_done_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
+
     clear_arithmetic_control_behavior(station.request_io)
     clear_hidden_comb_control_behaviors(station.request_hidden_combs)
+
+    hauler.to_request.phase = "DONE"
+    -- no special status needed, won't be in this state for long
     hauler.train.schedule = { current = 1, records = { { rail = station.stop.connected_rail } } }
 end
 

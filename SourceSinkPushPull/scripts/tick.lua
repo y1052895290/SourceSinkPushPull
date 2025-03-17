@@ -478,8 +478,7 @@ end
 ---@param item_key ItemKey
 ---@return ItemMode, number
 local function get_done_mode_and_score(station, item_key)
-    local stop = station.stop
-    local limit = stop.trains_limit
+    local limit = station.stop.trains_limit
     local score = 1.0 - (limit - station.total_deliveries) / limit -- fullness
     return 1, score -- mode is not relevant here
 end
@@ -546,6 +545,7 @@ local function tick_request_done()
     list_remove_value_or_destroy(network.request_haulers, item_key, hauler_id)
     list_remove_value_or_destroy(request_station.request_deliveries, item_key, hauler_id)
     hauler.to_request = nil
+    hauler.job = nil
     request_station.request_minimum_active_count = nil
     request_station.hauler = nil
     request_station.total_deliveries = request_station.total_deliveries - 1
@@ -643,6 +643,8 @@ local function tick_liquidate()
     set_hauler_color(hauler, e_train_colors.request)
     send_hauler_to_station(hauler, request_station.stop)
 
+    assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, request_station = request_station_id })
+
     return false
 end
 
@@ -703,6 +705,10 @@ local function tick_provide_done()
     set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
     set_hauler_color(hauler, e_train_colors.request)
     send_hauler_to_station(hauler, request_station.stop)
+
+    local job_index = hauler.job --[[@as JobIndex]]
+    network.jobs[job_index].request_station = request_station_id
+    gui.on_job_updated(network_name, job_index)
 
     return false
 end
@@ -789,6 +795,8 @@ local function tick_dispatch()
     set_hauler_color(hauler, e_train_colors.provide)
     send_hauler_to_station(hauler, provide_station.stop)
 
+    assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, provide_station = provide_station_id })
+
     return false
 end
 
@@ -836,6 +844,8 @@ local function tick_buffer()
     set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
     set_hauler_color(hauler, e_train_colors.provide)
     send_hauler_to_station(hauler, provide_station.stop)
+
+    assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, provide_station = provide_station_id })
 
     return false
 end

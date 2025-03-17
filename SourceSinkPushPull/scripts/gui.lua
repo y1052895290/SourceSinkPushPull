@@ -170,13 +170,48 @@ function gui.on_poll_finished()
     end
 end
 
+---@param network_name NetworkName
+---@param job_index JobIndex
+function gui.on_job_created(network_name, job_index)
+    for _, player_gui in pairs(storage.player_guis) do
+        if not (player_gui.unit_number or player_gui.train_id) then
+            if player_gui.network == network_name then
+                gui.network_job_created(player_gui --[[@as PlayerNetworkGui]], job_index)
+            end
+        end
+    end
+end
+
+---@param network_name NetworkName
+---@param job_index JobIndex
+function gui.on_job_removed(network_name, job_index)
+    for _, player_gui in pairs(storage.player_guis) do
+        if not (player_gui.unit_number or player_gui.train_id) then
+            if player_gui.network == network_name then
+                gui.network_job_removed(player_gui --[[@as PlayerNetworkGui]], job_index)
+            end
+        end
+    end
+end
+
+---@param network_name NetworkName
+---@param job_index JobIndex
+function gui.on_job_updated(network_name, job_index)
+    for _, player_gui in pairs(storage.player_guis) do
+        if not (player_gui.unit_number or player_gui.train_id) then
+            if player_gui.network == network_name then
+                gui.network_job_updated(player_gui --[[@as PlayerNetworkGui]], job_index)
+            end
+        end
+    end
+end
+
 ---@param hauler_id HaulerId
 function gui.on_manual_mode_changed(hauler_id)
     for _, player_gui in pairs(storage.player_guis) do
         if player_gui.train_id then
             if player_gui.train_id == hauler_id then
-                player_gui.elements.class_textbox.enabled = player_gui.train.manual_mode
-                player_gui.elements.class_auto_assign_button.enabled = player_gui.train.manual_mode
+                gui.hauler_manual_mode_changed(player_gui --[[@as PlayerHaulerGui]])
             end
         end
     end

@@ -575,6 +575,32 @@ function check_if_hauler_loaded_wrong_cargo(hauler, hauler_to_station)
     return false
 end
 
+---@param network Network
+---@param hauler Hauler
+---@param job Job
+function assign_new_job(network, hauler, job)
+    local network_jobs = network.jobs
+    local current_tick = job.tick
+
+    for old_job_index, old_job in pairs(network_jobs) do
+        -- TODO: increase this and make it configurable, it is just low for testing
+        if current_tick - old_job.tick < 36000 then break end -- 10 minutes
+        local old_hauler = storage.haulers[old_job.hauler]
+        if old_job_index ~= (old_hauler and old_hauler.job) then
+            network_jobs[old_job_index] = nil
+        end
+    end
+
+    local job_index = network.job_index_counter + 1
+
+    network.job_index_counter = job_index
+    hauler.job = job_index
+
+    network_jobs[job_index] = job
+
+    gui.on_job_created(network.surface.name, job_index)
+end
+
 --------------------------------------------------------------------------------
 
 ---@param entity LuaEntity

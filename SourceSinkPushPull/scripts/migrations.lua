@@ -161,6 +161,62 @@ local migrations = {
             end
         end
     end,
+    ["0.3.21"] = function()
+        for _, network in pairs(storage.networks) do
+            if not network.job_index_counter then
+                network.job_index_counter = 0
+                network.jobs = {}
+                for item_key, hauler_ids in pairs(network.buffer_haulers) do
+                    for _, hauler_id in pairs(hauler_ids) do
+                        local hauler = storage.haulers[hauler_id]
+                        if hauler.train.valid then
+                            assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, provide_station = hauler.to_provide.station })
+                            local job = network.jobs[network.job_index_counter]
+                            if hauler.to_provide.phase ~= "TRAVEL" then
+                                job.target_count = network.items[item_key].delivery_size
+                                job.provide_arrive_tick = game.tick
+                                if hauler.to_provide.phase == "DONE" then
+                                    job.provide_done_tick = game.tick
+                                end
+                            end
+                        end
+                    end
+                end
+                for item_key, hauler_ids in pairs(network.provide_haulers) do
+                    for _, hauler_id in pairs(hauler_ids) do
+                        local hauler = storage.haulers[hauler_id]
+                        if hauler.train.valid then
+                            assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, provide_station = hauler.to_provide.station })
+                            local job = network.jobs[network.job_index_counter]
+                            if hauler.to_provide.phase ~= "TRAVEL" then
+                                job.target_count = network.items[item_key].delivery_size
+                                job.provide_arrive_tick = game.tick
+                                if hauler.to_provide.phase == "DONE" then
+                                    job.provide_done_tick = game.tick
+                                end
+                            end
+                        end
+                    end
+                end
+                for item_key, hauler_ids in pairs(network.request_haulers) do
+                    for _, hauler_id in pairs(hauler_ids) do
+                        local hauler = storage.haulers[hauler_id]
+                        if hauler.train.valid then
+                            assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, request_station = hauler.to_request.station })
+                            local job = network.jobs[network.job_index_counter]
+                            if hauler.to_request.phase ~= "TRAVEL" then
+                                job.real_count = get_train_item_count(hauler.train, network.items[item_key].name, network.items[item_key].quality)
+                                job.request_arrive_tick = game.tick
+                                if hauler.to_request.phase == "DONE" then
+                                    job.request_done_tick = game.tick
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 }
 
 --------------------------------------------------------------------------------
@@ -173,6 +229,9 @@ function on_config_changed(data)
     for _, network in pairs(storage.networks) do
         for item_key, _ in pairs(network.items) do
             if is_item_key_invalid(item_key) then network.items[item_key] = nil end
+        end
+        for job_index, job in pairs(network.jobs) do
+            if job.item and is_item_key_invalid(job.item) then network.jobs[job_index] = nil end
         end
     end
 

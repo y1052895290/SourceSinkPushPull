@@ -122,6 +122,31 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
     odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
 }
 
+styles.sspp_network_history_header = { ---@type data.TableStyleSpecification
+    type = "table_style",
+    parent = "table",
+    left_padding = 12,
+    right_padding = 12,
+    cell_padding = 4,
+    column_widths = {
+        { column = 1, width = 32 + 4 + 20 },
+        { column = 2, width = 274 },
+        { column = 3, width = 120 },
+        { column = 4, width = 274 },
+    },
+    horizontal_spacing = 0,
+    vertical_spacing = 0,
+}
+
+styles.sspp_network_history_table = { ---@type data.TableStyleSpecification
+    type = "table_style",
+    parent = "sspp_network_history_header",
+    width = 764,
+    left_padding = 4,
+    right_padding = 4,
+    odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
+}
+
 styles.sspp_station_item_header = { ---@type data.TableStyleSpecification
     type = "table_style",
     parent = "table",
@@ -212,6 +237,19 @@ styles.sspp_compact_warning_image = { ---@type data.ImageStyleSpecification
     top_margin = 2,
     bottom_margin = 2,
     stretch_image_to_widget_size = true,
+}
+
+styles.sspp_history_cell_flow = { ---@type data.VerticalFlowStyleSpecification
+    type = "vertical_flow_style",
+    parent = "vertical_flow",
+    height = 20 * 4 + 4 * 3,
+    vertical_align = "center",
+}
+
+styles.sspp_history_action_label = { ---@type data.LabelStyleSpecification
+    type = "label_style",
+    parent = "label",
+    maximal_width = 274 - 8,
 }
 
 styles.sspp_station_cell_flow = { ---@type data.VerticalFlowStyleSpecification
