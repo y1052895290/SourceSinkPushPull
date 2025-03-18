@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.21
+Date: 2025-03-18
+  Bugfixes:
+    - Fixed crash trying to dispatch trains for items that are assigned to a class that does not exist yet.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.20
 Date: 2025-03-15
   Bugfixes:
