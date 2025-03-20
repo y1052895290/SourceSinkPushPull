@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.22
+Date: 2025-03-20
+  Bugfixes:
+    - Fixed crash trying to dispatch trains for classes/items that were removed from the network within the last few ticks.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.21
 Date: 2025-03-18
   Bugfixes:
