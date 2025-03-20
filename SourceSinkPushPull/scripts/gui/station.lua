@@ -398,8 +398,10 @@ end
 ---@param item_key ItemKey
 local function provide_remove_key(player_gui, item_key)
     local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
+    local network = storage.networks[player_gui.network]
 
     set_haulers_to_manual(station.provide_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
 end
 
 --------------------------------------------------------------------------------
@@ -513,8 +515,10 @@ end
 ---@param item_key ItemKey
 local function request_remove_key(player_gui, item_key)
     local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
+    local network = storage.networks[player_gui.network]
 
     set_haulers_to_manual(station.request_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
 end
 
 --------------------------------------------------------------------------------

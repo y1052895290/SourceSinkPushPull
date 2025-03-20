@@ -278,6 +278,26 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param player_gui PlayerNetworkGui
+---@param message LocalisedString
+---@param item_key ItemKey
+local function item_remove_key_inner(player_gui, message, item_key)
+    local network = storage.networks[player_gui.network]
+
+    set_haulers_to_manual(network.buffer_haulers[item_key], message, item_key)
+    set_haulers_to_manual(network.provide_haulers[item_key], message, item_key)
+    set_haulers_to_manual(network.request_haulers[item_key], message, item_key)
+    set_haulers_to_manual(network.to_depot_liquidate_haulers[item_key], message, item_key)
+    set_haulers_to_manual(network.at_depot_liquidate_haulers[item_key], message, item_key)
+
+    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
+
+    if player_gui.haulers_item == item_key then clear_grid_and_header(player_gui) end
+    if player_gui.stations_item == item_key then clear_grid_and_header(player_gui) end
+end
+
+--------------------------------------------------------------------------------
+
 ---@param class_table LuaGuiElement
 ---@param class_name ClassName
 ---@param class Class
@@ -337,6 +357,11 @@ end
 local function class_remove_key(player_gui, class_name)
     local network = storage.networks[player_gui.network]
 
+    for item_key, item in pairs(network.items) do
+        if item.class == class_name then
+            item_remove_key_inner(player_gui, { "sspp-alert.class-not-in-network" }, item_key)
+        end
+    end
     set_haulers_to_manual(network.fuel_haulers[class_name], { "sspp-alert.class-not-in-network" })
     set_haulers_to_manual(network.to_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
     set_haulers_to_manual(network.at_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
@@ -414,13 +439,7 @@ end
 ---@param player_gui PlayerNetworkGui
 ---@param item_key ItemKey
 local function item_remove_key(player_gui, item_key)
-    local network = storage.networks[player_gui.network]
-
-    set_haulers_to_manual(network.provide_haulers[item_key], { "sspp-alert.cargo-not-in-network" }, item_key)
-    set_haulers_to_manual(network.request_haulers[item_key], { "sspp-alert.cargo-not-in-network" }, item_key)
-
-    if item_key == player_gui.haulers_item then clear_grid_and_header(player_gui) end
-    if item_key == player_gui.stations_item then clear_grid_and_header(player_gui) end
+    item_remove_key_inner(player_gui, { "sspp-alert.cargo-not-in-network" }, item_key)
 end
 
 --------------------------------------------------------------------------------
