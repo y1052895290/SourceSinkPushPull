@@ -163,10 +163,11 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@class (exact) PlayerNetworkGui
 ---@field public network NetworkName
 ---@field public elements {[string]: LuaGuiElement}
----@field public history_indices JobIndex[]
+---@field public history_indices JobIndex[] -- TODO: might make more sense to just be a tag on the expand button
 ---@field public haulers_class ClassName?
 ---@field public haulers_item ItemKey?
 ---@field public stations_item ItemKey?
+---@field public expanded_job JobIndex?
 ---@field public popup_elements {[string]: LuaGuiElement}?
 
 ---@class (exact) PlayerStationGui

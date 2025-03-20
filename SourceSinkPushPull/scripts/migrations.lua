@@ -161,7 +161,7 @@ local migrations = {
             end
         end
     end,
-    ["0.3.22"] = function()
+    ["0.3.23"] = function()
         for _, network in pairs(storage.networks) do
             if not network.job_index_counter then
                 network.job_index_counter = 0

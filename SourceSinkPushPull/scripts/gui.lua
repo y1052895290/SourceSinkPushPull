@@ -136,7 +136,7 @@ end
 ---@return LuaGuiElement
 function gui.next_minimap(grid_table, grid_children, old_length, new_length, zoom, handler)
     if new_length > old_length then
-        local outer_frame = grid_table.add({ type = "frame", style = "train_with_minimap_frame" })
+        local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame" })
         local inner_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
         local minimap = inner_frame.add({ type = "minimap", style = "sspp_minimap", zoom = zoom })
 

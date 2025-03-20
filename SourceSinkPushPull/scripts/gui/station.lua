@@ -988,8 +988,10 @@ local function add_gui_complete(player, parts)
                         { type = "label", name = "limit_value", style = "sspp_station_limit_value", caption = tostring(limit) },
                         { type = "sprite-button", name = "bufferless_toggle", style = "control_settings_section_button", sprite = "sspp-bufferless-icon", tooltip = bufferless_tooltip, auto_toggle = true, toggled = is_bufferless, handler = handle_bufferless_toggled },
                     } },
-                    { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", vertical_scroll_policy = "never", children = {
-                        { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
+                    { type = "frame", style = "shallow_frame", direction = "horizontal", children = {
+                        { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", children = {
+                            { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
+                        } },
                     } },
                 } },
             } },

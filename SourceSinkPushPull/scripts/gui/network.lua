@@ -107,6 +107,7 @@ local function clear_grid_and_header(player_gui)
     player_gui.haulers_class = nil
     player_gui.haulers_item = nil
     player_gui.stations_item = nil
+    player_gui.expanded_job = nil
 end
 
 ---@param event EventData.on_gui_click
@@ -482,6 +483,99 @@ end }
 
 --------------------------------------------------------------------------------
 
+local function get_history_row_index(history_indices, job_index)
+    for row_index, row_job_index in pairs(history_indices) do
+        if row_job_index == job_index then
+            return row_index
+        end
+    end
+    error("job missing from table")
+end
+
+local function update_expanded_job(grid_table, job)
+    grid_table.clear()
+
+    local hauler_id = job.hauler
+    do
+        local hauler = storage.haulers[hauler_id]
+        local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame", direction = "vertical" })
+        local minimap_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        local camera_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        if hauler and hauler.train.valid then
+            local loco = hauler.train.front_stock --[[@as LuaEntity]]
+            minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 }).entity = loco
+            camera_frame.add({ type = "camera", style = "sspp_camera", position = loco.position, zoom = 0.25 }).entity = loco
+        else
+            minimap_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
+            camera_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
+        end
+        local title_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        title_frame.add({ type = "label", style = "sspp_minimap_subtitle_label", caption = "[img=item/locomotive] Train" })
+    end
+
+    local provide_station_id = job.provide_station
+    if provide_station_id then
+        local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame", direction = "vertical" })
+        local minimap_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        local camera_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        local stop = storage.entities[provide_station_id]
+        if stop and stop.valid then
+            minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 }).entity = stop
+            camera_frame.add({ type = "camera", style = "sspp_camera", position = stop.position, zoom = 0.25 }).entity = stop
+        else
+            minimap_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
+            camera_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
+        end
+        local title_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        title_frame.add({ type = "label", style = "sspp_minimap_subtitle_label", caption = "[img=item/sspp-provide-io] Provide" })
+    end
+
+    local request_station_id = job.request_station
+    if request_station_id then
+        local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame", direction = "vertical" })
+        local minimap_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        local camera_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        local stop = storage.entities[request_station_id]
+        if stop and stop.valid then
+            minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 }).entity = stop
+            camera_frame.add({ type = "camera", style = "sspp_camera", position = stop.position, zoom = 0.25 }).entity = stop
+        else
+            minimap_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
+            camera_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
+        end
+        local title_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+        title_frame.add({ type = "label", style = "sspp_minimap_subtitle_label", caption = "[img=item/sspp-request-io] Request" })
+    end
+end
+
+---@param event EventData.on_gui_click
+local handle_expand_job = { [events.on_gui_click] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerNetworkGui]]
+    local elements = player_gui.elements
+
+    clear_grid_and_header(player_gui)
+    gui.update_network_after_change(event.player_index)
+
+    -- TODO: untoggle other job buttons
+    event.element.toggled = true
+
+    local job_index = player_gui.history_indices[math.ceil(event.element.get_index_in_parent() / 5)]
+    local job = storage.networks[player_gui.network].jobs[job_index]
+
+    local name, quality = split_item_key(job.item)
+    if quality then
+        elements.grid_title.caption = { "sspp-gui.fmt-item-job-title", name, quality, job_index }
+    else
+        elements.grid_title.caption = { "sspp-gui.fmt-fluid-job-title", name, job_index }
+    end
+
+    player_gui.expanded_job = job_index
+
+    update_expanded_job(player_gui.elements.grid_table, job)
+end }
+
+--------------------------------------------------------------------------------
+
 ---@param action_lines flib.GuiElemDef[]
 ---@param caption LocalisedString
 local function append_action_line(action_lines, caption)
@@ -543,59 +637,83 @@ local function insert_history_row(history_table, row_index, job_index, job)
     local name, quality = split_item_key(job.item)
     local signal = { name = name, quality = quality, type = quality and "item" or "fluid" }
 
-    local elements, _ = flib_gui.add(history_table, {
-        { type = "flow", index = row_index * 4 - 3, style = "vertical_flow", direction = "vertical", children = {
-            { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "item/locomotive", handler = handle_open_hauler },
-            { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal", signal = signal },
-        } },
-        { type = "flow", index = row_index * 4 - 2, style = "sspp_history_cell_flow", direction = "vertical", children = action_lines },
-        { type = "flow", index = row_index * 4 - 1, style = "sspp_history_cell_flow", direction = "vertical", children = duration_lines },
-        { type = "flow", index = row_index * 4 - 0, style = "sspp_history_cell_flow", direction = "vertical", children = summary_lines },
+    flib_gui.add(history_table, {
+        { index = row_index * 5 - 4, type = "choose-elem-button", style = "slot_button", elem_type = "signal", signal = signal },
+        { index = row_index * 5 - 3, type = "flow", style = "sspp_history_cell_flow", direction = "vertical", children = action_lines },
+        { index = row_index * 5 - 2, type = "flow", style = "sspp_history_cell_flow", direction = "vertical", children = duration_lines },
+        { index = row_index * 5 - 1, type = "flow", style = "sspp_history_cell_flow", direction = "vertical", children = summary_lines },
+        { index = row_index * 5 - 0, type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-grid-icon", handler = handle_expand_job },
     })
-    elements.item_button.locked = true -- https://forums.factorio.com/viewtopic.php?t=127562
+    history_table.children[row_index * 5 - 4].locked = true -- https://forums.factorio.com/viewtopic.php?t=127562
+end
+
+---@param history_table LuaGuiElement
+---@param row_index integer
+local function destroy_history_row(history_table, row_index)
+    local history_children = history_table.children
+    history_children[row_index * 5 - 0].destroy()
+    history_children[row_index * 5 - 1].destroy()
+    history_children[row_index * 5 - 2].destroy()
+    history_children[row_index * 5 - 3].destroy()
+    history_children[row_index * 5 - 4].destroy()
 end
 
 --------------------------------------------------------------------------------
 
+-- ---@param player_gui PlayerNetworkGui
+-- local function scroll_to_pinned_job(player_gui)
+--     local pinned_job_index = player_gui.history_job
+--     if pinned_job_index then
+--         local row_index = get_history_row_index(player_gui.history_indices, pinned_job_index)
+--         local history_table = player_gui.elements.history_table
+--         history_table.parent.scroll_to_element(history_table.children[row_index * 5 - 3], "top-third")
+--     end
+-- end
+
 ---@param player_gui PlayerNetworkGui
 function gui.network_job_created(player_gui, job_index)
-    insert_history_row(player_gui.elements.history_table, 1, job_index, storage.networks[player_gui.network].jobs[job_index])
+    local history_table = player_gui.elements.history_table
+
+    -- kludge to maintain the colour of existing rows
+    if history_table.style.name == "sspp_network_history_table" then
+        history_table.style = "sspp_network_history_inverted_table"
+    else
+        history_table.style = "sspp_network_history_table"
+    end
+
+    insert_history_row(history_table, 1, job_index, storage.networks[player_gui.network].jobs[job_index])
     table.insert(player_gui.history_indices, 1, job_index)
+    -- scroll_to_pinned_job(player_gui)
 end
 
 ---@param player_gui PlayerNetworkGui
 function gui.network_job_removed(player_gui, job_index)
     local history_indices = player_gui.history_indices
-    for row_index = 1, #history_indices do
-        if history_indices[row_index] == job_index then
-            local table_children = player_gui.elements.history_table.children
-            table_children[row_index * 4 - 0].destroy()
-            table_children[row_index * 4 - 1].destroy()
-            table_children[row_index * 4 - 2].destroy()
-            table_children[row_index * 4 - 3].destroy()
-            table.remove(history_indices, row_index)
-            return
-        end
+    local row_index = get_history_row_index(history_indices, job_index)
+
+    destroy_history_row(player_gui.elements.history_table, row_index)
+    table.remove(history_indices, row_index)
+    -- scroll_to_pinned_job(player_gui)
+
+    if player_gui.expanded_job == job_index then
+        clear_grid_and_header(player_gui)
     end
-    error("job missing from table")
 end
 
 ---@param player_gui PlayerNetworkGui
 function gui.network_job_updated(player_gui, job_index)
     local history_indices = player_gui.history_indices
-    for row_index = 1, #history_indices do
-        if history_indices[row_index] == job_index then
-            local history_table = player_gui.elements.history_table
-            local history_children = history_table.children
-            history_children[row_index * 4 - 0].destroy()
-            history_children[row_index * 4 - 1].destroy()
-            history_children[row_index * 4 - 2].destroy()
-            history_children[row_index * 4 - 3].destroy()
-            insert_history_row(history_table, row_index, job_index, storage.networks[player_gui.network].jobs[job_index])
-            return
-        end
+    local row_index = get_history_row_index(history_indices, job_index)
+    local history_table = player_gui.elements.history_table
+    local job = storage.networks[player_gui.network].jobs[job_index]
+
+    destroy_history_row(history_table, row_index)
+    insert_history_row(history_table, row_index, job_index, job)
+    -- scroll_to_pinned_job(player_gui)
+
+    if player_gui.expanded_job == job_index then
+        update_expanded_job(player_gui.elements.grid_table, job)
     end
-    error("job missing from table")
 end
 
 --------------------------------------------------------------------------------
@@ -677,6 +795,8 @@ function gui.network_poll_finished(player_gui)
             end
         end
     end
+
+    if player_gui.expanded_job then return end
 
     local provide_enabled = elements.grid_provide_toggle.toggled
     local request_enabled = elements.grid_request_toggle.toggled
@@ -1065,14 +1185,15 @@ function gui.network_open(player_id, network_name, tab_index)
                         {
                             tab = { type = "tab", style = "tab", caption = { "sspp-gui.history" } },
                             content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
-                                { type = "table", style = "sspp_network_history_header", column_count = 4, children = {
+                                { type = "table", style = "sspp_network_history_header", column_count = 5, children = {
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.action" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.duration" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.summary" } },
+                                    { type = "empty-widget" },
                                 } },
                                 { type = "scroll-pane", style = "sspp_network_scroll_pane", direction = "vertical", children = {
-                                    { type = "table", name = "history_table", style = "sspp_network_history_table", column_count = 4 },
+                                    { type = "table", name = "history_table", style = "sspp_network_history_table", column_count = 5 },
                                 } },
                             } },
                         },
@@ -1089,8 +1210,10 @@ function gui.network_open(player_id, network_name, tab_index)
                         { type = "sprite-button", name = "grid_fuel_toggle", style = "control_settings_section_button", sprite = "sspp-fuel-icon", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_depot_toggle", style = "control_settings_section_button", sprite = "sspp-depot-icon", enabled = false, auto_toggle = true, toggled = true },
                     } },
-                    { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", vertical_scroll_policy = "always", children = {
-                        { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
+                    { type = "frame", style = "shallow_frame", direction = "horizontal", children = {
+                        { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", children = {
+                            { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
+                        } },
                     } },
                 } },
             } },
@@ -1149,6 +1272,7 @@ function gui.network_add_flib_handlers()
         ["network_expand_class_haulers"] = handle_expand_class_haulers[events.on_gui_click],
         ["network_expand_item_haulers"] = handle_expand_item_haulers[events.on_gui_click],
         ["network_expand_item_stations"] = handle_expand_item_stations[events.on_gui_click],
+        ["network_expand_job"] = handle_expand_job[events.on_gui_click],
         ["network_open_hauler"] = handle_open_hauler[events.on_gui_click],
         ["network_open_station"] = handle_open_station[events.on_gui_click],
         ["network_add_class"] = handle_add_class[events.on_gui_click],

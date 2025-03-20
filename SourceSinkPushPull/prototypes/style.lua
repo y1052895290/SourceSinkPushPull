@@ -57,10 +57,28 @@ styles.sspp_station_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
 
 styles.sspp_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
     type = "scroll_pane_style",
-    parent = "naked_scroll_pane",
-    padding = 0,
-    background_graphical_set = deep_slot_background_tiling(152, 152),
+    parent = "deep_scroll_pane",
+    margin = 4,
+    vertical_flow_style = {
+        type = "vertical_flow_style",
+        vertical_spacing = 0,
+    },
     vertically_stretchable = "on",
+    background_graphical_set = deep_slot_background_tiling(144, 144),
+    scrollbars_go_outside = true,
+}
+
+styles.sspp_thin_shallow_frame = { ---@type data.FrameStyleSpecification
+    type = "frame_style",
+    parent = "shallow_frame",
+    vertical_flow_style = {
+        type = "vertical_flow_style",
+        vertical_spacing = 8,
+    },
+    horizontal_flow_style = {
+        type = "horizontal_flow_style",
+        horizontal_spacing = 8,
+    },
 }
 
 --------------------------------------------------------------------------------
@@ -125,14 +143,15 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
 styles.sspp_network_history_header = { ---@type data.TableStyleSpecification
     type = "table_style",
     parent = "table",
-    left_padding = 12,
-    right_padding = 12,
+    left_padding = 18,
+    right_padding = 18,
     cell_padding = 4,
     column_widths = {
-        { column = 1, width = 32 + 4 + 20 },
-        { column = 2, width = 274 },
-        { column = 3, width = 120 },
-        { column = 4, width = 274 },
+        { column = 1, width = 40 + 8 },
+        { column = 2, width = 280 },
+        { column = 3, width = 112 },
+        { column = 4, width = 224 + 8 },
+        { column = 5, width = 32 },
     },
     horizontal_spacing = 0,
     vertical_spacing = 0,
@@ -142,9 +161,22 @@ styles.sspp_network_history_table = { ---@type data.TableStyleSpecification
     type = "table_style",
     parent = "sspp_network_history_header",
     width = 764,
-    left_padding = 4,
-    right_padding = 4,
+    left_padding = 10,
+    right_padding = 10,
+    top_cell_padding = 5,
+    bottom_cell_padding = 5,
     odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
+}
+
+styles.sspp_network_history_inverted_table = { ---@type data.TableStyleSpecification
+    type = "table_style",
+    parent = "sspp_network_history_header",
+    width = 764,
+    left_padding = 10,
+    right_padding = 10,
+    top_cell_padding = 5,
+    bottom_cell_padding = 5,
+    even_row_graphical_set = { position = { 472, 25 }, size = 1 },
 }
 
 styles.sspp_station_item_header = { ---@type data.TableStyleSpecification
@@ -181,7 +213,7 @@ styles.sspp_station_item_table = { ---@type data.TableStyleSpecification
 styles.sspp_grid_table = { ---@type data.TableStyleSpecification
     type = "table_style",
     parent = "table",
-    width = 152 * 3,
+    width = 144 * 3,
     horizontal_spacing = 0,
     vertical_spacing = 0,
 }
@@ -241,8 +273,8 @@ styles.sspp_compact_warning_image = { ---@type data.ImageStyleSpecification
 
 styles.sspp_history_cell_flow = { ---@type data.VerticalFlowStyleSpecification
     type = "vertical_flow_style",
-    parent = "vertical_flow",
-    height = 20 * 4 + 4 * 3,
+    vertical_spacing = 2,
+    height = 20 * 4 + 2 * 3,
     vertical_align = "center",
 }
 
@@ -320,7 +352,11 @@ styles.sspp_aligned_switch = { ---@type data.SwitchStyleSpecification
 
 styles.sspp_minimap = { ---@type data.MinimapStyleSpecification
     type = "minimap_style",
-    parent = "minimap",
+    size = 128,
+}
+
+styles.sspp_camera = { ---@type data.CameraStyleSpecification
+    type = "camera_style",
     size = 128,
 }
 
@@ -350,6 +386,14 @@ styles.sspp_minimap_bottom_label = { ---@type data.LabelStyleSpecification
     padding = 4,
     horizontal_align = "right",
     vertical_align = "bottom",
+}
+
+styles.sspp_minimap_subtitle_label = {
+    type = "label_style",
+    parent = "bold_label",
+    width = 128,
+    padding = 4,
+    horizontal_align = "center",
 }
 
 styles.sspp_frame_tool_button = { ---@type data.ButtonStyleSpecification
