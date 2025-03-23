@@ -170,7 +170,7 @@ local migrations = {
                     for _, hauler_id in pairs(hauler_ids) do
                         local hauler = storage.haulers[hauler_id]
                         if hauler.train.valid then
-                            local job = { hauler = hauler_id, tick = game.tick, item = item_key, provide_station = hauler.to_provide.station }
+                            local job = { hauler = hauler_id, start_tick = game.tick, item = item_key, provide_station = hauler.to_provide.station }
                             if hauler.to_provide.phase ~= "TRAVEL" then
                                 job.target_count = network.items[item_key].delivery_size
                                 job.provide_arrive_tick = game.tick
@@ -189,7 +189,7 @@ local migrations = {
                     for _, hauler_id in pairs(hauler_ids) do
                         local hauler = storage.haulers[hauler_id]
                         if hauler.train.valid then
-                            local job = { hauler = hauler_id, tick = game.tick, item = item_key, provide_station = hauler.to_provide.station }
+                            local job = { hauler = hauler_id, start_tick = game.tick, item = item_key, provide_station = hauler.to_provide.station }
                             if hauler.to_provide.phase ~= "TRAVEL" then
                                 job.target_count = network.items[item_key].delivery_size
                                 job.provide_arrive_tick = game.tick
@@ -208,9 +208,9 @@ local migrations = {
                     for _, hauler_id in pairs(hauler_ids) do
                         local hauler = storage.haulers[hauler_id]
                         if hauler.train.valid then
-                            local job = { hauler = hauler_id, tick = game.tick, item = item_key, request_station = hauler.to_request.station }
+                            local job = { hauler = hauler_id, start_tick = game.tick, item = item_key, request_station = hauler.to_request.station }
                             if hauler.to_request.phase ~= "TRAVEL" then
-                                job.real_count = get_train_item_count(hauler.train, network.items[item_key].name, network.items[item_key].quality)
+                                job.loaded_count = get_train_item_count(hauler.train, network.items[item_key].name, network.items[item_key].quality)
                                 job.request_arrive_tick = game.tick
                                 if hauler.to_request.phase == "DONE" then
                                     job.request_done_tick = game.tick

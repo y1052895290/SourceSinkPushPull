@@ -580,11 +580,13 @@ end
 ---@param job Job
 function assign_new_job(network, hauler, job)
     local network_name, network_jobs = network.surface.name, network.jobs
-    local current_tick = job.tick
+    local current_tick = job.start_tick
 
     for old_job_index, old_job in pairs(network_jobs) do
-        -- TODO: increase this and make it configurable, it is just low for testing
-        if current_tick - old_job.tick < 36000 then break end -- 10 minutes
+        -- TODO: make this a mod setting
+        if current_tick - old_job.start_tick < 1080000 then -- 30 mins
+            break -- keep this job and all later jobs
+        end
         local old_hauler = storage.haulers[old_job.hauler]
         if old_job_index ~= (old_hauler and old_hauler.job) then
             network_jobs[old_job_index] = nil

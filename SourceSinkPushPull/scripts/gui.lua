@@ -1,6 +1,7 @@
 -- SSPP by jagoly
 
 local flib_gui = require("__flib__.gui")
+local events = defines.events
 
 gui = {}
 
@@ -127,27 +128,36 @@ function gui.refresh_table(table, from_row, to_row, old_dict, key_remove)
     return new_dict
 end
 
+---@param event EventData.on_gui_click
+gui.handle_open_minimap_entity = { [events.on_gui_click] = function(event)
+    local entity = event.element.parent.entity
+    if entity and entity.valid then
+        game.get_player(event.player_index).opened = entity
+    end
+end }
+
 ---@param grid_table LuaGuiElement
 ---@param grid_children LuaGuiElement[]
 ---@param old_length integer
 ---@param new_length integer
----@param zoom number
----@param handler table
----@return LuaGuiElement
-function gui.next_minimap(grid_table, grid_children, old_length, new_length, zoom, handler)
+---@return LuaGuiElement minimap, LuaGuiElement top, LuaGuiElement bottom
+function gui.next_minimap(grid_table, grid_children, old_length, new_length)
     if new_length > old_length then
         local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame" })
         local inner_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        local minimap = inner_frame.add({ type = "minimap", style = "sspp_minimap", zoom = zoom })
+        local minimap = inner_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 })
 
-        minimap.add({ type = "button", style = "sspp_minimap_button", tags = flib_gui.format_handlers(handler) })
-        minimap.add({ type = "label", style = "sspp_minimap_top_label", ignored_by_interaction = true })
-        minimap.add({ type = "label", style = "sspp_minimap_bottom_label", ignored_by_interaction = true })
+        minimap.add({ type = "button", style = "sspp_minimap_button", tags = flib_gui.format_handlers(gui.handle_open_minimap_entity) })
+        local top = minimap.add({ type = "label", style = "sspp_minimap_top_label", ignored_by_interaction = true })
+        local bottom = minimap.add({ type = "label", style = "sspp_minimap_bottom_label", ignored_by_interaction = true })
 
-        return minimap
+        return minimap, top, bottom
     end
 
-    return grid_children[new_length].children[1].children[1]
+    local minimap = grid_children[new_length].children[1].children[1]
+    local minimap_children = minimap.children
+
+    return minimap, minimap_children[2], minimap_children[3]
 end
 
 --------------------------------------------------------------------------------
@@ -251,12 +261,16 @@ end
 --------------------------------------------------------------------------------
 
 function gui.register_event_handlers()
+    flib_gui.add_handlers({
+        ["gui_open_minimap_entity"] = gui.handle_open_minimap_entity[events.on_gui_click],
+    })
+
     gui.network_add_flib_handlers()
     gui.station_add_flib_handlers()
     gui.hauler_add_flib_handlers()
 
-    script.on_event(defines.events.on_gui_opened, on_gui_opened)
-    script.on_event(defines.events.on_gui_closed, on_gui_closed)
+    script.on_event(events.on_gui_opened, on_gui_opened)
+    script.on_event(events.on_gui_closed, on_gui_closed)
 
     flib_gui.handle_events()
 end

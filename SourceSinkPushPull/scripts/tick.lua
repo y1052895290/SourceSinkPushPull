@@ -643,7 +643,7 @@ local function tick_liquidate()
     set_hauler_color(hauler, e_train_colors.request)
     send_hauler_to_station(hauler, request_station.stop)
 
-    assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, request_station = request_station_id })
+    assign_new_job(network, hauler, { hauler = hauler_id, start_tick = game.tick, item = item_key, request_station = request_station_id })
 
     return false
 end
@@ -795,7 +795,7 @@ local function tick_dispatch()
     set_hauler_color(hauler, e_train_colors.provide)
     send_hauler_to_station(hauler, provide_station.stop)
 
-    assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, provide_station = provide_station_id })
+    assign_new_job(network, hauler, { hauler = hauler_id, start_tick = game.tick, item = item_key, provide_station = provide_station_id })
 
     return false
 end
@@ -845,7 +845,7 @@ local function tick_buffer()
     set_hauler_color(hauler, e_train_colors.provide)
     send_hauler_to_station(hauler, provide_station.stop)
 
-    assign_new_job(network, hauler, { hauler = hauler_id, tick = game.tick, item = item_key, provide_station = provide_station_id })
+    assign_new_job(network, hauler, { hauler = hauler_id, start_tick = game.tick, item = item_key, provide_station = provide_station_id })
 
     return false
 end

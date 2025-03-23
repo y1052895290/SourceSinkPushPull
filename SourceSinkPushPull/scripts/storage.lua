@@ -84,16 +84,16 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 
 ---@class (exact) Job
 ---@field public hauler HaulerId
----@field public tick MapTick
+---@field public start_tick MapTick
 ---@field public item ItemKey?
 ---@field public provide_station StationId?
 ---@field public target_count integer?
 ---@field public provide_arrive_tick MapTick?
 ---@field public provide_done_tick MapTick?
 ---@field public request_station StationId?
----@field public real_count integer?
+---@field public loaded_count integer?
 ---@field public request_arrive_tick MapTick?
----@field public request_done_tick MapTick?
+---@field public finish_tick MapTick?
 
 --------------------------------------------------------------------------------
 
@@ -163,7 +163,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@class (exact) PlayerNetworkGui
 ---@field public network NetworkName
 ---@field public elements {[string]: LuaGuiElement}
----@field public history_indices JobIndex[] -- TODO: might make more sense to just be a tag on the expand button
+---@field public history_indices JobIndex[]
 ---@field public haulers_class ClassName?
 ---@field public haulers_item ItemKey?
 ---@field public stations_item ItemKey?

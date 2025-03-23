@@ -101,8 +101,10 @@ local function clear_grid_and_header(player_gui)
     elements.grid_fuel_toggle.tooltip = ""
     elements.grid_depot_toggle.enabled = false
     elements.grid_depot_toggle.tooltip = ""
+    elements.right_scroll_pane.style = "sspp_right_grid_scroll_pane"
 
     elements.grid_table.clear()
+    elements.info_flow.clear()
 
     player_gui.haulers_class = nil
     player_gui.haulers_item = nil
@@ -117,26 +119,23 @@ local handle_expand_class_haulers = { [events.on_gui_click] = function(event)
 
     clear_grid_and_header(player_gui)
 
-    local element = event.element
-    local class_name = element.parent.children[element.get_index_in_parent() - 4].text
-    if class_name == "" then
-        gui.update_network_after_change(event.player_index)
-        return
+    local class_name = elements.class_table.children[event.element.get_index_in_parent() - 4].text
+    if class_name ~= "" then
+        elements.grid_title.caption = { "sspp-gui.fmt-class-haulers-title", class_name }
+        elements.grid_provide_toggle.enabled = true
+        elements.grid_provide_toggle.tooltip = { "sspp-gui.grid-haulers-provide-tooltip" }
+        elements.grid_request_toggle.enabled = true
+        elements.grid_request_toggle.tooltip = { "sspp-gui.grid-haulers-request-tooltip" }
+        elements.grid_liquidate_toggle.enabled = true
+        elements.grid_liquidate_toggle.tooltip = { "sspp-gui.grid-haulers-liquidate-tooltip" }
+        elements.grid_fuel_toggle.enabled = true
+        elements.grid_fuel_toggle.tooltip = { "sspp-gui.grid-haulers-fuel-tooltip" }
+        elements.grid_depot_toggle.enabled = true
+        elements.grid_depot_toggle.tooltip = { "sspp-gui.grid-haulers-depot-tooltip" }
+
+        player_gui.haulers_class = class_name
     end
 
-    elements.grid_title.caption = { "sspp-gui.fmt-class-haulers-title", class_name }
-    elements.grid_provide_toggle.enabled = true
-    elements.grid_provide_toggle.tooltip = { "sspp-gui.grid-haulers-provide-tooltip" }
-    elements.grid_request_toggle.enabled = true
-    elements.grid_request_toggle.tooltip = { "sspp-gui.grid-haulers-request-tooltip" }
-    elements.grid_liquidate_toggle.enabled = true
-    elements.grid_liquidate_toggle.tooltip = { "sspp-gui.grid-haulers-liquidate-tooltip" }
-    elements.grid_fuel_toggle.enabled = true
-    elements.grid_fuel_toggle.tooltip = { "sspp-gui.grid-haulers-fuel-tooltip" }
-    elements.grid_depot_toggle.enabled = true
-    elements.grid_depot_toggle.tooltip = { "sspp-gui.grid-haulers-depot-tooltip" }
-
-    player_gui.haulers_class = class_name
     gui.update_network_after_change(event.player_index)
 end }
 
@@ -147,27 +146,24 @@ local handle_expand_item_haulers = { [events.on_gui_click] = function(event)
 
     clear_grid_and_header(player_gui)
 
-    local element = event.element
-    local elem_value = element.parent.children[element.get_index_in_parent() - 6].children[3].elem_value
-    if not elem_value then
-        gui.update_network_after_change(event.player_index)
-        return
+    local elem_value = elements.item_table.children[event.element.get_index_in_parent() - 6].children[3].elem_value
+    if elem_value then
+        local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
+        if quality then
+            elements.grid_title.caption = { "sspp-gui.fmt-item-haulers-title", name, quality }
+        else
+            elements.grid_title.caption = { "sspp-gui.fmt-fluid-haulers-title", name }
+        end
+        elements.grid_provide_toggle.enabled = true
+        elements.grid_provide_toggle.tooltip = { "sspp-gui.grid-haulers-provide-tooltip" }
+        elements.grid_request_toggle.enabled = true
+        elements.grid_request_toggle.tooltip = { "sspp-gui.grid-haulers-request-tooltip" }
+        elements.grid_liquidate_toggle.enabled = true
+        elements.grid_liquidate_toggle.tooltip = { "sspp-gui.grid-haulers-liquidate-tooltip" }
+
+        player_gui.haulers_item = item_key
     end
 
-    local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
-    if quality then
-        elements.grid_title.caption = { "sspp-gui.fmt-item-haulers-title", name, quality }
-    else
-        elements.grid_title.caption = { "sspp-gui.fmt-fluid-haulers-title", name }
-    end
-    elements.grid_provide_toggle.enabled = true
-    elements.grid_provide_toggle.tooltip = { "sspp-gui.grid-haulers-provide-tooltip" }
-    elements.grid_request_toggle.enabled = true
-    elements.grid_request_toggle.tooltip = { "sspp-gui.grid-haulers-request-tooltip" }
-    elements.grid_liquidate_toggle.enabled = true
-    elements.grid_liquidate_toggle.tooltip = { "sspp-gui.grid-haulers-liquidate-tooltip" }
-
-    player_gui.haulers_item = item_key
     gui.update_network_after_change(event.player_index)
 end }
 
@@ -178,23 +174,46 @@ local handle_expand_item_stations = { [events.on_gui_click] = function(event)
 
     clear_grid_and_header(player_gui)
 
-    local element = event.element
-    local elem_value = element.parent.children[element.get_index_in_parent() - 4].children[3].elem_value
-    if not elem_value then return end
+    local elem_value = elements.item_table.children[event.element.get_index_in_parent() - 4].children[3].elem_value
+    if elem_value then
+        local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
+        if quality then
+            elements.grid_title.caption = { "sspp-gui.fmt-item-stations-title", name, quality }
+        else
+            elements.grid_title.caption = { "sspp-gui.fmt-fluid-stations-title", name }
+        end
+        elements.grid_stations_mode_switch.visible = true
+        elements.grid_provide_toggle.enabled = true
+        elements.grid_provide_toggle.tooltip = { "sspp-gui.grid-stations-provide-tooltip" }
+        elements.grid_request_toggle.enabled = true
+        elements.grid_request_toggle.tooltip = { "sspp-gui.grid-stations-request-tooltip" }
 
-    local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
-    if quality then
-        elements.grid_title.caption = { "sspp-gui.fmt-item-stations-title", name, quality }
-    else
-        elements.grid_title.caption = { "sspp-gui.fmt-fluid-stations-title", name }
+        player_gui.stations_item = item_key
     end
-    elements.grid_stations_mode_switch.visible = true
-    elements.grid_provide_toggle.enabled = true
-    elements.grid_provide_toggle.tooltip = { "sspp-gui.grid-stations-provide-tooltip" }
-    elements.grid_request_toggle.enabled = true
-    elements.grid_request_toggle.tooltip = { "sspp-gui.grid-stations-request-tooltip" }
 
-    player_gui.stations_item = item_key
+    gui.update_network_after_change(event.player_index)
+end }
+
+---@param event EventData.on_gui_click
+local handle_expand_job = { [events.on_gui_click] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerNetworkGui]]
+    local elements = player_gui.elements
+
+    clear_grid_and_header(player_gui)
+
+    local job_index = player_gui.history_indices[event.element.get_index_in_parent() / 5]
+    local job = storage.networks[player_gui.network].jobs[job_index]
+
+    local name, quality = split_item_key(job.item)
+    if quality then
+        elements.grid_title.caption = { "sspp-gui.fmt-item-job-title", name, quality, job_index }
+    else
+        elements.grid_title.caption = { "sspp-gui.fmt-fluid-job-title", name, job_index }
+    end
+    elements.right_scroll_pane.style = "sspp_right_flat_scroll_pane"
+
+    player_gui.expanded_job = job_index
+
     gui.update_network_after_change(event.player_index)
 end }
 
@@ -446,14 +465,110 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param history_table LuaGuiElement
+---@param row_index integer
+---@param job_index JobIndex
+---@param job Job
+local function insert_history_row(history_table, row_index, job_index, job)
+    local name, quality = split_item_key(job.item)
+
+    local elem_button = history_table.add({ index = row_index * 5 - 4, type = "choose-elem-button", style = "slot_button", elem_type = "signal", signal = { name = name, quality = quality, type = quality and "item" or "fluid" } })
+    elem_button.locked = true -- https://forums.factorio.com/viewtopic.php?t=127562
+    local actions_flow = history_table.add({ index = row_index * 5 - 3, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
+    local durations_flow = history_table.add({ index = row_index * 5 - 2, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
+    local summary_flow = history_table.add({ index = row_index * 5 - 1, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
+    history_table.add({ index = row_index * 5 - 0, type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-grid-icon", tags = flib_gui.format_handlers(handle_expand_job) })
+
+    local hauler = storage.haulers[job.hauler]
+    local unfinished_caption = (hauler and hauler.job == job_index) and "(active)" or "(aborted)"
+
+    local provide_station_id = job.provide_station
+    if provide_station_id then
+        local depart_tick, arrive_tick, done_tick = job.start_tick, job.provide_arrive_tick, job.provide_done_tick
+        local stop = storage.entities[provide_station_id]
+        actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-travel-to-pick-up", stop and stop.backer_name or "[virtual-signal=signal-ghost]" } })
+        durations_flow.add({ type = "label", style = "label", caption = arrive_tick and { "sspp-gui.fmt-seconds", math.floor((arrive_tick - depart_tick) / 60.0 + 0.5) } or unfinished_caption })
+        if arrive_tick then
+            actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-transfer-to-hauler", job.target_count } })
+            durations_flow.add({ type = "label", style = "label", caption = done_tick and { "sspp-gui.fmt-seconds", math.floor((done_tick - arrive_tick) / 60.0 + 0.5) } or unfinished_caption })
+        end
+    end
+
+    local request_station_id = job.request_station
+    if request_station_id then
+        local depart_tick, arrive_tick, done_tick = job.provide_done_tick or job.start_tick, job.request_arrive_tick, job.finish_tick
+        local stop = storage.entities[request_station_id]
+        actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-travel-to-drop-off", stop and stop.backer_name or "[virtual-signal=signal-ghost]" } })
+        durations_flow.add({ type = "label", style = "label", caption = arrive_tick and { "sspp-gui.fmt-seconds", math.floor((arrive_tick - depart_tick) / 60.0 + 0.5) } or unfinished_caption })
+        if arrive_tick then
+            actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-transfer-to-station", job.loaded_count } })
+            durations_flow.add({ type = "label", style = "label", caption = done_tick and { "sspp-gui.fmt-seconds", math.floor((done_tick - arrive_tick) / 60.0 + 0.5) } or unfinished_caption })
+        end
+    end
+
+    summary_flow.add({ type = "label", style = "label", caption = string.format("Started at: %s", flib_format.time(job.start_tick, true)) })
+
+    if job.finish_tick then
+        summary_flow.add({ type = "label", style = "label", caption = string.format("Finished at: %s", flib_format.time(job.finish_tick, true)) })
+        summary_flow.add({ type = "label", style = "label", caption = string.format("Total duration: %d", math.floor((job.finish_tick - job.start_tick) / 60.0 + 0.5)) })
+    end
+end
+
+--------------------------------------------------------------------------------
+
+---@param player_gui PlayerNetworkGui
+function gui.network_job_created(player_gui, job_index)
+    local history_table = player_gui.elements.history_table
+
+    if history_table.style.name == "sspp_network_history_inverted_table" then
+        history_table.style = "sspp_network_history_table"
+    else
+        history_table.style = "sspp_network_history_inverted_table"
+    end
+
+    insert_history_row(history_table, 1, job_index, storage.networks[player_gui.network].jobs[job_index])
+    table.insert(player_gui.history_indices, 1, job_index)
+end
+
+---@param player_gui PlayerNetworkGui
+function gui.network_job_removed(player_gui, job_index)
+    local history_indices = player_gui.history_indices
+
+    for row_index, row_job_index in pairs(history_indices) do
+        if row_job_index == job_index then
+            gui.delete_row(player_gui.elements.history_table, row_index * 5 - 4)
+            table.remove(history_indices, row_index)
+            if player_gui.expanded_job == job_index then clear_grid_and_header(player_gui) end
+            return
+        end
+    end
+end
+
+---@param player_gui PlayerNetworkGui
+function gui.network_job_updated(player_gui, job_index)
+    local history_table = player_gui.elements.history_table
+
+    for row_index, row_job_index in pairs(player_gui.history_indices) do
+        if row_job_index == job_index then
+            local toggled = history_table.children[row_index * 5].toggled
+            gui.delete_row(history_table, row_index * 5 - 4)
+            insert_history_row(history_table, row_index, job_index, storage.networks[player_gui.network].jobs[job_index])
+            history_table.children[row_index * 5].toggled = toggled
+            return
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+
 ---@param player_id PlayerId
 function gui.update_network_after_change(player_id)
     local player_gui = storage.player_guis[player_id] --[[@as PlayerNetworkGui]]
-
+    local elements = player_gui.elements
     local network = storage.networks[player_gui.network]
 
     network.classes = gui.refresh_table(
-        player_gui.elements.class_table,
+        elements.class_table,
         class_from_row,
         function(b, c, d, e) return class_to_row(player_gui, b, c, d, e) end,
         network.classes,
@@ -461,259 +576,93 @@ function gui.update_network_after_change(player_id)
     )
 
     network.items = gui.refresh_table(
-        player_gui.elements.item_table,
+        elements.item_table,
         item_from_row,
         function(b, c, d, e) return item_to_row(player_gui, b, c, d, e) end,
         network.items,
         function(b) return item_remove_key(player_gui, b) end
     )
+
+    local history_children = elements.history_table.children
+    local expanded_job_index = player_gui.expanded_job
+
+    for row_index, job_index in pairs(player_gui.history_indices) do
+        history_children[row_index * 5].toggled = (expanded_job_index == job_index)
+    end
 end
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
-local handle_open_hauler = { [events.on_gui_click] = function(event)
-    game.get_player(event.player_index).opened = event.element.parent.entity
-end }
-
----@param event EventData.on_gui_click
-local handle_open_station = { [events.on_gui_click] = function(event)
-    game.get_player(event.player_index).opened = event.element.parent.entity
-end }
-
---------------------------------------------------------------------------------
-
-local function get_history_row_index(history_indices, job_index)
-    for row_index, row_job_index in pairs(history_indices) do
-        if row_job_index == job_index then
-            return row_index
-        end
-    end
-    error("job missing from table")
-end
-
-local function update_expanded_job(grid_table, job)
-    grid_table.clear()
-
-    local hauler_id = job.hauler
-    do
-        local hauler = storage.haulers[hauler_id]
-        local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame", direction = "vertical" })
-        local minimap_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        local camera_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        if hauler and hauler.train.valid then
-            local loco = hauler.train.front_stock --[[@as LuaEntity]]
-            minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 }).entity = loco
-            camera_frame.add({ type = "camera", style = "sspp_camera", position = loco.position, zoom = 0.25 }).entity = loco
-        else
-            minimap_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
-            camera_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
-        end
-        local title_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        title_frame.add({ type = "label", style = "sspp_minimap_subtitle_label", caption = "[img=item/locomotive] Train" })
-    end
-
-    local provide_station_id = job.provide_station
-    if provide_station_id then
-        local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame", direction = "vertical" })
-        local minimap_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        local camera_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        local stop = storage.entities[provide_station_id]
-        if stop and stop.valid then
-            minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 }).entity = stop
-            camera_frame.add({ type = "camera", style = "sspp_camera", position = stop.position, zoom = 0.25 }).entity = stop
-        else
-            minimap_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
-            camera_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
-        end
-        local title_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        title_frame.add({ type = "label", style = "sspp_minimap_subtitle_label", caption = "[img=item/sspp-provide-io] Provide" })
-    end
-
-    local request_station_id = job.request_station
-    if request_station_id then
-        local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame", direction = "vertical" })
-        local minimap_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        local camera_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        local stop = storage.entities[request_station_id]
-        if stop and stop.valid then
-            minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 }).entity = stop
-            camera_frame.add({ type = "camera", style = "sspp_camera", position = stop.position, zoom = 0.25 }).entity = stop
-        else
-            minimap_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
-            camera_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
-        end
-        local title_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-        title_frame.add({ type = "label", style = "sspp_minimap_subtitle_label", caption = "[img=item/sspp-request-io] Request" })
-    end
-end
-
----@param event EventData.on_gui_click
-local handle_expand_job = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerNetworkGui]]
-    local elements = player_gui.elements
-
-    clear_grid_and_header(player_gui)
-    gui.update_network_after_change(event.player_index)
-
-    -- TODO: untoggle other job buttons
-    event.element.toggled = true
-
-    local job_index = player_gui.history_indices[math.ceil(event.element.get_index_in_parent() / 5)]
-    local job = storage.networks[player_gui.network].jobs[job_index]
-
-    local name, quality = split_item_key(job.item)
-    if quality then
-        elements.grid_title.caption = { "sspp-gui.fmt-item-job-title", name, quality, job_index }
+---@param grid_table LuaGuiElement
+---@param subtitle LocalisedString
+---@param entity LuaEntity?
+local function add_job_minimap_widgets(grid_table, subtitle, entity)
+    local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame", direction = "vertical" })
+    local minimap_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+    local camera_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+    if entity then
+        local minimap = minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 })
+        minimap.entity = entity
+        minimap.add({ type = "button", style = "sspp_minimap_button", tags = flib_gui.format_handlers(gui.handle_open_minimap_entity) })
+        local camera = camera_frame.add({ type = "camera", style = "sspp_camera", zoom = 0.25, position = entity.position })
+        camera.entity = entity
     else
-        elements.grid_title.caption = { "sspp-gui.fmt-fluid-job-title", name, job_index }
+        minimap_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
+        camera_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
     end
+    local title_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
+    title_frame.add({ type = "label", style = "sspp_minimap_subtitle_label", caption = subtitle })
+end
 
-    player_gui.expanded_job = job_index
-
-    update_expanded_job(player_gui.elements.grid_table, job)
-end }
-
---------------------------------------------------------------------------------
-
----@param action_lines flib.GuiElemDef[]
+---@param info_flow LuaGuiElement
 ---@param caption LocalisedString
-local function append_action_line(action_lines, caption)
-    action_lines[#action_lines+1] = { type = "label", style = "sspp_history_action_label", caption = caption }
+---@param tick MapTick
+local function add_job_label_and_time(info_flow, caption, tick)
+    local flow = info_flow.add({ type = "flow", style = "sspp_job_action_flow", direction = "horizontal" })
+    flow.add({ type = "label", style = "caption_label", caption = caption })
+    flow.add({ type = "empty-widget", style = "flib_horizontal_pusher" })
+    flow.add({ type = "label", style = "caption_label", caption = flib_format.time(tick, true) })
 end
 
----@param duration_lines flib.GuiElemDef[]
+---@param info_flow LuaGuiElement
+---@param caption LocalisedString
 ---@param first_tick MapTick
----@param last_tick_or_in_progress MapTick|boolean
-local function append_duration_line(duration_lines, first_tick, last_tick_or_in_progress)
-    local caption ---@type LocalisedString
-    if last_tick_or_in_progress == true then
-        caption = "(active)"
-    elseif last_tick_or_in_progress == false then
-        caption = "(aborted)"
-    else
-        caption = string.format("%.1f seconds", (last_tick_or_in_progress - first_tick) / 60.0)
-    end
-    duration_lines[#duration_lines+1] = { type = "label", style = "label", caption = caption }
+---@param last_tick MapTick?
+local function add_job_label_and_duration(info_flow, caption, first_tick, last_tick)
+    local flow = info_flow.add({ type = "flow", style = "sspp_job_action_flow", direction = "horizontal" })
+    flow.add({ type = "label", style = "label", caption = caption })
+    flow.add({ type = "empty-widget", style = "flib_horizontal_pusher" })
+    flow.add({ type = "label", style = "label", caption = last_tick and { "sspp-gui.fmt-seconds", math.floor((last_tick - first_tick) / 60.0 + 0.5) } or "(aborted)" })
 end
 
----@param history_table LuaGuiElement
----@param row_index integer
----@param job_index JobIndex
----@param job Job
-local function insert_history_row(history_table, row_index, job_index, job)
-    local action_lines = {} ---@type flib.GuiElemDef[]
-    local duration_lines = {} ---@type flib.GuiElemDef[]
-    local summary_lines = {} ---@type flib.GuiElemDef[]
-
-    local hauler = storage.haulers[job.hauler]
-    local in_progress = hauler ~= nil and hauler.job == job_index
-
-    summary_lines[#summary_lines+1] = { type = "label", style = "label", caption = string.format("Started at %s", flib_format.time(job.tick, true)) }
-
-    if job.provide_station then
-        local station = storage.stations[job.provide_station]
-        append_action_line(action_lines, string.format("Travel to [color=green]pick up[/color] at %s", station and station.stop.backer_name or "[color=blue]destroyed station[/color]"))
-        append_duration_line(duration_lines, job.tick, job.provide_arrive_tick or in_progress)
-        if job.target_count then
-            append_action_line(action_lines, string.format("Transfer [font=default-bold]%d[/font] cargo to train", job.target_count))
-            append_duration_line(duration_lines, job.provide_arrive_tick, job.provide_done_tick or in_progress)
-        end
-    end
-    if job.request_station then
-        local station = storage.stations[job.request_station]
-        append_action_line(action_lines, string.format("Travel to [color=red]drop off[/color] at %s", station and station.stop.backer_name or "[color=blue]destroyed station[/color]"))
-        append_duration_line(duration_lines, job.provide_done_tick or job.tick, job.request_arrive_tick or in_progress)
-        if job.real_count then
-            append_action_line(action_lines, string.format("Transfer [font=default-bold]%d[/font] cargo to station", job.real_count))
-            append_duration_line(duration_lines, job.request_arrive_tick, job.request_done_tick or in_progress)
-            if job.request_done_tick then
-                summary_lines[#summary_lines+1] = { type = "label", style = "label", caption = string.format("Finished at %s", flib_format.time(job.request_done_tick, true)) }
-                summary_lines[#summary_lines+1] = { type = "label", style = "label", caption = string.format("Total duration was %d seconds", math.ceil((job.request_done_tick - job.tick) / 60.0)) }
-            end
-        end
-    end
-
-    local name, quality = split_item_key(job.item)
-    local signal = { name = name, quality = quality, type = quality and "item" or "fluid" }
-
-    flib_gui.add(history_table, {
-        { index = row_index * 5 - 4, type = "choose-elem-button", style = "slot_button", elem_type = "signal", signal = signal },
-        { index = row_index * 5 - 3, type = "flow", style = "sspp_history_cell_flow", direction = "vertical", children = action_lines },
-        { index = row_index * 5 - 2, type = "flow", style = "sspp_history_cell_flow", direction = "vertical", children = duration_lines },
-        { index = row_index * 5 - 1, type = "flow", style = "sspp_history_cell_flow", direction = "vertical", children = summary_lines },
-        { index = row_index * 5 - 0, type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-grid-icon", handler = handle_expand_job },
-    })
-    history_table.children[row_index * 5 - 4].locked = true -- https://forums.factorio.com/viewtopic.php?t=127562
+---@param info_flow LuaGuiElement
+---@param path LuaRailPath?
+local function add_job_travel_progress_footer(info_flow, path)
+    info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
+    info_flow.add({ type = "line" })
+    local flow = info_flow.add({ type = "flow", style = "sspp_job_action_flow", direction = "horizontal" })
+    flow.add({ type = "label", style = "info_label", caption = { "sspp-gui.distance-to-travel" } })
+    flow.add({ type = "empty-widget", style = "flib_horizontal_pusher" })
+    local format = path and "sspp-gui.fmt-metres" or "(no path)"
+    local distance = path and math.floor(path.total_distance - path.travelled_distance + 0.5)
+    flow.add({ type = "label", style = "info_label", caption = { format, distance } })
 end
 
----@param history_table LuaGuiElement
----@param row_index integer
-local function destroy_history_row(history_table, row_index)
-    local history_children = history_table.children
-    history_children[row_index * 5 - 0].destroy()
-    history_children[row_index * 5 - 1].destroy()
-    history_children[row_index * 5 - 2].destroy()
-    history_children[row_index * 5 - 3].destroy()
-    history_children[row_index * 5 - 4].destroy()
-end
-
---------------------------------------------------------------------------------
-
--- ---@param player_gui PlayerNetworkGui
--- local function scroll_to_pinned_job(player_gui)
---     local pinned_job_index = player_gui.history_job
---     if pinned_job_index then
---         local row_index = get_history_row_index(player_gui.history_indices, pinned_job_index)
---         local history_table = player_gui.elements.history_table
---         history_table.parent.scroll_to_element(history_table.children[row_index * 5 - 3], "top-third")
---     end
--- end
-
----@param player_gui PlayerNetworkGui
-function gui.network_job_created(player_gui, job_index)
-    local history_table = player_gui.elements.history_table
-
-    -- kludge to maintain the colour of existing rows
-    if history_table.style.name == "sspp_network_history_table" then
-        history_table.style = "sspp_network_history_inverted_table"
-    else
-        history_table.style = "sspp_network_history_table"
-    end
-
-    insert_history_row(history_table, 1, job_index, storage.networks[player_gui.network].jobs[job_index])
-    table.insert(player_gui.history_indices, 1, job_index)
-    -- scroll_to_pinned_job(player_gui)
-end
-
----@param player_gui PlayerNetworkGui
-function gui.network_job_removed(player_gui, job_index)
-    local history_indices = player_gui.history_indices
-    local row_index = get_history_row_index(history_indices, job_index)
-
-    destroy_history_row(player_gui.elements.history_table, row_index)
-    table.remove(history_indices, row_index)
-    -- scroll_to_pinned_job(player_gui)
-
-    if player_gui.expanded_job == job_index then
-        clear_grid_and_header(player_gui)
-    end
-end
-
----@param player_gui PlayerNetworkGui
-function gui.network_job_updated(player_gui, job_index)
-    local history_indices = player_gui.history_indices
-    local row_index = get_history_row_index(history_indices, job_index)
-    local history_table = player_gui.elements.history_table
-    local job = storage.networks[player_gui.network].jobs[job_index]
-
-    destroy_history_row(history_table, row_index)
-    insert_history_row(history_table, row_index, job_index, job)
-    -- scroll_to_pinned_job(player_gui)
-
-    if player_gui.expanded_job == job_index then
-        update_expanded_job(player_gui.elements.grid_table, job)
-    end
+---@param info_flow LuaGuiElement
+---@param train LuaTrain
+---@param item_key ItemKey
+---@param target_count integer?
+local function add_job_transfer_progress_footer(info_flow, train, item_key, target_count)
+    info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
+    info_flow.add({ type = "line" })
+    local flow = info_flow.add({ type = "flow", style = "sspp_job_action_flow", direction = "horizontal" })
+    flow.add({ type = "label", style = "info_label", caption = { "sspp-gui.cargo-to-transfer" } })
+    flow.add({ type = "empty-widget", style = "flib_horizontal_pusher" })
+    local name, quality = split_item_key(item_key)
+    local format = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+    local count = get_train_item_count(train, name, quality)
+    if target_count then count = target_count - count end
+    flow.add({ type = "label", style = "info_label", caption = { format, count } })
 end
 
 --------------------------------------------------------------------------------
@@ -725,6 +674,8 @@ function gui.network_poll_finished(player_gui)
     local elements = player_gui.elements
 
     local class_hauler_totals = {} ---@type {[ClassName]: integer}
+
+    -- update dynamic parts of item rows, and sum totals of active haulers
     do
         local push_tickets = network.push_tickets
         local pull_tickets = network.pull_tickets
@@ -735,13 +686,12 @@ function gui.network_poll_finished(player_gui)
         local to_depot_liquidate_haulers = network.to_depot_liquidate_haulers
         local at_depot_liquidate_haulers = network.at_depot_liquidate_haulers
 
-        local item_table = elements.item_table
-        local columns = item_table.column_count
-        local table_children = item_table.children
+        local table_children = elements.item_table.children
 
-        for i = 0, #table_children - 1, columns do
+        for i = 0, #table_children - 1, elements.item_table.column_count do
             if table_children[i + 1].children[4].sprite == "" then
                 local _, _, item_key = gui.extract_elem_value_fields(table_children[i + 1].children[3].elem_value)
+                local class_name = table_children[i + 2].text
 
                 local provide_total = len_or_zero(provide_haulers[item_key])
                 local request_total = len_or_zero(request_haulers[item_key])
@@ -756,7 +706,6 @@ function gui.network_poll_finished(player_gui)
                 table_children[i + 6].caption = { "sspp-gui.fmt-item-demand", push_demand, pull_demand }
                 table_children[i + 8].caption = { "sspp-gui.fmt-item-haulers", provide_total, request_total, liquidate_total }
 
-                local class_name = table_children[i + 2].text
                 class_hauler_totals[class_name] = (class_hauler_totals[class_name] or 0) + provide_total + request_total + liquidate_total
             else
                 table_children[i + 6].caption = ""
@@ -765,38 +714,100 @@ function gui.network_poll_finished(player_gui)
         end
     end
 
+    -- update dynamic parts of class rows, making use of the totals from above
     do
         local fuel_haulers = network.fuel_haulers
         local to_depot_haulers = network.to_depot_haulers
         local at_depot_haulers = network.at_depot_haulers
-        local classes = network.classes
 
-        local class_table = elements.class_table
-        local columns = class_table.column_count
-        local table_children = class_table.children
+        local table_children = elements.class_table.children
 
-        for i = 0, #table_children - 1, columns do
+        for i = 0, #table_children - 1, elements.class_table.column_count do
             if table_children[i + 1].children[4].sprite == "" then
                 local class_name = table_children[i + 2].text
-                local class = classes[class_name]
 
                 local available = len_or_zero(at_depot_haulers[class_name])
-                local total = (class_hauler_totals[class_name] or 0) + len_or_zero(fuel_haulers[class_name])
-                if class.bypass_depot then
+                local occupied = (class_hauler_totals[class_name] or 0) + len_or_zero(fuel_haulers[class_name])
+
+                if table_children[i + 5].state then
                     available = available + len_or_zero(to_depot_haulers[class_name])
                 else
-                    total = total + len_or_zero(to_depot_haulers[class_name])
+                    occupied = occupied + len_or_zero(to_depot_haulers[class_name])
                 end
-                total = total + available
 
-                table_children[i + 7].caption = { "sspp-gui.fmt-class-available", available, total }
+                table_children[i + 7].caption = { "sspp-gui.fmt-class-available", available, available + occupied }
             else
                 table_children[i + 7].caption = ""
             end
         end
     end
 
-    if player_gui.expanded_job then return end
+    local expanded_job_index = player_gui.expanded_job
+    if expanded_job_index then
+        local grid_table, info_flow = elements.grid_table, elements.info_flow
+
+        local job = network.jobs[expanded_job_index]
+        local hauler = storage.haulers[job.hauler] ---@type Hauler?
+
+        grid_table.clear()
+        info_flow.clear()
+
+        add_job_minimap_widgets(grid_table, "[item=locomotive] Train", hauler and hauler.train.front_stock)
+
+        add_job_label_and_time(info_flow, "Job started", job.start_tick)
+        info_flow.add({ type = "line" })
+
+        local in_progress_tick = hauler and hauler.job == expanded_job_index and game.tick or nil
+
+        local item_key = job.item
+        if item_key then
+            local provide_station_id, request_station_id = job.provide_station, job.request_station
+
+            if provide_station_id then
+                local depart_tick, arrive_tick, done_tick = job.start_tick, job.provide_arrive_tick, job.provide_done_tick
+                local stop = storage.entities[provide_station_id]
+                add_job_minimap_widgets(grid_table, "[item=sspp-provide-io] Provide", stop)
+                add_job_label_and_duration(info_flow, { "sspp-gui.fmt-travel-to-pick-up", stop and stop.backer_name or "[virtual-signal=signal-ghost]" }, depart_tick, arrive_tick or in_progress_tick)
+                if in_progress_tick and not arrive_tick then
+                    add_job_travel_progress_footer(info_flow, hauler.train.path)
+                end
+                if arrive_tick then
+                    add_job_label_and_duration(info_flow, { "sspp-gui.fmt-transfer-to-hauler", job.target_count }, arrive_tick, done_tick or in_progress_tick)
+                    if in_progress_tick and not request_station_id then
+                        add_job_transfer_progress_footer(info_flow, hauler.train, item_key, job.target_count)
+                    end
+                end
+            end
+
+            if request_station_id then
+                local depart_tick, arrive_tick, done_tick = job.provide_done_tick or job.start_tick, job.request_arrive_tick, job.finish_tick
+                local stop = storage.entities[request_station_id]
+                add_job_minimap_widgets(grid_table, "[item=sspp-request-io] Request", stop)
+                add_job_label_and_duration(info_flow, { "sspp-gui.fmt-travel-to-drop-off", stop and stop.backer_name or "[virtual-signal=signal-ghost]" }, depart_tick, arrive_tick or in_progress_tick)
+                if in_progress_tick and not arrive_tick then
+                    add_job_travel_progress_footer(info_flow, hauler.train.path)
+                end
+                if arrive_tick then
+                    add_job_label_and_duration(info_flow, { "sspp-gui.fmt-transfer-to-station", job.loaded_count }, arrive_tick, done_tick or in_progress_tick)
+                    if in_progress_tick then
+                        add_job_transfer_progress_footer(info_flow, hauler.train, item_key, nil)
+                    end
+                end
+            end
+        end
+
+        if not in_progress_tick then
+            info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
+            info_flow.add({ type = "line" })
+            if job.finish_tick then
+                add_job_label_and_time(info_flow, "Job finished", job.finish_tick)
+            else
+                info_flow.add({ type = "label", style = "caption_label", caption = "Job cancelled" })
+            end
+        end
+
+        return -- the rest of this function is only relevant to hauler and station grids
+    end
 
     local provide_enabled = elements.grid_provide_toggle.toggled
     local request_enabled = elements.grid_request_toggle.toggled
@@ -806,8 +817,9 @@ function gui.network_poll_finished(player_gui)
 
     local grid_table = elements.grid_table
     local grid_children = grid_table.children
-    local old_length = #grid_children
-    local new_length = 0
+
+    -- to prevent having create hundreds of new minimaps every time, we reuse them between polls
+    local old_length, new_length = #grid_children, 0
 
     local haulers_class_name = player_gui.haulers_class
     if haulers_class_name then
@@ -838,14 +850,14 @@ function gui.network_poll_finished(player_gui)
                 end
                 if state_icon then
                     new_length = new_length + 1
-                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
-                    minimap.children[2].caption = state_icon
-                    if name then
-                        minimap.children[3].caption = tostring(get_train_item_count(hauler.train, name, quality)) .. make_item_icon(name, quality)
-                    else
-                        minimap.children[3].caption = ""
-                    end
+                    local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = hauler.train.front_stock
+                    top.caption = state_icon
+                    if name then
+                        bottom.caption = tostring(get_train_item_count(hauler.train, name, quality)) .. make_item_icon(name, quality)
+                    else
+                        bottom.caption = ""
+                    end
                 end
             end
         end
@@ -869,10 +881,10 @@ function gui.network_poll_finished(player_gui)
                 end
                 if state_icon then
                     new_length = new_length + 1
-                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
-                    minimap.children[2].caption = state_icon
-                    minimap.children[3].caption = tostring(get_train_item_count(hauler.train, name, quality)) .. item_icon
+                    local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = hauler.train.front_stock
+                    top.caption = state_icon
+                    bottom.caption = tostring(get_train_item_count(hauler.train, name, quality)) .. item_icon
                 end
             end
         end
@@ -889,25 +901,25 @@ function gui.network_poll_finished(player_gui)
             if station.network == network_name then
                 if provide_enabled and station.provide_items and station.provide_items[stations_item_key] then
                     new_length = new_length + 1
-                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_station)
-                    minimap.children[2].caption = station.stop.backer_name
-                    if item_icon then
-                        minimap.children[3].caption = "+" .. tostring(station.provide_counts[stations_item_key]) .. item_icon
-                    else
-                        minimap.children[3].caption = tostring(len_or_zero(station.provide_deliveries[stations_item_key])) .. "[img=virtual-signal/up-arrow]"
-                    end
+                    local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = station.stop
+                    top.caption = station.stop.backer_name
+                    if item_icon then
+                        bottom.caption = "+" .. tostring(station.provide_counts[stations_item_key]) .. item_icon
+                    else
+                        bottom.caption = tostring(len_or_zero(station.provide_deliveries[stations_item_key])) .. "[img=virtual-signal/up-arrow]"
+                    end
                 end
                 if request_enabled and station.request_items and station.request_items[stations_item_key] then
                     new_length = new_length + 1
-                    local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_station)
-                    minimap.children[2].caption = station.stop.backer_name
-                    if item_icon then
-                        minimap.children[3].caption = "-" .. tostring(station.request_counts[stations_item_key]) .. item_icon
-                    else
-                        minimap.children[3].caption = tostring(len_or_zero(station.request_deliveries[stations_item_key])) .. "[img=virtual-signal/down-arrow]"
-                    end
+                    local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = station.stop
+                    top.caption = station.stop.backer_name
+                    if item_icon then
+                        bottom.caption = "-" .. tostring(station.request_counts[stations_item_key]) .. item_icon
+                    else
+                        bottom.caption = tostring(len_or_zero(station.request_deliveries[stations_item_key])) .. "[img=virtual-signal/down-arrow]"
+                    end
                 end
             end
         end
@@ -1211,8 +1223,9 @@ function gui.network_open(player_id, network_name, tab_index)
                         { type = "sprite-button", name = "grid_depot_toggle", style = "control_settings_section_button", sprite = "sspp-depot-icon", enabled = false, auto_toggle = true, toggled = true },
                     } },
                     { type = "frame", style = "shallow_frame", direction = "horizontal", children = {
-                        { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", children = {
+                        { type = "scroll-pane", name = "right_scroll_pane", style = "sspp_right_grid_scroll_pane", direction = "vertical", children = {
                             { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
+                            { type = "flow", name = "info_flow", style = "vertical_flow", direction = "vertical" },
                         } },
                     } },
                 } },
@@ -1273,8 +1286,6 @@ function gui.network_add_flib_handlers()
         ["network_expand_item_haulers"] = handle_expand_item_haulers[events.on_gui_click],
         ["network_expand_item_stations"] = handle_expand_item_stations[events.on_gui_click],
         ["network_expand_job"] = handle_expand_job[events.on_gui_click],
-        ["network_open_hauler"] = handle_open_hauler[events.on_gui_click],
-        ["network_open_station"] = handle_open_station[events.on_gui_click],
         ["network_add_class"] = handle_add_class[events.on_gui_click],
         ["network_add_item"] = handle_add_item[events.on_gui_click],
         ["network_add_fluid"] = handle_add_fluid[events.on_gui_click],

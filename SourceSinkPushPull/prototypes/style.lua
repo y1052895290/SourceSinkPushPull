@@ -55,7 +55,7 @@ styles.sspp_station_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
     height = 132 * 4 + 36,
 }
 
-styles.sspp_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
+styles.sspp_right_flat_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
     type = "scroll_pane_style",
     parent = "deep_scroll_pane",
     margin = 4,
@@ -64,8 +64,13 @@ styles.sspp_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
         vertical_spacing = 0,
     },
     vertically_stretchable = "on",
-    background_graphical_set = deep_slot_background_tiling(144, 144),
     scrollbars_go_outside = true,
+}
+
+styles.sspp_right_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecification
+    type = "scroll_pane_style",
+    parent = "sspp_right_flat_scroll_pane",
+    background_graphical_set = deep_slot_background_tiling(144, 144),
 }
 
 styles.sspp_thin_shallow_frame = { ---@type data.FrameStyleSpecification
@@ -284,6 +289,16 @@ styles.sspp_history_action_label = { ---@type data.LabelStyleSpecification
     maximal_width = 274 - 8,
 }
 
+styles.sspp_job_action_flow = { ---@type data.HorizontalFlowStyleSpecification
+    type = "horizontal_flow_style",
+    parent = "packed_horizontal_flow",
+    width = 432,
+    height = 28,
+    vertical_align = "center",
+    left_padding = 8,
+    right_padding = 8,
+}
+
 styles.sspp_station_cell_flow = { ---@type data.VerticalFlowStyleSpecification
     type = "vertical_flow_style",
     parent = "packed_vertical_flow",
@@ -388,7 +403,7 @@ styles.sspp_minimap_bottom_label = { ---@type data.LabelStyleSpecification
     vertical_align = "bottom",
 }
 
-styles.sspp_minimap_subtitle_label = {
+styles.sspp_minimap_subtitle_label = { ---@type data.LabelStyleSpecification
     type = "label_style",
     parent = "bold_label",
     width = 128,

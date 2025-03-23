@@ -216,7 +216,7 @@ function main.hauler_arrived_at_request_station(hauler)
     local network_item = network.items[item_key]
     local name, quality = network_item.name, network_item.quality
 
-    job.real_count = get_train_item_count(train, name, quality)
+    job.loaded_count = get_train_item_count(train, name, quality)
     job.request_arrive_tick = game.tick
     gui.on_job_updated(network_name, job_index)
 
@@ -265,7 +265,7 @@ function main.hauler_done_at_request_station(hauler)
     local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
     local station = storage.stations[hauler.to_request.station]
 
-    storage.networks[network_name].jobs[job_index].request_done_tick = game.tick
+    storage.networks[network_name].jobs[job_index].finish_tick = game.tick
     gui.on_job_updated(network_name, job_index)
 
     clear_arithmetic_control_behavior(station.request_io)

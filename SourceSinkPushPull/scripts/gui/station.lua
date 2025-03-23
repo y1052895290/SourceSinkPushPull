@@ -293,7 +293,7 @@ local function provide_to_row_network(table_children, i, network_item)
 
     table_children[i + 3].children[1].children[3].caption = network_item.class
     table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
-    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
+    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
 end
 
 ---@param table_children LuaGuiElement[]
@@ -415,7 +415,7 @@ local function request_to_row_network(table_children, i, network_item)
 
     table_children[i + 3].children[1].children[3].caption = network_item.class
     table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
-    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-duration", network_item.delivery_time }
+    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
 end
 
 ---@param table_children LuaGuiElement[]
@@ -593,13 +593,6 @@ end
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
-local handle_open_hauler = { [events.on_gui_click] = function(event)
-    game.get_player(event.player_index).opened = event.element.parent.entity
-end }
-
---------------------------------------------------------------------------------
-
 ---@param player_gui PlayerStationGui
 function gui.station_poll_finished(player_gui)
     local parts = player_gui.parts
@@ -611,15 +604,15 @@ function gui.station_poll_finished(player_gui)
 
     local grid_table = elements.grid_table
     local grid_children = grid_table.children
-    local old_length = #grid_children
-    local new_length = 0
+
+    -- minimap reuse doesn't really matter for stations, but the code that already exists for networks
+    local old_length, new_length = #grid_children, 0
 
     if station.provide_counts then
-        local provide_table = elements.provide_table
-        local columns, table_children = provide_table.column_count, provide_table.children
-
+        local table_children = elements.provide_table.children
         local dynamic_index = -1 -- zero based
-        for i = 0, #table_children - 1, columns do
+
+        for i = 0, #table_children - 1, elements.provide_table.column_count do
             if table_children[i + 1].children[2].sprite == "" then
                 local _, quality, item_key = gui.extract_elem_value_fields(table_children[i + 2].elem_value)
                 local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
@@ -648,21 +641,20 @@ function gui.station_poll_finished(player_gui)
 
             for _, hauler_id in pairs(hauler_ids) do
                 new_length = new_length + 1
-                local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
+                local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
                 local train = storage.haulers[hauler_id].train
-                minimap.children[2].caption = "[img=virtual-signal/up-arrow]"
-                minimap.children[3].caption = tostring(get_train_item_count(train, name, quality)) .. icon
                 minimap.entity = train.front_stock
+                top.caption = "[img=virtual-signal/up-arrow]"
+                bottom.caption = tostring(get_train_item_count(train, name, quality)) .. icon
             end
         end
     end
 
     if station.request_counts then
-        local request_table = elements.request_table
-        local columns, table_children = request_table.column_count, request_table.children
-
+        local table_children = elements.request_table.children
         local dynamic_index = -1 -- zero based
-        for i = 0, #table_children - 1, columns do
+
+        for i = 0, #table_children - 1, elements.request_table.column_count do
             if table_children[i + 1].children[2].sprite == "" then
                 local _, quality, item_key = gui.extract_elem_value_fields(table_children[i + 2].elem_value)
                 local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
@@ -691,11 +683,11 @@ function gui.station_poll_finished(player_gui)
 
             for _, hauler_id in pairs(hauler_ids) do
                 new_length = new_length + 1
-                local minimap = gui.next_minimap(grid_table, grid_children, old_length, new_length, 1.0, handle_open_hauler)
+                local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
                 local train = storage.haulers[hauler_id].train
-                minimap.children[2].caption = "[img=virtual-signal/down-arrow]"
-                minimap.children[3].caption = tostring(get_train_item_count(train, name, quality)) .. icon
                 minimap.entity = train.front_stock
+                top.caption = "[img=virtual-signal/down-arrow]"
+                bottom.caption = tostring(get_train_item_count(train, name, quality)) .. icon
             end
         end
     end
@@ -989,7 +981,7 @@ local function add_gui_complete(player, parts)
                         { type = "sprite-button", name = "bufferless_toggle", style = "control_settings_section_button", sprite = "sspp-bufferless-icon", tooltip = bufferless_tooltip, auto_toggle = true, toggled = is_bufferless, handler = handle_bufferless_toggled },
                     } },
                     { type = "frame", style = "shallow_frame", direction = "horizontal", children = {
-                        { type = "scroll-pane", style = "sspp_grid_scroll_pane", direction = "vertical", children = {
+                        { type = "scroll-pane", style = "sspp_right_grid_scroll_pane", direction = "vertical", children = {
                             { type = "table", name = "grid_table", style = "sspp_grid_table", column_count = 3 },
                         } },
                     } },
@@ -1090,7 +1082,6 @@ function gui.station_add_flib_handlers()
         ["station_disable_toggled"] = handle_disable_toggled[events.on_gui_click],
         ["station_bufferless_toggled"] = handle_bufferless_toggled[events.on_gui_click],
         ["station_limit_changed"] = handle_limit_changed[events.on_gui_value_changed],
-        ["station_open_hauler"] = handle_open_hauler[events.on_gui_click],
         ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],
         ["station_add_provide_fluid"] = handle_add_provide_fluid[events.on_gui_click],
         ["station_add_request_item"] = handle_add_request_item[events.on_gui_click],
