@@ -63,6 +63,13 @@ function main.hauler_disabled_or_destroyed(hauler_id, hauler)
             list_remove_value_or_destroy(network.at_depot_haulers, hauler.class, hauler_id)
         end
     end
+
+    local job_index = hauler.job
+    if job_index then
+        network.jobs[job_index].abort_tick = game.tick
+        hauler.job = nil
+        gui.on_job_updated(hauler.network, job_index)
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -76,13 +83,6 @@ function main.hauler_set_to_manual(hauler)
     hauler.to_fuel = nil
     hauler.to_depot = nil
     hauler.at_depot = nil
-
-    local job_index = hauler.job
-    if job_index then
-        -- TODO: could actually set an "abort time" value
-        hauler.job = nil
-        gui.on_job_updated(hauler.network, job_index)
-    end
 
     hauler.train.schedule = nil
 end

@@ -375,6 +375,13 @@ styles.sspp_camera = { ---@type data.CameraStyleSpecification
     size = 128,
 }
 
+styles.sspp_dead_entity_image = { ---@type data.ImageStyleSpecification
+    type = "image_style",
+    size = 128,
+    padding = 48,
+    stretch_image_to_widget_size = true,
+}
+
 styles.sspp_minimap_button = { ---@type data.ButtonStyleSpecification
     type = "button_style",
     parent = "locomotive_minimap_button",

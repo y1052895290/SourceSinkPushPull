@@ -624,15 +624,15 @@ local function add_job_minimap_widgets(grid_table, subtitle, entity)
     local outer_frame = grid_table.add({ type = "frame", style = "sspp_thin_shallow_frame", direction = "vertical" })
     local minimap_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
     local camera_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
-    if entity then
+    if entity and entity.valid then
         local minimap = minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 })
         minimap.entity = entity
         minimap.add({ type = "button", style = "sspp_minimap_button", tags = flib_gui.format_handlers(gui.handle_open_minimap_entity) })
         local camera = camera_frame.add({ type = "camera", style = "sspp_camera", zoom = 0.25, position = entity.position })
         camera.entity = entity
     else
-        minimap_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
-        camera_frame.add({ type = "sprite", style = "achievement_image", sprite = "utility/not_available" })
+        minimap_frame.add({ type = "sprite", style = "sspp_dead_entity_image", sprite = "utility/not_available" })
+        camera_frame.add({ type = "sprite", style = "sspp_dead_entity_image", sprite = "utility/not_available" })
     end
     local title_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
     title_frame.add({ type = "label", style = "sspp_minimap_subtitle_label", caption = subtitle })
