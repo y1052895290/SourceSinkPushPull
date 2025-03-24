@@ -162,64 +162,67 @@ local migrations = {
         end
     end,
     ["0.3.23"] = function()
+        local function try_init_job(network, hauler_id, job_type)
+            local hauler = storage.haulers[hauler_id]
+            if not hauler.train.valid then return nil, nil end
+            local job = { hauler = hauler_id, type = job_type, start_tick = game.tick } ---@type Job
+            local job_index = network.job_index_counter + 1
+            hauler.job = job_index
+            network.job_index_counter = job_index
+            network.jobs[job_index] = job
+            return job, hauler
+        end
         for _, network in pairs(storage.networks) do
             if not network.job_index_counter then
                 network.job_index_counter = 0
                 network.jobs = {}
                 for item_key, hauler_ids in pairs(network.buffer_haulers) do
                     for _, hauler_id in pairs(hauler_ids) do
-                        local hauler = storage.haulers[hauler_id]
-                        if hauler.train.valid then
-                            local job = { hauler = hauler_id, start_tick = game.tick, item = item_key, provide_station = hauler.to_provide.station }
+                        local job, hauler = try_init_job(network, hauler_id, item_key)
+                        if job then ---@cast hauler -nil
+                            job.provide_stop = storage.entities[hauler.to_provide.station]
                             if hauler.to_provide.phase ~= "TRAVEL" then
                                 job.target_count = network.items[item_key].delivery_size
                                 job.provide_arrive_tick = game.tick
-                                if hauler.to_provide.phase == "DONE" then
-                                    job.provide_done_tick = game.tick
-                                end
+                                if hauler.to_provide.phase == "DONE" then job.provide_done_tick = game.tick end
                             end
-                            local job_index = network.job_index_counter + 1
-                            hauler.job = job_index
-                            network.job_index_counter = job_index
-                            network.jobs[job_index] = job
                         end
                     end
                 end
                 for item_key, hauler_ids in pairs(network.provide_haulers) do
                     for _, hauler_id in pairs(hauler_ids) do
-                        local hauler = storage.haulers[hauler_id]
-                        if hauler.train.valid then
-                            local job = { hauler = hauler_id, start_tick = game.tick, item = item_key, provide_station = hauler.to_provide.station }
+                        local job, hauler = try_init_job(network, hauler_id, item_key)
+                        if job then ---@cast hauler -nil
+                            job.provide_stop = storage.entities[hauler.to_provide.station]
                             if hauler.to_provide.phase ~= "TRAVEL" then
                                 job.target_count = network.items[item_key].delivery_size
                                 job.provide_arrive_tick = game.tick
-                                if hauler.to_provide.phase == "DONE" then
-                                    job.provide_done_tick = game.tick
-                                end
+                                if hauler.to_provide.phase == "DONE" then job.provide_done_tick = game.tick end
                             end
-                            local job_index = network.job_index_counter + 1
-                            hauler.job = job_index
-                            network.job_index_counter = job_index
-                            network.jobs[job_index] = job
                         end
                     end
                 end
                 for item_key, hauler_ids in pairs(network.request_haulers) do
                     for _, hauler_id in pairs(hauler_ids) do
-                        local hauler = storage.haulers[hauler_id]
-                        if hauler.train.valid then
-                            local job = { hauler = hauler_id, start_tick = game.tick, item = item_key, request_station = hauler.to_request.station }
+                        local job, hauler = try_init_job(network, hauler_id, item_key)
+                        if job then ---@cast hauler -nil
+                            job.request_stop = storage.entities[hauler.to_request.station]
                             if hauler.to_request.phase ~= "TRAVEL" then
                                 job.loaded_count = get_train_item_count(hauler.train, network.items[item_key].name, network.items[item_key].quality)
                                 job.request_arrive_tick = game.tick
-                                if hauler.to_request.phase == "DONE" then
-                                    job.request_done_tick = game.tick
-                                end
+                                if hauler.to_request.phase == "DONE" then job.finish_tick = game.tick end
                             end
-                            local job_index = network.job_index_counter + 1
-                            hauler.job = job_index
-                            network.job_index_counter = job_index
-                            network.jobs[job_index] = job
+                        end
+                    end
+                end
+                for _, hauler_ids in pairs(network.fuel_haulers) do
+                    for _, hauler_id in pairs(hauler_ids) do
+                        local job, hauler = try_init_job(network, hauler_id, "FUEL")
+                        if job then ---@cast hauler -nil
+                            if hauler.to_fuel == "TRANSFER" then
+                                job.fuel_stop = hauler.train.station
+                                job.fuel_arrive_tick = game.tick
+                            end
                         end
                     end
                 end

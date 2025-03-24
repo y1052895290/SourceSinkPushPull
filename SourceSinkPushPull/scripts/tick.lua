@@ -53,6 +53,26 @@ local function prepare_for_tick_poll()
     storage.tick_state = "POLL"
 end
 
+---@param hauler Hauler
+---@param to_station HaulerToStation
+---@return boolean? done
+function disable_if_wrong_cargo_else_check_if_done(hauler, to_station)
+    local train = hauler.train
+
+    for _, item in pairs(train.get_contents()) do
+        if item.name .. ":" .. (item.quality or "normal") ~= to_station.item then goto wrong_cargo_found end
+    end
+    for fluid, _ in pairs(train.get_fluid_contents()) do
+        if fluid ~= to_station.item then goto wrong_cargo_found end
+    end
+    do return to_station.phase == "DONE" end
+
+    ::wrong_cargo_found::
+    set_hauler_status(hauler, { "sspp-alert.loaded-wrong-cargo" })
+    send_alert_for_train(train, hauler.status)
+    train.manual_mode = true
+end
+
 ---@param network_items {[ItemKey]: NetworkItem}
 ---@param station_items {[ItemKey]: ProvideItem|RequestItem}?
 ---@param station_deliveries {[ItemKey]: HaulerId[]}?
@@ -171,11 +191,7 @@ local function tick_poll()
     if hauler_id then
         local hauler = storage.haulers[hauler_id]
         if hauler.to_provide then
-            if check_if_hauler_loaded_wrong_cargo(hauler, hauler.to_provide) then
-                set_hauler_status(hauler, { "sspp-alert.loaded-wrong-cargo" })
-                send_alert_for_train(hauler.train, hauler.status)
-                hauler.train.manual_mode = true
-            elseif hauler.to_provide.phase == "DONE" then
+            if disable_if_wrong_cargo_else_check_if_done(hauler, hauler.to_provide) then
                 if hauler.to_provide.buffer then
                     hauler_buffer_item_key = hauler.to_provide.item
                 else
@@ -183,15 +199,9 @@ local function tick_poll()
                     list_append_or_create(network.provide_done_tickets, hauler_provide_item_key, station_id)
                 end
             end
-        else
-            if check_if_hauler_loaded_wrong_cargo(hauler, hauler.to_request) then
-                set_hauler_status(hauler, { "sspp-alert.loaded-wrong-cargo" })
-                send_alert_for_train(hauler.train, hauler.status)
-                hauler.train.manual_mode = true
-            elseif hauler.to_request.phase == "DONE" then
-                hauler_request_item_key = hauler.to_request.item
-                list_append_or_create(network.request_done_tickets, hauler_request_item_key, station_id)
-            end
+        elseif disable_if_wrong_cargo_else_check_if_done(hauler, hauler.to_request) then
+            hauler_request_item_key = hauler.to_request.item
+            list_append_or_create(network.request_done_tickets, hauler_request_item_key, station_id)
         end
     end
 
@@ -545,31 +555,13 @@ local function tick_request_done()
     list_remove_value_or_destroy(network.request_haulers, item_key, hauler_id)
     list_remove_value_or_destroy(request_station.request_deliveries, item_key, hauler_id)
     hauler.to_request = nil
-    hauler.job = nil
     request_station.request_minimum_active_count = nil
     request_station.hauler = nil
     request_station.total_deliveries = request_station.total_deliveries - 1
 
-    local class = network.classes[hauler.class]
-    if class then
-        if check_if_hauler_needs_fuel(hauler, class) then
-            list_append_or_create(network.fuel_haulers, hauler.class, hauler_id)
-            hauler.to_fuel = "TRAVEL"
-            set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
-            set_hauler_color(hauler, e_train_colors.fuel)
-            send_hauler_to_named_stop(hauler, class.fueler_name)
-        else
-            list_append_or_create(network.to_depot_haulers, hauler.class, hauler_id)
-            hauler.to_depot = ""
-            set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
-            set_hauler_color(hauler, e_train_colors.depot)
-            send_hauler_to_named_stop(hauler, class.depot_name)
-        end
-    else
-        set_hauler_status(hauler, { "sspp-alert.class-not-in-network" })
-        send_alert_for_train(hauler.train, hauler.status)
-        hauler.train.manual_mode = true
-    end
+    hauler.job = nil
+
+    main.hauler_send_to_fuel_or_depot(hauler, true, false)
 
     return false
 end
@@ -643,7 +635,7 @@ local function tick_liquidate()
     set_hauler_color(hauler, e_train_colors.request)
     send_hauler_to_station(hauler, request_station.stop)
 
-    assign_new_job(network, hauler, { hauler = hauler_id, start_tick = game.tick, item = item_key, request_station = request_station_id })
+    assign_new_job(network, hauler, { hauler = hauler_id, type = item_key, start_tick = game.tick, request_stop = request_station.stop })
 
     return false
 end
@@ -707,7 +699,7 @@ local function tick_provide_done()
     send_hauler_to_station(hauler, request_station.stop)
 
     local job_index = hauler.job --[[@as JobIndex]]
-    network.jobs[job_index].request_station = request_station_id
+    network.jobs[job_index].request_stop = request_station.stop
     gui.on_job_updated(network_name, job_index)
 
     return false
@@ -795,7 +787,7 @@ local function tick_dispatch()
     set_hauler_color(hauler, e_train_colors.provide)
     send_hauler_to_station(hauler, provide_station.stop)
 
-    assign_new_job(network, hauler, { hauler = hauler_id, start_tick = game.tick, item = item_key, provide_station = provide_station_id })
+    assign_new_job(network, hauler, { hauler = hauler_id, type = item_key, start_tick = game.tick, provide_stop = provide_station.stop })
 
     return false
 end
@@ -845,7 +837,7 @@ local function tick_buffer()
     set_hauler_color(hauler, e_train_colors.provide)
     send_hauler_to_station(hauler, provide_station.stop)
 
-    assign_new_job(network, hauler, { hauler = hauler_id, start_tick = game.tick, item = item_key, provide_station = provide_station_id })
+    assign_new_job(network, hauler, { hauler = hauler_id, type = item_key, start_tick = game.tick, provide_stop = provide_station.stop })
 
     return false
 end

@@ -2,6 +2,7 @@
 
 --------------------------------------------------------------------------------
 
+--- This function also takes hauler_id as hauler.train can be invalid.
 ---@param hauler_id HaulerId
 ---@param hauler Hauler
 function main.hauler_disabled_or_destroyed(hauler_id, hauler)
@@ -88,57 +89,17 @@ end
 
 ---@param hauler Hauler
 function main.hauler_set_to_automatic(hauler)
-    local train = hauler.train
     local network = storage.networks[hauler.network]
 
-    local class = network.classes[hauler.class]
-    if not class then
+    if not network.classes[hauler.class] then
+        local train = hauler.train
         set_hauler_status(hauler, { "sspp-alert.class-not-in-network" })
         send_alert_for_train(train, hauler.status)
         train.manual_mode = true
         return
     end
 
-    if check_if_hauler_needs_fuel(hauler, class) then
-        list_append_or_create(network.fuel_haulers, hauler.class, train.id)
-        hauler.to_fuel = "TRAVEL"
-        set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
-        set_hauler_color(hauler, e_train_colors.fuel)
-        send_hauler_to_named_stop(hauler, class.fueler_name)
-        return
-    end
-
-    local train_items, train_fluids = train.get_contents(), train.get_fluid_contents()
-    local train_item, train_fluid = train_items[1], next(train_fluids)
-
-    if train_items[2] or next(train_fluids, train_fluid) or (train_item and train_fluid) then
-        set_hauler_status(hauler, { "sspp-alert.multiple-items-or-fluids" })
-        send_alert_for_train(train, hauler.status)
-        train.manual_mode = true
-        return
-    end
-
-    local item_key = train_fluid or train_item and (train_item.name .. ":" .. (train_item.quality or "normal"))
-    if item_key then
-        if network.items[item_key] then
-            list_append_or_create(network.to_depot_liquidate_haulers, item_key, train.id)
-            hauler.to_depot = item_key
-            set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.waiting-for-request" or "sspp-alert.going-to-depot" }, item_key)
-            set_hauler_color(hauler, e_train_colors.liquidate)
-            send_hauler_to_named_stop(hauler, class.depot_name)
-        else
-            set_hauler_status(hauler, { "sspp-alert.cargo-not-in-network" }, item_key)
-            send_alert_for_train(train, hauler.status)
-            train.manual_mode = true
-        end
-        return
-    end
-
-    list_append_or_create(network.to_depot_haulers, hauler.class, train.id)
-    hauler.to_depot = ""
-    set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
-    set_hauler_color(hauler, e_train_colors.depot)
-    send_hauler_to_named_stop(hauler, class.depot_name)
+    main.hauler_send_to_fuel_or_depot(hauler, true, true)
 end
 
 --------------------------------------------------------------------------------
@@ -156,16 +117,10 @@ function main.hauler_arrived_at_provide_station(hauler)
         return
     end
 
-    local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
-    local item_key = hauler.to_provide.item
+    local network_name, item_key = hauler.network, hauler.to_provide.item
     local network = storage.networks[network_name]
-    local job = network.jobs[job_index]
     local network_item = network.items[item_key]
     local name, quality = network_item.name, network_item.quality
-
-    job.target_count = network_item.delivery_size
-    job.provide_arrive_tick = game.tick
-    gui.on_job_updated(network_name, job_index)
 
     local provide_item = station.provide_items[item_key]
     local constant = compute_load_target(network_item, provide_item)
@@ -194,6 +149,12 @@ function main.hauler_arrived_at_provide_station(hauler)
     hauler.to_provide.phase = "TRANSFER"
     set_arithmetic_control_behavior(station.provide_io, constant, "-", signal)
     train.schedule = { current = 1, records = { { station = stop.backer_name, wait_conditions = wait_conditions }, { rail = stop.connected_rail } } }
+
+    local job_index = hauler.job --[[@as JobIndex]]
+    local job = network.jobs[job_index]
+    job.target_count = network_item.delivery_size
+    job.provide_arrive_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
 end
 
 ---@param hauler Hauler
@@ -209,16 +170,10 @@ function main.hauler_arrived_at_request_station(hauler)
         return
     end
 
-    local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
-    local item_key = hauler.to_request.item
+    local network_name, item_key = hauler.network, hauler.to_request.item
     local network = storage.networks[network_name]
-    local job = network.jobs[job_index]
     local network_item = network.items[item_key]
     local name, quality = network_item.name, network_item.quality
-
-    job.loaded_count = get_train_item_count(train, name, quality)
-    job.request_arrive_tick = game.tick
-    gui.on_job_updated(network_name, job_index)
 
     local signal, wait_conditions ---@type SignalID, WaitCondition[]
     if quality then
@@ -240,17 +195,19 @@ function main.hauler_arrived_at_request_station(hauler)
     hauler.to_request.phase = "TRANSFER"
     set_arithmetic_control_behavior(station.request_io, 0, "+", signal)
     train.schedule = { current = 1, records = { { station = stop.backer_name, wait_conditions = wait_conditions }, { rail = stop.connected_rail } } }
+
+    local job_index = hauler.job --[[@as JobIndex]]
+    local job = network.jobs[job_index]
+    job.loaded_count = get_train_item_count(train, name, quality)
+    job.request_arrive_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
 end
 
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
 function main.hauler_done_at_provide_station(hauler)
-    local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
-    local station = storage.stations[hauler.to_provide.station]
-
-    storage.networks[network_name].jobs[job_index].provide_done_tick = game.tick
-    gui.on_job_updated(network_name, job_index)
+    local network_name, station = hauler.network, storage.stations[hauler.to_provide.station]
 
     clear_arithmetic_control_behavior(station.provide_io)
     clear_hidden_comb_control_behaviors(station.provide_hidden_combs)
@@ -258,15 +215,15 @@ function main.hauler_done_at_provide_station(hauler)
     hauler.to_provide.phase = "DONE"
     set_hauler_status(hauler, { "sspp-alert.waiting-for-request" }, hauler.status_item, hauler.status_stop)
     hauler.train.schedule = { current = 1, records = { { rail = station.stop.connected_rail } } }
+
+    local job_index = hauler.job --[[@as JobIndex]]
+    storage.networks[network_name].jobs[job_index].provide_done_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
 end
 
 ---@param hauler Hauler
 function main.hauler_done_at_request_station(hauler)
-    local network_name, job_index = hauler.network, hauler.job --[[@as JobIndex]]
-    local station = storage.stations[hauler.to_request.station]
-
-    storage.networks[network_name].jobs[job_index].finish_tick = game.tick
-    gui.on_job_updated(network_name, job_index)
+    local network_name, station = hauler.network, storage.stations[hauler.to_request.station]
 
     clear_arithmetic_control_behavior(station.request_io)
     clear_hidden_comb_control_behaviors(station.request_hidden_combs)
@@ -274,31 +231,77 @@ function main.hauler_done_at_request_station(hauler)
     hauler.to_request.phase = "DONE"
     -- no special status needed, won't be in this state for long
     hauler.train.schedule = { current = 1, records = { { rail = station.stop.connected_rail } } }
+
+    local job_index = hauler.job --[[@as JobIndex]]
+    storage.networks[network_name].jobs[job_index].finish_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
 end
 
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
-function main.hauler_arrived_at_fuel_stop(hauler)
-    local train = hauler.train
-    local stop = train.station --[[@as LuaEntity]]
-
-    local wait_conditions = { { type = "fuel_full" } }
-
-    hauler.to_fuel = "TRANSFER"
-    train.schedule = { current = 1, records = { { station = stop.backer_name, wait_conditions = wait_conditions }, { rail = stop.connected_rail } } }
-end
-
----@param hauler Hauler
-function main.hauler_done_at_fuel_stop(hauler)
+---@param check_fuel boolean
+---@param check_cargo boolean
+function main.hauler_send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
+    local class_name = hauler.class
     local train = hauler.train
     local network = storage.networks[hauler.network]
-    local class = network.classes[hauler.class]
+    local class = network.classes[class_name]
 
-    list_remove_value_or_destroy(network.fuel_haulers, hauler.class, train.id)
-    hauler.to_fuel = nil
+    if check_fuel then
+        local maximum_delivery_time = 150.0 -- TODO: calculate properly
+        local energy_per_second = 5000000.0 / 3.0 -- TODO: calculate properly
 
-    list_append_or_create(network.to_depot_haulers, hauler.class, train.id)
+        -- TODO: could be less, this assumes constant burning
+        local energy_threshold = energy_per_second * maximum_delivery_time
+
+        local loco_dict = train.locomotives ---@type {string: LuaEntity[]}
+        for _, loco_list in pairs(loco_dict) do
+            for _, loco in pairs(loco_list) do
+                local burner = assert(loco.burner, "TODO: electric trains")
+                local energy = burner.remaining_burning_fuel
+                for _, item_with_count in pairs(burner.inventory.get_contents()) do
+                    energy = energy + prototypes.item[item_with_count.name].fuel_value * item_with_count.count
+                end
+                if energy < energy_threshold then
+                    list_append_or_create(network.fuel_haulers, class_name, train.id)
+                    hauler.to_fuel = "TRAVEL"
+                    set_hauler_status(hauler, { "sspp-alert.getting-fuel" })
+                    set_hauler_color(hauler, e_train_colors.fuel)
+                    send_hauler_to_named_stop(hauler, class.fueler_name)
+                    assign_new_job(network, hauler, { hauler = train.id, type = "FUEL", start_tick = game.tick })
+                    return
+                end
+            end
+        end
+    end
+
+    if check_cargo then
+        local train_items, train_fluids = train.get_contents(), train.get_fluid_contents()
+        local train_item, train_fluid = train_items[1], next(train_fluids)
+
+        local item_key = train_fluid or (train_item and (train_item.name .. ":" .. (train_item.quality or "normal")))
+        if item_key then
+            if train_items[2] or next(train_fluids, train_fluid) or (train_item and train_fluid) then
+                set_hauler_status(hauler, { "sspp-alert.multiple-items-or-fluids" })
+                send_alert_for_train(train, hauler.status)
+                train.manual_mode = true
+            elseif not network.items[item_key] then
+                set_hauler_status(hauler, { "sspp-alert.cargo-not-in-network" }, item_key)
+                send_alert_for_train(train, hauler.status)
+                train.manual_mode = true
+            else
+                list_append_or_create(network.to_depot_liquidate_haulers, item_key, train.id)
+                hauler.to_depot = item_key
+                set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.waiting-for-request" or "sspp-alert.going-to-depot" }, item_key)
+                set_hauler_color(hauler, e_train_colors.liquidate)
+                send_hauler_to_named_stop(hauler, class.depot_name)
+            end
+            return
+        end
+    end
+
+    list_append_or_create(network.to_depot_haulers, class_name, train.id)
     hauler.to_depot = ""
     set_hauler_status(hauler, { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" })
     set_hauler_color(hauler, e_train_colors.depot)
@@ -308,13 +311,48 @@ end
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
+function main.hauler_arrived_at_fuel_stop(hauler)
+    local network_name, train = hauler.network, hauler.train
+    local stop = train.station --[[@as LuaEntity]]
+
+    local wait_conditions = { { type = "fuel_full" } }
+
+    hauler.to_fuel = "TRANSFER"
+    train.schedule = { current = 1, records = { { station = stop.backer_name, wait_conditions = wait_conditions }, { rail = stop.connected_rail } } }
+
+    local job_index = hauler.job --[[@as JobIndex]]
+    local job = storage.networks[network_name].jobs[job_index]
+    job.fuel_stop = stop
+    job.fuel_arrive_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
+end
+
+---@param hauler Hauler
+function main.hauler_done_at_fuel_stop(hauler)
+    local network_name = hauler.network
+    local network = storage.networks[network_name]
+
+    list_remove_value_or_destroy(network.fuel_haulers, hauler.class, hauler.train.id)
+    hauler.to_fuel = nil
+
+    local job_index = hauler.job --[[@as JobIndex]]
+    network.jobs[job_index].finish_tick = game.tick
+    gui.on_job_updated(network_name, job_index)
+
+    hauler.job = nil
+
+    main.hauler_send_to_fuel_or_depot(hauler, false, true)
+end
+
+--------------------------------------------------------------------------------
+
+---@param hauler Hauler
 function main.hauler_arrived_at_depot_stop(hauler)
-    local hauler_id = hauler.train.id
-    local class_name = hauler.class
+    local item_key, hauler_id = hauler.to_depot, hauler.train.id
     local network = storage.networks[hauler.network]
-    local item_key = hauler.to_depot
 
     if item_key == "" then
+        local class_name = hauler.class
         list_remove_value_or_destroy(network.to_depot_haulers, class_name, hauler_id)
         list_append_or_create(network.at_depot_haulers, class_name, hauler_id)
         set_hauler_status(hauler, { "sspp-alert.ready-for-dispatch" })

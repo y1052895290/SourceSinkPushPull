@@ -13,6 +13,48 @@ function gui.caption_with_info(caption)
     return { "", caption, " [img=info]" }
 end
 
+---@param path LuaRailPath?
+---@return LocalisedString
+function gui.format_distance(path)
+    if path then
+        return { "sspp-gui.fmt-metres", math.floor(path.total_distance - path.travelled_distance + 0.5) }
+    end
+    return { "sspp-gui.no-path" }
+end
+
+---@param start_tick MapTick
+---@param finish_tick_or_in_progress (MapTick|true)?
+---@return LocalisedString
+function gui.format_duration(start_tick, finish_tick_or_in_progress)
+    if finish_tick_or_in_progress then
+        if finish_tick_or_in_progress ~= true then
+            return { "sspp-gui.fmt-seconds", math.floor((finish_tick_or_in_progress - start_tick) / 60.0 + 0.5) }
+        end
+        return { "sspp-gui.active" }
+    end
+    return { "sspp-gui.aborted" }
+end
+
+---@param tick MapTick
+---@return LocalisedString
+function gui.format_time(tick)
+    local total_seconds = math.floor(tick / 60)
+    local seconds = total_seconds % 60
+    local minutes = math.floor(total_seconds / 60) % 60
+    local hours = math.floor(total_seconds / 3600)
+    return string.format("%02d:%02d:%02d", hours, minutes, seconds)
+end
+
+--- The entity passed to this function can be invalid.
+---@param stop LuaEntity?
+---@return string
+function gui.get_stop_name(stop)
+    if stop and stop.valid then
+        return stop.backer_name --[[@as string]]
+    end
+    return "[virtual-signal=signal-ghost]"
+end
+
 ---@param input LuaGuiElement
 ---@param max_length integer
 ---@return string

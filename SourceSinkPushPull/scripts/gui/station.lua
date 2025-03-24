@@ -605,7 +605,7 @@ function gui.station_poll_finished(player_gui)
     local grid_table = elements.grid_table
     local grid_children = grid_table.children
 
-    -- minimap reuse doesn't really matter for stations, but the code that already exists for networks
+    -- minimap reuse doesn't really matter for stations, but the code already exists for networks
     local old_length, new_length = #grid_children, 0
 
     if station.provide_counts then

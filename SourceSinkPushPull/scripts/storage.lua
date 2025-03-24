@@ -21,6 +21,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@alias JobIndex integer
 ---@alias TickState "INITIAL"|"POLL"|"REQUEST_DONE"|"LIQUIDATE"|"PROVIDE_DONE"|"DISPATCH"|"BUFFER"
 ---@alias HaulerPhase "TRAVEL"|"TRANSFER"|"DONE"
+---@alias JobType "FUEL"|ItemKey
 ---@alias PlayerGui PlayerNetworkGui|PlayerStationGui|PlayerHaulerGui
 
 ---@class (exact) SourceSinkPushPull.Storage
@@ -84,16 +85,19 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 
 ---@class (exact) Job
 ---@field public hauler HaulerId
+---@field public type JobType
 ---@field public start_tick MapTick
----@field public item ItemKey?
----@field public provide_station StationId?
+---@field public fuel_stop LuaEntity?
+---@field public fuel_arrive_tick MapTick?
+---@field public provide_stop LuaEntity?
 ---@field public target_count integer?
 ---@field public provide_arrive_tick MapTick?
 ---@field public provide_done_tick MapTick?
----@field public request_station StationId?
+---@field public request_stop LuaEntity?
 ---@field public loaded_count integer?
 ---@field public request_arrive_tick MapTick?
 ---@field public finish_tick MapTick?
+---@field public abort_tick MapTick?
 
 --------------------------------------------------------------------------------
 

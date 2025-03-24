@@ -1,9 +1,13 @@
 -- SSPP by jagoly
 
 local flib_gui = require("__flib__.gui")
-local flib_format = require("__flib__.format")
 local events = defines.events
+
 local cwi = gui.caption_with_info
+local format_disatnce = gui.format_distance
+local format_duration = gui.format_duration
+local format_time = gui.format_time
+local get_stop_name = gui.get_stop_name
 
 --------------------------------------------------------------------------------
 
@@ -203,12 +207,13 @@ local handle_expand_job = { [events.on_gui_click] = function(event)
 
     local job_index = player_gui.history_indices[event.element.get_index_in_parent() / 5]
     local job = storage.networks[player_gui.network].jobs[job_index]
+    local job_type = job.type
 
-    local name, quality = split_item_key(job.item)
-    if quality then
-        elements.grid_title.caption = { "sspp-gui.fmt-item-job-title", name, quality, job_index }
+    if job_type == "FUEL" then
+        elements.grid_title.caption = { "sspp-gui.fmt-job-title", "[virtual-signal=signal-fuel]", job_index }
     else
-        elements.grid_title.caption = { "sspp-gui.fmt-fluid-job-title", name, job_index }
+        local name, quality = split_item_key(job_type)
+        elements.grid_title.caption = { "sspp-gui.fmt-job-title", make_item_icon(name, quality), job_index }
     end
     elements.right_scroll_pane.style = "sspp_right_flat_scroll_pane"
 
@@ -470,47 +475,66 @@ end
 ---@param job_index JobIndex
 ---@param job Job
 local function insert_history_row(history_table, row_index, job_index, job)
-    local name, quality = split_item_key(job.item)
+    local hauler = storage.haulers[job.hauler] --[[@as Hauler?]]
+    local job_type = job.type
+    local in_progress = hauler and hauler.job == job_index or nil
 
-    local elem_button = history_table.add({ index = row_index * 5 - 4, type = "choose-elem-button", style = "slot_button", elem_type = "signal", signal = { name = name, quality = quality, type = quality and "item" or "fluid" } })
+    local signal ---@type SignalID
+    if job_type == "FUEL" then
+        signal = { name = "signal-fuel", type = "virtual" }
+    else
+        local name, quality = split_item_key(job_type)
+        signal = { name = name, quality = quality, type = quality and "item" or "fluid" }
+    end
+
+    local elem_button = history_table.add({ index = row_index * 5 - 4, type = "choose-elem-button", style = "slot_button", elem_type = "signal", signal = signal })
     elem_button.locked = true -- https://forums.factorio.com/viewtopic.php?t=127562
     local actions_flow = history_table.add({ index = row_index * 5 - 3, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
     local durations_flow = history_table.add({ index = row_index * 5 - 2, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
     local summary_flow = history_table.add({ index = row_index * 5 - 1, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
     history_table.add({ index = row_index * 5 - 0, type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-grid-icon", tags = flib_gui.format_handlers(handle_expand_job) })
 
-    local hauler = storage.haulers[job.hauler]
-    local unfinished_caption = (hauler and hauler.job == job_index) and "(active)" or "(aborted)"
+    if job_type == "FUEL" then
+        local fuel_stop = job.fuel_stop or (in_progress and hauler--[[@as Hauler]].train.path_end_stop)
 
-    local provide_station_id = job.provide_station
-    if provide_station_id then
-        local depart_tick, arrive_tick, done_tick = job.start_tick, job.provide_arrive_tick, job.provide_done_tick
-        local stop = storage.entities[provide_station_id]
-        actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-travel-to-pick-up", stop and stop.backer_name or "[virtual-signal=signal-ghost]" } })
-        durations_flow.add({ type = "label", style = "label", caption = arrive_tick and { "sspp-gui.fmt-seconds", math.floor((arrive_tick - depart_tick) / 60.0 + 0.5) } or unfinished_caption })
+        local depart_tick, arrive_tick, done_tick = job.start_tick, job.fuel_arrive_tick, job.finish_tick
+        actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-travel-to-fuel", get_stop_name(fuel_stop) } })
+        durations_flow.add({ type = "label", style = "label", caption = format_duration(depart_tick, arrive_tick or in_progress) })
         if arrive_tick then
-            actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-transfer-to-hauler", job.target_count } })
-            durations_flow.add({ type = "label", style = "label", caption = done_tick and { "sspp-gui.fmt-seconds", math.floor((done_tick - arrive_tick) / 60.0 + 0.5) } or unfinished_caption })
+            actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.transfer-fuel-to-hauler" } })
+            durations_flow.add({ type = "label", style = "label", caption = format_duration(arrive_tick, done_tick or in_progress) })
+        end
+    else
+        local provide_stop, request_stop = job.provide_stop, job.request_stop
+
+        if provide_stop then
+            local depart_tick, arrive_tick, done_tick = job.start_tick, job.provide_arrive_tick, job.provide_done_tick
+            actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-travel-to-pick-up", get_stop_name(provide_stop) } })
+            durations_flow.add({ type = "label", style = "label", caption = format_duration(depart_tick, arrive_tick or in_progress) })
+            if arrive_tick then
+                actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-transfer-cargo-to-hauler", job.target_count } })
+                durations_flow.add({ type = "label", style = "label", caption = format_duration(arrive_tick, done_tick or in_progress) })
+            end
+        end
+
+        if request_stop then
+            local depart_tick, arrive_tick, done_tick = job.provide_done_tick or job.start_tick, job.request_arrive_tick, job.finish_tick
+            actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-travel-to-drop-off", get_stop_name(request_stop) } })
+            durations_flow.add({ type = "label", style = "label", caption = format_duration(depart_tick, arrive_tick or in_progress) })
+            if arrive_tick then
+                actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-transfer-cargo-to-station", job.loaded_count } })
+                durations_flow.add({ type = "label", style = "label", caption = format_duration(arrive_tick, done_tick or in_progress) })
+            end
         end
     end
 
-    local request_station_id = job.request_station
-    if request_station_id then
-        local depart_tick, arrive_tick, done_tick = job.provide_done_tick or job.start_tick, job.request_arrive_tick, job.finish_tick
-        local stop = storage.entities[request_station_id]
-        actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-travel-to-drop-off", stop and stop.backer_name or "[virtual-signal=signal-ghost]" } })
-        durations_flow.add({ type = "label", style = "label", caption = arrive_tick and { "sspp-gui.fmt-seconds", math.floor((arrive_tick - depart_tick) / 60.0 + 0.5) } or unfinished_caption })
-        if arrive_tick then
-            actions_flow.add({ type = "label", style = "sspp_history_action_label", caption = { "sspp-gui.fmt-transfer-to-station", job.loaded_count } })
-            durations_flow.add({ type = "label", style = "label", caption = done_tick and { "sspp-gui.fmt-seconds", math.floor((done_tick - arrive_tick) / 60.0 + 0.5) } or unfinished_caption })
-        end
-    end
-
-    summary_flow.add({ type = "label", style = "label", caption = string.format("Started at: %s", flib_format.time(job.start_tick, true)) })
-
-    if job.finish_tick then
-        summary_flow.add({ type = "label", style = "label", caption = string.format("Finished at: %s", flib_format.time(job.finish_tick, true)) })
-        summary_flow.add({ type = "label", style = "label", caption = string.format("Total duration: %d", math.floor((job.finish_tick - job.start_tick) / 60.0 + 0.5)) })
+    local start_tick, finish_tick, abort_tick = job.start_tick, job.finish_tick, job.abort_tick
+    summary_flow.add({ type = "label", style = "label", caption = { "", { "sspp-gui.job-started" }, format_time(start_tick) } })
+    if finish_tick then
+        summary_flow.add({ type = "label", style = "label", caption = { "", { "sspp-gui.job-finished" }, format_time(finish_tick) } })
+        summary_flow.add({ type = "label", style = "label", caption = { "", { "sspp-gui.total-duration" }, format_duration(start_tick, finish_tick) } })
+    elseif abort_tick then
+        summary_flow.add({ type = "label", style = "label", caption = { "", { "sspp-gui.job-aborted" }, format_time(abort_tick) } })
     end
 end
 
@@ -615,54 +639,55 @@ local function add_job_minimap_widgets(grid_table, subtitle, entity)
 end
 
 ---@param info_flow LuaGuiElement
----@param caption LocalisedString
----@param tick MapTick
-local function add_job_label_and_time(info_flow, caption, tick)
+---@param left_caption LocalisedString
+---@param right_caption LocalisedString
+local function add_job_label_pusher_label(info_flow, style, left_caption, right_caption)
     local flow = info_flow.add({ type = "flow", style = "sspp_job_action_flow", direction = "horizontal" })
-    flow.add({ type = "label", style = "caption_label", caption = caption })
+    flow.add({ type = "label", style = style, caption = left_caption })
     flow.add({ type = "empty-widget", style = "flib_horizontal_pusher" })
-    flow.add({ type = "label", style = "caption_label", caption = flib_format.time(tick, true) })
+    flow.add({ type = "label", style = style, caption = right_caption })
 end
 
 ---@param info_flow LuaGuiElement
----@param caption LocalisedString
----@param first_tick MapTick
----@param last_tick MapTick?
-local function add_job_label_and_duration(info_flow, caption, first_tick, last_tick)
-    local flow = info_flow.add({ type = "flow", style = "sspp_job_action_flow", direction = "horizontal" })
-    flow.add({ type = "label", style = "label", caption = caption })
-    flow.add({ type = "empty-widget", style = "flib_horizontal_pusher" })
-    flow.add({ type = "label", style = "label", caption = last_tick and { "sspp-gui.fmt-seconds", math.floor((last_tick - first_tick) / 60.0 + 0.5) } or "(aborted)" })
-end
-
----@param info_flow LuaGuiElement
----@param path LuaRailPath?
-local function add_job_travel_progress_footer(info_flow, path)
+---@param train LuaTrain
+local function add_job_travel_progress_footer(info_flow, train)
     info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
     info_flow.add({ type = "line" })
-    local flow = info_flow.add({ type = "flow", style = "sspp_job_action_flow", direction = "horizontal" })
-    flow.add({ type = "label", style = "info_label", caption = { "sspp-gui.distance-to-travel" } })
-    flow.add({ type = "empty-widget", style = "flib_horizontal_pusher" })
-    local format = path and "sspp-gui.fmt-metres" or "(no path)"
-    local distance = path and math.floor(path.total_distance - path.travelled_distance + 0.5)
-    flow.add({ type = "label", style = "info_label", caption = { format, distance } })
+    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.distance-to-travel" }, format_disatnce(train.path) )
+end
+
+---@param info_flow LuaGuiElement
+---@param train LuaTrain
+local function add_job_fuel_transfer_progress_footer(info_flow, train)
+    info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
+    info_flow.add({ type = "line" })
+    local min_fullness = 1.0
+    for _, loco_list in pairs(train.locomotives--[=[@as {string: LuaEntity[]}]=]) do
+        for _, loco in pairs(loco_list) do
+            local inventory = assert(loco.burner, "TODO: electric trains").inventory
+            local total_slots, total_filled_slots = inventory.count_empty_stacks(), 0.0
+            for _, item in pairs(inventory.get_contents()) do
+                local filled_slots = item.count / prototypes.item[item.name].stack_size
+                total_slots, total_filled_slots = (total_slots + math.ceil(filled_slots)), (total_filled_slots + filled_slots)
+            end
+            min_fullness = math.min(min_fullness, total_filled_slots / total_slots)
+        end
+    end
+    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.fuel-to-transfer" }, string.format("%.0f%%", (1.0 - min_fullness) * 100.0) )
 end
 
 ---@param info_flow LuaGuiElement
 ---@param train LuaTrain
 ---@param item_key ItemKey
 ---@param target_count integer?
-local function add_job_transfer_progress_footer(info_flow, train, item_key, target_count)
+local function add_job_cargo_transfer_progress_footer(info_flow, train, item_key, target_count)
     info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
     info_flow.add({ type = "line" })
-    local flow = info_flow.add({ type = "flow", style = "sspp_job_action_flow", direction = "horizontal" })
-    flow.add({ type = "label", style = "info_label", caption = { "sspp-gui.cargo-to-transfer" } })
-    flow.add({ type = "empty-widget", style = "flib_horizontal_pusher" })
     local name, quality = split_item_key(item_key)
     local format = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
     local count = get_train_item_count(train, name, quality)
     if target_count then count = target_count - count end
-    flow.add({ type = "label", style = "info_label", caption = { format, count } })
+    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.cargo-to-transfer" }, { format, count } )
 end
 
 --------------------------------------------------------------------------------
@@ -747,51 +772,61 @@ function gui.network_poll_finished(player_gui)
         local grid_table, info_flow = elements.grid_table, elements.info_flow
 
         local job = network.jobs[expanded_job_index]
-        local hauler = storage.haulers[job.hauler] ---@type Hauler?
+        local hauler = storage.haulers[job.hauler] --[[@as Hauler?]]
+        local job_type = job.type
+        local in_progress_tick = hauler and hauler.job == expanded_job_index and game.tick or nil
+        local in_progress_train = in_progress_tick and hauler--[[@as Hauler]].train
 
         grid_table.clear()
         info_flow.clear()
 
-        add_job_minimap_widgets(grid_table, "[item=locomotive] Train", hauler and hauler.train.front_stock)
-
-        add_job_label_and_time(info_flow, "Job started", job.start_tick)
+        add_job_minimap_widgets(grid_table, { "", "[img=item/locomotive] ", { "sspp-gui.hauler" } }, hauler and hauler.train.front_stock)
+        info_flow.add({ type = "line" })
+        add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-started" }, format_time(job.start_tick))
         info_flow.add({ type = "line" })
 
-        local in_progress_tick = hauler and hauler.job == expanded_job_index and game.tick or nil
+        if job_type == "FUEL" then
+            local fuel_stop = job.fuel_stop or (in_progress_train and in_progress_train.path_end_stop)
 
-        local item_key = job.item
-        if item_key then
-            local provide_station_id, request_station_id = job.provide_station, job.request_station
-
-            if provide_station_id then
-                local depart_tick, arrive_tick, done_tick = job.start_tick, job.provide_arrive_tick, job.provide_done_tick
-                local stop = storage.entities[provide_station_id]
-                add_job_minimap_widgets(grid_table, "[item=sspp-provide-io] Provide", stop)
-                add_job_label_and_duration(info_flow, { "sspp-gui.fmt-travel-to-pick-up", stop and stop.backer_name or "[virtual-signal=signal-ghost]" }, depart_tick, arrive_tick or in_progress_tick)
-                if in_progress_tick and not arrive_tick then
-                    add_job_travel_progress_footer(info_flow, hauler.train.path)
+            local depart_tick, arrive_tick, done_tick = job.start_tick, job.fuel_arrive_tick, job.finish_tick
+            add_job_minimap_widgets(grid_table, { "", "[img=item/train-stop] ", { "sspp-gui.fuel" } }, fuel_stop)
+            add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-fuel", get_stop_name(fuel_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
+            if arrive_tick then
+                add_job_label_pusher_label(info_flow, "label", { "sspp-gui.transfer-fuel-to-hauler" }, format_duration(arrive_tick, done_tick or in_progress_tick))
+                if in_progress_train then
+                    add_job_fuel_transfer_progress_footer(info_flow, in_progress_train)
                 end
+            elseif in_progress_train then
+                add_job_travel_progress_footer(info_flow, in_progress_train)
+            end
+        else
+            local provide_stop, request_stop = job.provide_stop, job.request_stop
+
+            if provide_stop then
+                local depart_tick, arrive_tick, done_tick = job.start_tick, job.provide_arrive_tick, job.provide_done_tick
+                add_job_minimap_widgets(grid_table, { "", "[img=item/sspp-provide-io] ", { "sspp-gui.provide" } }, provide_stop)
+                add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-pick-up", get_stop_name(provide_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
                 if arrive_tick then
-                    add_job_label_and_duration(info_flow, { "sspp-gui.fmt-transfer-to-hauler", job.target_count }, arrive_tick, done_tick or in_progress_tick)
-                    if in_progress_tick and not request_station_id then
-                        add_job_transfer_progress_footer(info_flow, hauler.train, item_key, job.target_count)
+                    add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-transfer-cargo-to-hauler", job.target_count }, format_duration(arrive_tick, done_tick or in_progress_tick))
+                    if in_progress_train and not request_stop then
+                        add_job_cargo_transfer_progress_footer(info_flow, in_progress_train, job_type, job.target_count)
                     end
+                elseif in_progress_train then
+                    add_job_travel_progress_footer(info_flow, in_progress_train)
                 end
             end
 
-            if request_station_id then
+            if request_stop then
                 local depart_tick, arrive_tick, done_tick = job.provide_done_tick or job.start_tick, job.request_arrive_tick, job.finish_tick
-                local stop = storage.entities[request_station_id]
-                add_job_minimap_widgets(grid_table, "[item=sspp-request-io] Request", stop)
-                add_job_label_and_duration(info_flow, { "sspp-gui.fmt-travel-to-drop-off", stop and stop.backer_name or "[virtual-signal=signal-ghost]" }, depart_tick, arrive_tick or in_progress_tick)
-                if in_progress_tick and not arrive_tick then
-                    add_job_travel_progress_footer(info_flow, hauler.train.path)
-                end
+                add_job_minimap_widgets(grid_table, { "", "[img=item/sspp-request-io] ", { "sspp-gui.request" } }, request_stop)
+                add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-drop-off", get_stop_name(request_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
                 if arrive_tick then
-                    add_job_label_and_duration(info_flow, { "sspp-gui.fmt-transfer-to-station", job.loaded_count }, arrive_tick, done_tick or in_progress_tick)
-                    if in_progress_tick then
-                        add_job_transfer_progress_footer(info_flow, hauler.train, item_key, nil)
+                    add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-transfer-cargo-to-station", job.loaded_count }, format_duration(arrive_tick, done_tick or in_progress_tick))
+                    if in_progress_train then
+                        add_job_cargo_transfer_progress_footer(info_flow, in_progress_train, job_type, nil)
                     end
+                elseif in_progress_train then
+                    add_job_travel_progress_footer(info_flow, in_progress_train)
                 end
             end
         end
@@ -800,11 +835,12 @@ function gui.network_poll_finished(player_gui)
             info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
             info_flow.add({ type = "line" })
             if job.finish_tick then
-                add_job_label_and_time(info_flow, "Job finished", job.finish_tick)
+                add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-finished" }, format_time(job.finish_tick))
             else
-                info_flow.add({ type = "label", style = "caption_label", caption = "Job cancelled" })
+                add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-aborted" }, format_time(job.abort_tick))
             end
         end
+        info_flow.add({ type = "line" })
 
         return -- the rest of this function is only relevant to hauler and station grids
     end

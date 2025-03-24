@@ -530,51 +530,6 @@ function send_hauler_to_named_stop(hauler, stop_name)
     } }
 end
 
----@param hauler Hauler
----@param class Class
----@return boolean
-function check_if_hauler_needs_fuel(hauler, class)
-    assert(class)
-    local maximum_delivery_time = 120.0 -- TODO: calculate properly
-    local energy_per_second = 5000000.0 / 3.0 -- TODO: calculate properly
-
-    -- TODO: could be less, this assumes constant burning
-    local energy_threshold = energy_per_second * maximum_delivery_time
-
-    local loco_dict = hauler.train.locomotives ---@type {string: LuaEntity[]}
-    for _, loco_list in pairs(loco_dict) do
-        for _, loco in pairs(loco_list) do
-            local burner = assert(loco.burner, "TODO: electric trains")
-            local energy = burner.remaining_burning_fuel
-            for _, item_with_count in pairs(burner.inventory.get_contents()) do
-                energy = energy + prototypes.item[item_with_count.name].fuel_value * item_with_count.count
-            end
-            if energy < energy_threshold then
-                return true
-            end
-        end
-    end
-
-    return false
-end
-
----@param hauler Hauler
----@param hauler_to_station HaulerToStation
----@return boolean
-function check_if_hauler_loaded_wrong_cargo(hauler, hauler_to_station)
-    local train = hauler.train
-
-    for _, item in pairs(train.get_contents()) do
-        if item.name .. ":" .. (item.quality or "normal") ~= hauler_to_station.item then return true end
-    end
-
-    for fluid, _ in pairs(train.get_fluid_contents()) do
-        if fluid ~= hauler_to_station.item then return true end
-    end
-
-    return false
-end
-
 ---@param network Network
 ---@param hauler Hauler
 ---@param job Job
@@ -584,8 +539,8 @@ function assign_new_job(network, hauler, job)
 
     for old_job_index, old_job in pairs(network_jobs) do
         -- TODO: make this a mod setting
-        if current_tick - old_job.start_tick < 1080000 then -- 30 mins
-            break -- keep this job and all later jobs
+        if current_tick - old_job.start_tick < 108000 then -- 30 mins
+            break -- keep this job and all newer jobs
         end
         local old_hauler = storage.haulers[old_job.hauler]
         if old_job_index ~= (old_hauler and old_hauler.job) then
