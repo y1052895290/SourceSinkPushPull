@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.23
+Date: 2025-03-25
+  Features:
+    - Added a brand new tab to the network window, History.
+    - This tab shows you a real-time view of every job SSPP dispatches.
+    - Jobs can be expanded to monitor them more closely.
+    - Currently it can't be filtered, but filtering support will be added soon.
+  Changes:
+    - Changed the default request mode to Pull. This should help new users get their first delivery going sooner.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.22
 Date: 2025-03-20
   Bugfixes:
