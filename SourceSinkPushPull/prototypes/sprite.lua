@@ -24,11 +24,6 @@ data:extend({
         size = 32, scale = 0.5, flags = { "gui-icon" },
     },
     {
-        type = "sprite", name = "sspp-depot-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-depot-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
         type = "sprite", name = "sspp-disable-icon",
         filename = "__SourceSinkPushPull__/graphics/gui/sspp-disable-icon.png",
         size = 32, scale = 0.5, flags = { "gui-icon" },
@@ -36,11 +31,6 @@ data:extend({
     {
         type = "sprite", name = "sspp-export-icon",
         filename = "__SourceSinkPushPull__/graphics/gui/sspp-export-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-fuel-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-fuel-icon.png",
         size = 32, scale = 0.5, flags = { "gui-icon" },
     },
     {

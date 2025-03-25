@@ -879,10 +879,10 @@ function gui.network_poll_finished(player_gui)
                     end
                 end
                 if fuel_enabled and hauler.to_fuel then
-                    state_icon = "[img=sspp-fuel-icon]"
+                    state_icon = "[img=virtual-signal/signal-fuel]"
                 end
                 if depot_enabled and (hauler.to_depot or hauler.at_depot) == "" then
-                    state_icon = "[img=sspp-depot-icon]"
+                    state_icon = "[img=virtual-signal/signal-moon]"
                 end
                 if state_icon then
                     new_length = new_length + 1
@@ -1255,8 +1255,8 @@ function gui.network_open(player_id, network_name, tab_index)
                         { type = "sprite-button", name = "grid_provide_toggle", style = "control_settings_section_button", sprite = "virtual-signal/up-arrow", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_request_toggle", style = "control_settings_section_button", sprite = "virtual-signal/down-arrow", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_liquidate_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-skull", enabled = false, auto_toggle = true, toggled = true },
-                        { type = "sprite-button", name = "grid_fuel_toggle", style = "control_settings_section_button", sprite = "sspp-fuel-icon", enabled = false, auto_toggle = true, toggled = true },
-                        { type = "sprite-button", name = "grid_depot_toggle", style = "control_settings_section_button", sprite = "sspp-depot-icon", enabled = false, auto_toggle = true, toggled = true },
+                        { type = "sprite-button", name = "grid_fuel_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-fuel", enabled = false, auto_toggle = true, toggled = true },
+                        { type = "sprite-button", name = "grid_depot_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-moon", enabled = false, auto_toggle = true, toggled = true },
                     } },
                     { type = "frame", style = "shallow_frame", direction = "horizontal", children = {
                         { type = "scroll-pane", name = "right_scroll_pane", style = "sspp_right_grid_scroll_pane", direction = "vertical", children = {
