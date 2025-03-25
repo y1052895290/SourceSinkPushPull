@@ -1,6 +1,10 @@
 -- SSPP by jagoly
 
+local lib = require("scripts.lib")
+
 main = {}
+
+--------------------------------------------------------------------------------
 
 require("main.station")
 require("main.hauler")
@@ -164,8 +168,8 @@ local function on_train_schedule_changed(event)
     local hauler = storage.haulers[train.id]
     if not hauler then return end
 
-    set_hauler_status(hauler, { "sspp-alert.schedule-modified" })
-    send_alert_for_train(train, hauler.status)
+    lib.set_hauler_status(hauler, { "sspp-alert.schedule-modified" })
+    lib.show_train_alert(train, hauler.status)
     train.manual_mode = true
 end
 

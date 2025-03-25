@@ -3,11 +3,13 @@
 local flib_gui = require("__flib__.gui")
 local events = defines.events
 
-local cwi = gui.caption_with_info
-local format_disatnce = gui.format_distance
-local format_duration = gui.format_duration
-local format_time = gui.format_time
-local get_stop_name = gui.get_stop_name
+local lib = require("scripts.lib")
+
+local len_or_zero, split_item_key, make_item_icon = lib.len_or_zero, lib.split_item_key, lib.make_item_icon
+local get_stop_name, get_train_item_count = lib.get_stop_name, lib.get_train_item_count
+local format_distance, format_duration, format_time = lib.format_distance, lib.format_duration, lib.format_time
+
+local cwi, extract_elem_value_fields, acquire_next_minimap = gui.caption_with_info, gui.extract_elem_value_fields, gui.acquire_next_minimap
 
 --------------------------------------------------------------------------------
 
@@ -152,7 +154,7 @@ local handle_expand_item_haulers = { [events.on_gui_click] = function(event)
 
     local elem_value = elements.item_table.children[event.element.get_index_in_parent() - 6].children[3].elem_value
     if elem_value then
-        local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
+        local name, quality, item_key = extract_elem_value_fields(elem_value)
         if quality then
             elements.grid_title.caption = { "sspp-gui.fmt-item-haulers-title", name, quality }
         else
@@ -180,7 +182,7 @@ local handle_expand_item_stations = { [events.on_gui_click] = function(event)
 
     local elem_value = elements.item_table.children[event.element.get_index_in_parent() - 4].children[3].elem_value
     if elem_value then
-        local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
+        local name, quality, item_key = extract_elem_value_fields(elem_value)
         if quality then
             elements.grid_title.caption = { "sspp-gui.fmt-item-stations-title", name, quality }
         else
@@ -310,11 +312,11 @@ end
 local function item_remove_key_inner(player_gui, message, item_key)
     local network = storage.networks[player_gui.network]
 
-    set_haulers_to_manual(network.buffer_haulers[item_key], message, item_key)
-    set_haulers_to_manual(network.provide_haulers[item_key], message, item_key)
-    set_haulers_to_manual(network.request_haulers[item_key], message, item_key)
-    set_haulers_to_manual(network.to_depot_liquidate_haulers[item_key], message, item_key)
-    set_haulers_to_manual(network.at_depot_liquidate_haulers[item_key], message, item_key)
+    lib.set_haulers_to_manual(network.buffer_haulers[item_key], message, item_key)
+    lib.set_haulers_to_manual(network.provide_haulers[item_key], message, item_key)
+    lib.set_haulers_to_manual(network.request_haulers[item_key], message, item_key)
+    lib.set_haulers_to_manual(network.to_depot_liquidate_haulers[item_key], message, item_key)
+    lib.set_haulers_to_manual(network.at_depot_liquidate_haulers[item_key], message, item_key)
 
     storage.disabled_items[network.surface.name .. ":" .. item_key] = true
 
@@ -388,9 +390,9 @@ local function class_remove_key(player_gui, class_name)
             item_remove_key_inner(player_gui, { "sspp-alert.class-not-in-network" }, item_key)
         end
     end
-    set_haulers_to_manual(network.fuel_haulers[class_name], { "sspp-alert.class-not-in-network" })
-    set_haulers_to_manual(network.to_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
-    set_haulers_to_manual(network.at_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
+    lib.set_haulers_to_manual(network.fuel_haulers[class_name], { "sspp-alert.class-not-in-network" })
+    lib.set_haulers_to_manual(network.to_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
+    lib.set_haulers_to_manual(network.at_depot_haulers[class_name], { "sspp-alert.class-not-in-network" })
 
     if player_gui.haulers_class == class_name then clear_grid_and_header(player_gui) end
 end
@@ -433,7 +435,7 @@ local function item_from_row(table_children, i)
 
     if delivery_size < 1 or delivery_time < 1.0 then return end
 
-    local name, quality, item_key = gui.extract_elem_value_fields(elem_value)
+    local name, quality, item_key = extract_elem_value_fields(elem_value)
     return item_key, {
         name = name,
         quality = quality,
@@ -653,7 +655,7 @@ end
 local function add_job_travel_progress_footer(info_flow, train)
     info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
     info_flow.add({ type = "line" })
-    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.distance-to-travel" }, format_disatnce(train.path) )
+    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.distance-to-travel" }, format_distance(train.path) )
 end
 
 ---@param info_flow LuaGuiElement
@@ -715,7 +717,7 @@ function gui.network_poll_finished(player_gui)
 
         for i = 0, #table_children - 1, elements.item_table.column_count do
             if table_children[i + 1].children[4].sprite == "" then
-                local _, _, item_key = gui.extract_elem_value_fields(table_children[i + 1].children[3].elem_value)
+                local _, _, item_key = extract_elem_value_fields(table_children[i + 1].children[3].elem_value)
                 local class_name = table_children[i + 2].text
 
                 local provide_total = len_or_zero(provide_haulers[item_key])
@@ -882,11 +884,11 @@ function gui.network_poll_finished(player_gui)
                     state_icon = "[img=virtual-signal/signal-fuel]"
                 end
                 if depot_enabled and (hauler.to_depot or hauler.at_depot) == "" then
-                    state_icon = "[img=virtual-signal/signal-moon]"
+                    state_icon = "[img=virtual-signal/signal-white-flag]"
                 end
                 if state_icon then
                     new_length = new_length + 1
-                    local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
+                    local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = hauler.train.front_stock
                     top.caption = state_icon
                     if name then
@@ -917,7 +919,7 @@ function gui.network_poll_finished(player_gui)
                 end
                 if state_icon then
                     new_length = new_length + 1
-                    local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
+                    local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = hauler.train.front_stock
                     top.caption = state_icon
                     bottom.caption = tostring(get_train_item_count(hauler.train, name, quality)) .. item_icon
@@ -937,7 +939,7 @@ function gui.network_poll_finished(player_gui)
             if station.network == network_name then
                 if provide_enabled and station.provide_items and station.provide_items[stations_item_key] then
                     new_length = new_length + 1
-                    local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
+                    local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = station.stop
                     top.caption = station.stop.backer_name
                     if item_icon then
@@ -948,7 +950,7 @@ function gui.network_poll_finished(player_gui)
                 end
                 if request_enabled and station.request_items and station.request_items[stations_item_key] then
                     new_length = new_length + 1
-                    local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
+                    local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = station.stop
                     top.caption = station.stop.backer_name
                     if item_icon then
@@ -1035,7 +1037,7 @@ local handle_import_import = { [events.on_gui_click] = function(event)
         for item_key, item in pairs(items) do
             if type(item_key) ~= "string" then goto failure end
 
-            if is_item_key_invalid(item_key) then
+            if lib.is_item_key_invalid(item_key) then
                 items[item_key] = nil -- not an error, just skip this item
             else
                 if type(item) ~= "table" then goto failure end
@@ -1256,7 +1258,7 @@ function gui.network_open(player_id, network_name, tab_index)
                         { type = "sprite-button", name = "grid_request_toggle", style = "control_settings_section_button", sprite = "virtual-signal/down-arrow", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_liquidate_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-skull", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_fuel_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-fuel", enabled = false, auto_toggle = true, toggled = true },
-                        { type = "sprite-button", name = "grid_depot_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-moon", enabled = false, auto_toggle = true, toggled = true },
+                        { type = "sprite-button", name = "grid_depot_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-white-flag", enabled = false, auto_toggle = true, toggled = true },
                     } },
                     { type = "frame", style = "shallow_frame", direction = "horizontal", children = {
                         { type = "scroll-pane", name = "right_scroll_pane", style = "sspp_right_grid_scroll_pane", direction = "vertical", children = {

@@ -1,5 +1,7 @@
 -- SSPP by jagoly
 
+local lib = require("scripts.lib")
+
 --------------------------------------------------------------------------------
 
 function main.reboot()
@@ -29,8 +31,8 @@ function main.reboot()
     end
 
     for _, station in pairs(storage.stations) do
-        destroy_hidden_combs(station.provide_hidden_combs)
-        destroy_hidden_combs(station.request_hidden_combs)
+        lib.destroy_hidden_combs(station.provide_hidden_combs)
+        lib.destroy_hidden_combs(station.request_hidden_combs)
     end
     storage.stations = {}
 

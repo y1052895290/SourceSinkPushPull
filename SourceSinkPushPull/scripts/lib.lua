@@ -1,27 +1,32 @@
 -- SSPP by jagoly
 
+local m_max, m_ceil, m_floor = math.max, math.ceil, math.floor
+local b_test, b_or, b_and, b_not = bit32.btest, bit32.bor, bit32.band, bit32.bnot
+local s_match, s_gmatch, s_format = string.match, string.gmatch, string.format
+
+local lib = {}
+
 --------------------------------------------------------------------------------
 
+--- Get the length of a list, or zero if the argument is nil.
 ---@generic T
 ---@param list T[]?
-function len_or_zero(list)
+function lib.len_or_zero(list)
     if list then
         return #list
     end
     return 0
 end
 
---------------------------------------------------------------------------------
-
 --- Create a list if needed, then append a value.
 ---@generic T
 ---@param object {[string]: T[]}
----@param key string
+---@param list_name string
 ---@param value T
-function list_append_or_create(object, key, value)
-    local list = object[key]
+function lib.list_create_or_append(object, list_name, value)
+    local list = object[list_name]
     if not list then
-        object[key] = { value }
+        object[list_name] = { value }
     else
         list[#list+1] = value
     end
@@ -30,14 +35,14 @@ end
 --- Create a list if needed, then append one or more copies of a value.
 ---@generic T
 ---@param object {[string]: T[]}
----@param key string
+---@param list_name string
 ---@param value T
 ---@param copies integer
-function list_extend_or_create(object, key, value, copies)
-    local list = object[key]
+function lib.list_create_or_extend(object, list_name, value, copies)
+    local list = object[list_name]
     if not list then
         list = {}
-        object[key] = list
+        object[list_name] = list
     end
     local length = #list
     for i = length + 1, length + copies do
@@ -45,11 +50,55 @@ function list_extend_or_create(object, key, value, copies)
     end
 end
 
+--- Remove a known value from a list, then delete the list if it became empty.
+---@generic T
+---@param object {[string]: T[]}
+---@param list_name string
+---@param value T
+function lib.list_destroy_or_remove(object, list_name, value)
+    local list = object[list_name]
+    local length = #list
+
+    for index = 1, length do
+        if list[index] == value then
+            if length > 1 then
+                list[index] = list[length]
+                list[length] = nil
+            else
+                object[list_name] = nil
+            end
+            return
+        end
+    end
+
+    error("value not found")
+end
+
+--- Remove a known value from a list.
+---@generic T
+---@param list T[]
+---@param value T
+function lib.list_remove(list, value)
+    local length = #list
+
+    for index = 1, length do
+        if list[index] == value then
+            if length > 1 then
+                list[index] = list[length]
+            end
+            list[length] = nil
+            return
+        end
+    end
+
+    error("value not found")
+end
+
 --- Remove a value from a list if it exists.
 ---@generic T
 ---@param list T[]
 ---@param value T
-function list_remove_value_if_exists(list, value)
+function lib.list_remove_if_exists(list, value)
     local length = #list
 
     for index = 1, length do
@@ -67,7 +116,7 @@ end
 ---@generic T
 ---@param list T[]
 ---@param value T
-function list_remove_value_all(list, value)
+function lib.list_remove_all(list, value)
     local index, length = 1, #list
 
     while index <= length do
@@ -81,106 +130,69 @@ function list_remove_value_all(list, value)
     end
 end
 
---- Remove a known value from a list.
----@generic T
----@param list T[]
----@param value T
-function list_remove_value(list, value)
-    local length = #list
-
-    for index = 1, length do
-        if list[index] == value then
-            if length > 1 then
-                list[index] = list[length]
-            end
-            list[length] = nil
-            return
-        end
-    end
-
-    error("value not found")
-end
-
---- Remove a known value from a list, then delete the list if it became empty.
----@generic T
----@param object {[string]: T[]}
----@param key string
----@param value T
-function list_remove_value_or_destroy(object, key, value)
-    local list = object[key]
-    local length = #list
-
-    for index = 1, length do
-        if list[index] == value then
-            if length > 1 then
-                list[index] = list[length]
-                list[length] = nil
-            else
-                object[key] = nil
-            end
-            return
-        end
-    end
-
-    error("value not found")
-end
-
 --------------------------------------------------------------------------------
 
 ---@param item_key string
 ---@return string name, string? quality
-function split_item_key(item_key)
-    local name, quality = string.match(item_key, "(.-):(.+)")
+local function split_item_key(item_key)
+    local name, quality = s_match(item_key, "(.-):(.+)")
     if name then
         return name, quality
     end
     return item_key, nil
 end
+lib.split_item_key = split_item_key
 
 ---@param item_key ItemKey
 ---@return boolean
-function is_item_key_invalid(item_key)
+local function is_item_key_invalid(item_key)
     local name, quality = split_item_key(item_key)
     if quality then
         return not (prototypes.item[name] and prototypes.quality[quality])
     end
     return not prototypes.fluid[name]
 end
+lib.is_item_key_invalid = is_item_key_invalid
 
 ---@param name string
 ---@param quality string?
-function make_item_icon(name, quality)
+---@return string
+local function make_item_icon(name, quality)
     if quality then
         return "[item=" .. name .. ",quality=" .. quality .. "]"
     end
     return "[fluid=" .. name .. "]"
 end
+lib.make_item_icon = make_item_icon
 
----@param train LuaTrain
----@param name string
----@param quality string?
----@return integer
-function get_train_item_count(train, name, quality)
-    if quality then
-        return train.get_item_count({ name = name, quality = quality })
+---@param proto LuaItemPrototype
+local function enumerate_spoil_results(proto)
+    local i = 0
+    return function()
+        proto = proto.spoil_result
+        if proto then
+            i = i + 1
+            return i, proto
+        end
+        return nil, nil
     end
-    return math.ceil(train.get_fluid_count(name))
 end
+lib.enumerate_spoil_results = enumerate_spoil_results
 
 --------------------------------------------------------------------------------
 
 ---@param network_item NetworkItem
 ---@param station_item ProvideItem|RequestItem
 ---@return integer
-function compute_storage_needed(network_item, station_item)
+function lib.compute_storage_needed(network_item, station_item)
     local delivery_size, delivery_time = network_item.delivery_size, network_item.delivery_time
     local throughput, latency = station_item.throughput, station_item.latency
     local round = 100.0 -- for fluids
     if network_item.quality then round = prototypes.item[network_item.name].stack_size end
-    local result = math.max(delivery_size, throughput * delivery_time)
-    local buffer = math.max(round, throughput * latency)
-    result = math.ceil(result / round) * round
-    buffer = math.ceil(buffer / round) * round
+    local result = m_max(delivery_size, throughput * delivery_time)
+    local buffer = m_max(round, throughput * latency)
+    result = m_ceil(result / round) * round
+    buffer = m_ceil(buffer / round) * round
     -- double the buffer if using any push or pull mode (dynamic counts as push or pull here)
     if station_item.mode > 3 then buffer = buffer + buffer end
     return result + buffer
@@ -189,31 +201,43 @@ end
 ---@param network_item NetworkItem
 ---@param station_item ProvideItem|RequestItem
 ---@return integer
-function compute_buffer(network_item, station_item)
+function lib.compute_buffer(network_item, station_item)
     local throughput, latency = station_item.throughput, station_item.latency
     local round = 100.0 -- for fluids
     if network_item.quality then round = prototypes.item[network_item.name].stack_size end
-    local buffer = math.max(round, throughput * latency)
-    buffer = math.ceil(buffer / round) * round
+    local buffer = m_max(round, throughput * latency)
+    buffer = m_ceil(buffer / round) * round
     return buffer
 end
 
 ---@param network_item NetworkItem
 ---@param provide_item ProvideItem
 ---@return integer
-function compute_load_target(network_item, provide_item)
+function lib.compute_load_target(network_item, provide_item)
     local delivery_size, granularity = network_item.delivery_size, provide_item.granularity
     if network_item.quality then
         -- for items, granularity is exact, so round down to the nearest multiple of granularity
-        return math.floor(delivery_size / granularity) * granularity
+        return m_floor(delivery_size / granularity) * granularity
     end
     -- for fluids, loading exact amounts is not possible, so just subtract granularity
     return delivery_size - granularity
 end
 
+--------------------------------------------------------------------------------
+
+--- The entity passed to this function can be invalid.
+---@param stop LuaEntity?
+---@return string
+function lib.get_stop_name(stop)
+    if stop and stop.valid then
+        return stop.backer_name --[[@as string]]
+    end
+    return "[virtual-signal=signal-ghost]"
+end
+
 ---@param provide_items {[ItemKey]: ProvideItem}?
 ---@param request_items {[ItemKey]: RequestItem}?
-function compute_stop_name(provide_items, request_items)
+function lib.generate_stop_name(provide_items, request_items)
     local provide_icons, p_len = {}, 0 ---@type string[], integer
     local request_icons, r_len = {}, 0 ---@type string[], integer
 
@@ -292,54 +316,66 @@ end
 ---@param stop LuaEntity
 ---@param flag StopFlag
 ---@return boolean value
-function read_stop_flag(stop, flag)
+function lib.read_stop_flag(stop, flag)
     local cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local condition = cb.logistic_condition --[[@as CircuitCondition]]
-    return bit32.btest(condition.constant or 0, flag)
+    return b_test(condition.constant or 0, flag)
 end
 
 ---@param stop LuaEntity
 ---@param flag StopFlag
 ---@param value boolean
-function write_stop_flag(stop, flag, value)
+function lib.write_stop_flag(stop, flag, value)
     local cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local condition = cb.logistic_condition --[[@as CircuitCondition]]
     if value then
-        condition.constant = bit32.bor(condition.constant or 0, flag)
+        condition.constant = b_or(condition.constant or 0, flag)
     else
-        condition.constant = bit32.band(condition.constant or 0, bit32.bnot(flag))
+        condition.constant = b_and(condition.constant or 0, b_not(flag))
     end
     cb.logistic_condition = condition --[[@as CircuitConditionDefinition]]
 end
+
+--------------------------------------------------------------------------------
 
 ---@param comb LuaEntity
 ---@param constant integer
 ---@param operation "-"|"+"
 ---@param input SignalID
 ---@param output SignalID?
-function set_arithmetic_control_behavior(comb, constant, operation, input, output)
+function lib.set_control_behavior(comb, constant, operation, input, output)
     local cb = comb.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
     cb.parameters = { first_constant = constant, operation = operation, second_signal = input, output_signal = output or input }
 end
 
 ---@param comb LuaEntity
-function clear_arithmetic_control_behavior(comb)
+function lib.clear_control_behavior(comb)
     local cb = comb.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
     cb.parameters = nil
+end
+
+---@param hidden_combs LuaEntity[]?
+function lib.clear_hidden_control_behaviors(hidden_combs)
+    if hidden_combs then
+        for _, hidden_comb in pairs(hidden_combs) do
+            local cb = hidden_comb.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
+            cb.parameters = nil
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
 
 ---@param provide_io LuaEntity
 ---@return {[ItemKey]: ProvideItem}
-function combinator_description_to_provide_items(provide_io)
+function lib.combinator_description_to_provide_items(provide_io)
     local description = provide_io.combinator_description
 
-    local version, lines = string.match(description, "P([%d]+)(.*)")
+    local version, lines = s_match(description, "P([%d]+)(.*)")
     local items = {} ---@type {[ItemKey]: ProvideItem}
 
     if version == "1" then
-        for item_key, mode, throughput, latency, granularity in string.gmatch(lines, "\n(%g+) ([1234567]) ([%d%.]+) ([%d%.]+) (%d+)") do
+        for item_key, mode, throughput, latency, granularity in s_gmatch(lines, "\n(%g+) ([1234567]) ([%d%.]+) ([%d%.]+) (%d+)") do
             if not is_item_key_invalid(item_key) then
                 mode, throughput, latency, granularity = tonumber(mode), tonumber(throughput), tonumber(latency), tonumber(granularity)
                 if mode and throughput and latency and granularity then
@@ -381,10 +417,10 @@ end
 
 ---@param provide_items {[ItemKey]: ProvideItem}
 ---@return string
-function provide_items_to_combinator_description(provide_items)
+function lib.provide_items_to_combinator_description(provide_items)
     local result = "P1"
     for item_key, item in pairs(provide_items) do
-        result = result .. string.format(
+        result = result .. s_format(
             "\n%s %u %s %s %u",
             item_key, item.mode, tostring(item.throughput), tostring(item.latency), item.granularity
         )
@@ -394,14 +430,14 @@ end
 
 ---@param request_io LuaEntity
 ---@return {[ItemKey]: RequestItem}
-function combinator_description_to_request_items(request_io)
+function lib.combinator_description_to_request_items(request_io)
     local description = request_io.combinator_description
 
-    local version, lines = string.match(description, "R([%d]+)(.*)")
+    local version, lines = s_match(description, "R([%d]+)(.*)")
     local items = {} ---@type {[ItemKey]: RequestItem}
 
     if version == "1" then
-        for item_key, mode, throughput, latency in string.gmatch(lines, "\n(%g+) ([1234567]) ([%d%.]+) ([%d%.]+)") do
+        for item_key, mode, throughput, latency in s_gmatch(lines, "\n(%g+) ([1234567]) ([%d%.]+) ([%d%.]+)") do
             if not is_item_key_invalid(item_key) then
                 mode, throughput, latency = tonumber(mode), tonumber(throughput), tonumber(latency)
                 if mode and throughput and latency then
@@ -440,10 +476,10 @@ end
 
 ---@param request_items {[ItemKey]: RequestItem}
 ---@return string
-function request_items_to_combinator_description(request_items)
+function lib.request_items_to_combinator_description(request_items)
     local result = "R1"
     for item_key, item in pairs(request_items) do
-        result = result .. string.format(
+        result = result .. s_format(
             "\n%s %u %s %s",
             item_key, item.mode, tostring(item.throughput), tostring(item.latency)
         )
@@ -453,11 +489,68 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param train LuaTrain
+---@param name string
+---@param quality string?
+---@return integer
+function lib.get_train_item_count(train, name, quality)
+    if quality then
+        return train.get_item_count({ name = name, quality = quality })
+    end
+    return m_ceil(train.get_fluid_count(name))
+end
+
+---@param train LuaTrain
+---@param color_id TrainColor
+local function set_train_color(train, color_id)
+    if mod_settings.auto_paint_trains then
+        local color = mod_settings.train_colors[color_id]
+        for _, locos in pairs(train.locomotives) do
+            for _, loco in pairs(locos) do
+                loco.copy_color_from_train_stop = false
+                loco.color = color
+            end
+        end
+    end
+end
+
+---@param train LuaTrain
+---@param color_id TrainColor
+---@param stop LuaEntity
+function lib.send_train_to_station(train, color_id, stop)
+    set_train_color(train, color_id)
+    train.schedule = { current = 1, records = { { rail = stop.connected_rail, rail_direction = stop.connected_rail_direction }, { station = stop.backer_name } } }
+end
+
+---@param train LuaTrain
+---@param color_id TrainColor
+---@param stop_name string
+function lib.send_train_to_named_stop(train, color_id, stop_name)
+    set_train_color(train, color_id)
+    train.schedule = { current = 1, records = { { station = stop_name } } }
+end
+
+---@param train LuaTrain
+---@param message LocalisedString
+function lib.show_train_alert(train, message)
+    local entity = assert(train.front_stock or train.back_stock)
+
+    local icon = { name = "locomotive", type = "item" }
+    local sound = { path = "utility/console_message" }
+
+    for _, player in pairs(entity.force.players) do
+        player.add_custom_alert(entity, icon, message, true)
+        player.play_sound(sound)
+    end
+end
+
+--------------------------------------------------------------------------------
+
 ---@param hauler Hauler
 ---@param message LocalisedString
 ---@param item ItemKey?
 ---@param stop LuaEntity?
-function set_hauler_status(hauler, message, item, stop)
+function lib.set_hauler_status(hauler, message, item, stop)
     hauler.status = message
     hauler.status_item = item
     hauler.status_stop = stop
@@ -471,142 +564,34 @@ function set_hauler_status(hauler, message, item, stop)
     end
 end
 
----@param hauler Hauler
----@param color_id TrainColor
-function set_hauler_color(hauler, color_id)
-    if mod_settings.auto_paint_trains then
-        for _, locos in pairs(hauler.train.locomotives) do
-            for _, loco in pairs(locos) do
-                loco.copy_color_from_train_stop = false
-                loco.color = mod_settings.train_colors[color_id]
-            end
-        end
-    end
-end
-
----@param train LuaTrain
----@param message LocalisedString
-function send_alert_for_train(train, message)
-    local entity = assert(train.front_stock or train.back_stock)
-
-    local icon = { name = "locomotive", type = "item" }
-    local sound = { path = "utility/console_message" }
-
-    for _, player in pairs(entity.force.players) do
-        player.add_custom_alert(entity, icon, message, true)
-        player.play_sound(sound)
-    end
-end
-
 ---@param hauler_ids HaulerId[]?
 ---@param message LocalisedString
 ---@param item ItemKey?
 ---@param stop LuaEntity?
-function set_haulers_to_manual(hauler_ids, message, item, stop)
+function lib.set_haulers_to_manual(hauler_ids, message, item, stop)
     if hauler_ids then
         for i = #hauler_ids, 1, -1 do
             local hauler = storage.haulers[hauler_ids[i]]
-            set_hauler_status(hauler, message, item, stop)
-            send_alert_for_train(hauler.train, message)
+            lib.set_hauler_status(hauler, message, item, stop)
+            lib.send_alert_for_train(hauler.train, message)
             hauler.train.manual_mode = true
         end
     end
 end
 
----@param hauler Hauler
----@param stop LuaEntity
-function send_hauler_to_station(hauler, stop)
-    hauler.train.schedule = { current = 1, records = {
-        { rail = stop.connected_rail, rail_direction = stop.connected_rail_direction },
-        { station = stop.backer_name },
-    } }
-end
-
----@param hauler Hauler
----@param stop_name string
-function send_hauler_to_named_stop(hauler, stop_name)
-    hauler.train.schedule = { current = 1, records = {
-        { station = stop_name },
-    } }
-end
-
 ---@param network Network
 ---@param hauler Hauler
 ---@param job Job
-function assign_new_job(network, hauler, job)
-    local network_name, network_jobs = network.surface.name, network.jobs
-    local current_tick = job.start_tick
-
-    for old_job_index, old_job in pairs(network_jobs) do
-        -- TODO: make this a mod setting
-        if current_tick - old_job.start_tick < 108000 then -- 30 mins
-            break -- keep this job and all newer jobs
-        end
-        local old_hauler = storage.haulers[old_job.hauler]
-        if old_job_index ~= (old_hauler and old_hauler.job) then
-            network_jobs[old_job_index] = nil
-            gui.on_job_removed(network_name, old_job_index)
-        end
-    end
-
+function lib.assign_network_hauler_job(network, hauler, job)
     local job_index = network.job_index_counter + 1
 
     network.job_index_counter = job_index
     hauler.job = job_index
 
-    network_jobs[job_index] = job
-
-    gui.on_job_created(network_name, job_index)
+    network.jobs[job_index] = job
 end
 
 --------------------------------------------------------------------------------
-
----@param entity LuaEntity
----@return StationParts?
-function get_station_parts(entity)
-    local name = entity.name
-    if name == "entity-ghost" then name = entity.ghost_name end
-
-    local stop ---@type LuaEntity
-    if name == "sspp-stop" then
-        stop = entity
-    else
-        local stop_ids = storage.comb_stop_ids[entity.unit_number]
-        if #stop_ids ~= 1 then return nil end
-        stop = storage.entities[stop_ids[1]]
-    end
-
-    local comb_ids = storage.stop_comb_ids[stop.unit_number]
-
-    local combs_by_name = {} ---@type {[string]: LuaEntity?}
-
-    for _, comb_id in pairs(comb_ids) do
-        if #storage.comb_stop_ids[comb_id] ~= 1 then return nil end
-
-        local comb = storage.entities[comb_id]
-        name = comb.name
-        if name == "entity-ghost" then name = comb.ghost_name end
-        if combs_by_name[name] then return nil end
-
-        combs_by_name[name] = comb
-    end
-
-    local general_io = combs_by_name["sspp-general-io"]
-    if not general_io then return nil end
-
-    local provide_io = combs_by_name["sspp-provide-io"]
-    local request_io = combs_by_name["sspp-request-io"]
-    if not (provide_io or request_io) then return nil end
-
-    local ids = {}
-
-    ids[stop.unit_number] = true
-    ids[general_io.unit_number] = true
-    if provide_io then ids[provide_io.unit_number] = true end
-    if request_io then ids[request_io.unit_number] = true end
-
-    return { ids = ids, stop = stop, general_io = general_io, provide_io = provide_io, request_io = request_io }
-end
 
 ---@param comb LuaEntity
 ---@param hidden_comb LuaEntity
@@ -620,7 +605,7 @@ end
 ---@param comb LuaEntity
 ---@param hidden_combs LuaEntity[]
 ---@param items {[ItemKey]: ProvideItem|RequestItem}
-function ensure_hidden_combs(comb, hidden_combs, items)
+function lib.ensure_hidden_combs(comb, hidden_combs, items)
     local old_spoil_depth = #hidden_combs
     local new_spoil_depth = 0
     for item_key, _ in pairs(items) do
@@ -637,7 +622,7 @@ function ensure_hidden_combs(comb, hidden_combs, items)
     end
     if old_spoil_depth < new_spoil_depth then
         for i = old_spoil_depth + 1, new_spoil_depth do
-            local hidden_comb = assert(comb.surface.create_entity({ name = "sspp-hidden-io", position = comb.position, force = comb.force }))
+            local hidden_comb = comb.surface.create_entity({ name = "sspp-hidden-io", position = comb.position, force = comb.force }) --[[@as LuaEntity]]
             connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_input_red)
             connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_input_green)
             connect_hidden_comb_wire(comb, hidden_comb, defines.wire_connector_id.combinator_output_red)
@@ -653,7 +638,7 @@ function ensure_hidden_combs(comb, hidden_combs, items)
 end
 
 ---@param hidden_combs LuaEntity[]?
-function destroy_hidden_combs(hidden_combs)
+function lib.destroy_hidden_combs(hidden_combs)
     if hidden_combs then
         for _, hidden_comb in pairs(hidden_combs) do
             hidden_comb.destroy({})
@@ -661,27 +646,40 @@ function destroy_hidden_combs(hidden_combs)
     end
 end
 
----@param hidden_combs LuaEntity[]?
-function clear_hidden_comb_control_behaviors(hidden_combs)
-    if hidden_combs then
-        for _, hidden_comb in pairs(hidden_combs) do
-            local cb = hidden_comb.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
-            cb.parameters = nil
-        end
+--------------------------------------------------------------------------------
+
+---@param path LuaRailPath?
+---@return LocalisedString
+function lib.format_distance(path)
+    if path then
+        return { "sspp-gui.fmt-metres", m_floor(path.total_distance - path.travelled_distance + 0.5) }
     end
+    return { "sspp-gui.no-path" }
+end
+
+---@param start_tick MapTick
+---@param finish_tick_or_in_progress (MapTick|true)?
+---@return LocalisedString
+function lib.format_duration(start_tick, finish_tick_or_in_progress)
+    if finish_tick_or_in_progress then
+        if finish_tick_or_in_progress ~= true then
+            return { "sspp-gui.fmt-seconds", m_floor((finish_tick_or_in_progress - start_tick) / 60.0 + 0.5) }
+        end
+        return { "sspp-gui.active" }
+    end
+    return { "sspp-gui.aborted" }
+end
+
+---@param tick MapTick
+---@return LocalisedString
+function lib.format_time(tick)
+    local total_seconds = m_floor(tick / 60)
+    local seconds = total_seconds % 60
+    local minutes = m_floor(total_seconds / 60) % 60
+    local hours = m_floor(total_seconds / 3600)
+    return s_format("%02d:%02d:%02d", hours, minutes, seconds)
 end
 
 --------------------------------------------------------------------------------
 
----@param proto LuaItemPrototype
-function enumerate_spoil_results(proto)
-    local i = 0
-    return function()
-        proto = proto.spoil_result
-        if proto then
-            i = i + 1
-            return i, proto
-        end
-        return nil, nil
-    end
-end
+return lib

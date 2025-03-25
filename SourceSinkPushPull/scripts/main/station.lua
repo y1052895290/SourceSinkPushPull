@@ -1,5 +1,7 @@
 -- SSPP by jagoly
 
+local lib = require("scripts.lib")
+
 --------------------------------------------------------------------------------
 
 ---@param stop LuaEntity
@@ -76,11 +78,11 @@ local function try_create_station(stop, combs)
         stop_connector.connect_to(io_connector, true)
 
         station.provide_io = provide_io
-        station.provide_items = combinator_description_to_provide_items(provide_io)
+        station.provide_items = lib.combinator_description_to_provide_items(provide_io)
         station.provide_deliveries = {}
         station.provide_hidden_combs = {}
 
-        ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, station.provide_items)
+        lib.ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, station.provide_items)
     end
 
     if request_io then
@@ -89,15 +91,15 @@ local function try_create_station(stop, combs)
         stop_connector.connect_to(io_connector, true)
 
         station.request_io = request_io
-        station.request_items = combinator_description_to_request_items(request_io)
+        station.request_items = lib.combinator_description_to_request_items(request_io)
         station.request_deliveries = {}
         station.request_hidden_combs = {}
 
-        ensure_hidden_combs(station.request_io, station.request_hidden_combs, station.request_items)
+        lib.ensure_hidden_combs(station.request_io, station.request_hidden_combs, station.request_items)
     end
 
-    if not read_stop_flag(stop, e_stop_flags.custom_name) then
-        stop.backer_name = compute_stop_name(station.provide_items, station.request_items)
+    if not lib.read_stop_flag(stop, e_stop_flags.custom_name) then
+        stop.backer_name = lib.generate_stop_name(station.provide_items, station.request_items)
     end
 
     storage.stations[station_id] = station
@@ -123,7 +125,7 @@ local function disable_items_and_haulers(network_name, items, deliveries)
         ---@cast deliveries {[ItemKey]: HaulerId[]}
         for item_key, _ in pairs(items) do
             storage.disabled_items[network_name .. ":" .. item_key] = true
-            set_haulers_to_manual(deliveries[item_key], { "sspp-alert.station-broken" })
+            lib.set_haulers_to_manual(deliveries[item_key], { "sspp-alert.station-broken" })
         end
     end
 end
@@ -135,18 +137,18 @@ local function try_destroy_station(stop)
     local station_id = stop.unit_number ---@type StationId
     local station = storage.stations[station_id]
     if station then
-        list_remove_value_if_exists(storage.poll_stations, station_id)
+        lib.list_remove_if_exists(storage.poll_stations, station_id)
 
         disable_items_and_haulers(station.network, station.provide_items, station.provide_deliveries)
         disable_items_and_haulers(station.network, station.request_items, station.request_deliveries)
 
-        destroy_hidden_combs(station.provide_hidden_combs)
-        destroy_hidden_combs(station.request_hidden_combs)
+        lib.destroy_hidden_combs(station.provide_hidden_combs)
+        lib.destroy_hidden_combs(station.request_hidden_combs)
 
         storage.stations[station_id] = nil
     end
 
-    if not read_stop_flag(stop, e_stop_flags.custom_name) then
+    if not lib.read_stop_flag(stop, e_stop_flags.custom_name) then
         stop.backer_name = "[virtual-signal=signal-ghost]"
     end
 end
@@ -163,7 +165,7 @@ function main.stop_built(stop, ghost_unit_number)
     if stop.trains_limit > 10 or stop.trains_limit < 1 then
         stop.trains_limit = mod_settings.default_train_limit
     end
-    if not read_stop_flag(stop, e_stop_flags.custom_name) then
+    if not lib.read_stop_flag(stop, e_stop_flags.custom_name) then
         stop.backer_name = "[virtual-signal=signal-ghost]"
     end
 
@@ -201,9 +203,9 @@ function main.comb_built(comb, ghost_unit_number)
     if name == "sspp-general-io" then
         comb.combinator_description = "{}" -- TODO
     elseif name == "sspp-provide-io" then
-        comb.combinator_description = provide_items_to_combinator_description(combinator_description_to_provide_items(comb))
+        comb.combinator_description = lib.provide_items_to_combinator_description(lib.combinator_description_to_provide_items(comb))
     elseif name == "sspp-request-io" then
-        comb.combinator_description = request_items_to_combinator_description(combinator_description_to_request_items(comb))
+        comb.combinator_description = lib.request_items_to_combinator_description(lib.combinator_description_to_request_items(comb))
     end
 
     storage.entities[comb.unit_number] = comb
@@ -261,7 +263,7 @@ function main.stop_broken(stop_id, stop)
 
     for _, comb_id in pairs(comb_ids) do
         local stop_ids = storage.comb_stop_ids[comb_id]
-        list_remove_value(stop_ids, stop_id)
+        lib.list_remove(stop_ids, stop_id)
 
         for _, other_stop_id in pairs(stop_ids) do
             local other_comb_ids = storage.stop_comb_ids[other_stop_id]
@@ -292,7 +294,7 @@ function main.comb_broken(comb_id, comb)
 
     for _, stop_id in pairs(stop_ids) do
         local comb_ids = storage.stop_comb_ids[stop_id]
-        list_remove_value(comb_ids, comb_id)
+        lib.list_remove(comb_ids, comb_id)
 
         local other_combs = {}
         for _, other_comb_id in pairs(comb_ids) do

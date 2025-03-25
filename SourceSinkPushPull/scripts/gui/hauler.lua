@@ -3,6 +3,8 @@
 local flib_gui = require("__flib__.gui")
 local events = defines.events
 
+local lib = require("scripts.lib")
+
 --------------------------------------------------------------------------------
 
 ---@param player_gui PlayerHaulerGui
@@ -12,7 +14,7 @@ function gui.hauler_status_changed(player_gui)
 
     elements.status_label.caption = hauler.status
     if hauler.status_item then
-        local name, quality = split_item_key(hauler.status_item)
+        local name, quality = lib.split_item_key(hauler.status_item)
         if quality then
             elements.item_button.elem_value = { name = name, quality = quality, type = "item" }
         else
@@ -121,8 +123,7 @@ local handle_class_auto_assign = { [events.on_gui_click] = function(event)
                     if map_carriage_name(carriages[i]) ~= train_carriage_names[i] then goto continue end
                 end
                 if matching_class then
-                    -- TODO: show this in the widget rather than sending an alert
-                    send_alert_for_train(train, { "sspp-alert.auto-assign-multiple-classes" })
+                    lib.show_train_alert(train, { "sspp-alert.auto-assign-multiple-classes" })
                     return
                 end
                 matching_class = class_name
@@ -139,8 +140,7 @@ local handle_class_auto_assign = { [events.on_gui_click] = function(event)
         for class_name, _ in pairs(storage.networks[network_name].classes) do
             if not classes_with_haulers[class_name] then
                 if matching_class then
-                    -- TODO: show this in the widget rather than sending an alert
-                    send_alert_for_train(train, { "sspp-alert.auto-assign-multiple-classes" })
+                    lib.show_train_alert(train, { "sspp-alert.auto-assign-multiple-classes" })
                     return
                 end
                 matching_class = class_name
@@ -149,7 +149,7 @@ local handle_class_auto_assign = { [events.on_gui_click] = function(event)
     end
 
     if not matching_class then
-        send_alert_for_train(train, { "sspp-alert.auto-assign-no-class" })
+        lib.show_train_alert(train, { "sspp-alert.auto-assign-no-class" })
         return
     end
 

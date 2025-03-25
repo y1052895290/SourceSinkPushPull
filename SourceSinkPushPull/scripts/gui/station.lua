@@ -3,7 +3,61 @@
 local flib_gui = require("__flib__.gui")
 local events = defines.events
 
-local cwi = gui.caption_with_info
+local lib = require("scripts.lib")
+
+local split_item_key, make_item_icon, get_train_item_count = lib.split_item_key, lib.make_item_icon, lib.get_train_item_count
+
+local cwi, extract_elem_value_fields, acquire_next_minimap = gui.caption_with_info, gui.extract_elem_value_fields, gui.acquire_next_minimap
+
+--------------------------------------------------------------------------------
+
+--- Find all of the entities that make up a station, works with ghosts.
+---@param entity LuaEntity
+---@return StationParts?
+local function get_station_parts(entity)
+    local name = entity.name
+    if name == "entity-ghost" then name = entity.ghost_name end
+
+    local stop ---@type LuaEntity
+    if name == "sspp-stop" then
+        stop = entity
+    else
+        local stop_ids = storage.comb_stop_ids[entity.unit_number]
+        if #stop_ids ~= 1 then return nil end
+        stop = storage.entities[stop_ids[1]]
+    end
+
+    local comb_ids = storage.stop_comb_ids[stop.unit_number]
+
+    local combs_by_name = {} ---@type {[string]: LuaEntity?}
+
+    for _, comb_id in pairs(comb_ids) do
+        if #storage.comb_stop_ids[comb_id] ~= 1 then return nil end
+
+        local comb = storage.entities[comb_id]
+        name = comb.name
+        if name == "entity-ghost" then name = comb.ghost_name end
+        if combs_by_name[name] then return nil end
+
+        combs_by_name[name] = comb
+    end
+
+    local general_io = combs_by_name["sspp-general-io"]
+    if not general_io then return nil end
+
+    local provide_io = combs_by_name["sspp-provide-io"]
+    local request_io = combs_by_name["sspp-request-io"]
+    if not (provide_io or request_io) then return nil end
+
+    local ids = {}
+
+    ids[stop.unit_number] = true
+    ids[general_io.unit_number] = true
+    if provide_io then ids[provide_io.unit_number] = true end
+    if request_io then ids[request_io.unit_number] = true end
+
+    return { ids = ids, stop = stop, general_io = general_io, provide_io = provide_io, request_io = request_io }
+end
 
 --------------------------------------------------------------------------------
 
@@ -228,7 +282,7 @@ local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
     local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
     local table = player_gui.elements[table_name]
 
-    if read_stop_flag(player_gui.parts.stop, e_stop_flags.bufferless) then
+    if lib.read_stop_flag(player_gui.parts.stop, e_stop_flags.bufferless) then
         if get_total_rows(player_gui.elements) == 0 then
             inner(table, elem_type)
             set_buffer_settings_enabled(table, false)
@@ -306,7 +360,7 @@ local function provide_to_row_statistics(table_children, i, network_item, item)
     local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
     local stack_size = quality and prototypes.item[name].stack_size or 1
 
-    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
+    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, lib.compute_storage_needed(network_item, item) / stack_size }
 end
 
 ---@param network_items {[ItemKey]: NetworkItem}
@@ -344,7 +398,7 @@ local function provide_from_row(table_children, i)
     local elem_value = table_children[i + 2].elem_value ---@type (table|string)?
     if not elem_value then return end
 
-    local _, _, item_key = gui.extract_elem_value_fields(elem_value)
+    local _, _, item_key = extract_elem_value_fields(elem_value)
 
     local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
     if not throughput then return item_key end
@@ -401,7 +455,7 @@ local function provide_remove_key(player_gui, item_key)
     local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
     local network = storage.networks[player_gui.network]
 
-    set_haulers_to_manual(station.provide_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+    lib.set_haulers_to_manual(station.provide_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
     storage.disabled_items[network.surface.name .. ":" .. item_key] = true
 end
 
@@ -428,7 +482,7 @@ local function request_to_row_statistics(table_children, i, network_item, item)
     local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
     local stack_size = quality and prototypes.item[name].stack_size or 1
 
-    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, compute_storage_needed(network_item, item) / stack_size }
+    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, lib.compute_storage_needed(network_item, item) / stack_size }
 end
 
 ---@param network_items {[ItemKey]: NetworkItem}
@@ -465,7 +519,7 @@ local function request_from_row(table_children, i)
     local elem_value = table_children[i + 2].elem_value ---@type (table|string)?
     if not elem_value then return end
 
-    local _, _, item_key = gui.extract_elem_value_fields(elem_value)
+    local _, _, item_key = extract_elem_value_fields(elem_value)
 
     local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
     if not throughput then return item_key end
@@ -518,7 +572,7 @@ local function request_remove_key(player_gui, item_key)
     local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
     local network = storage.networks[player_gui.network]
 
-    set_haulers_to_manual(station.request_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+    lib.set_haulers_to_manual(station.request_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
     storage.disabled_items[network.surface.name .. ":" .. item_key] = true
 end
 
@@ -560,9 +614,9 @@ function gui.update_station_after_change(player_id)
         )
         if station then
             station.provide_items = items
-            ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, items)
+            lib.ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, items)
         end
-        parts.provide_io.combinator_description = provide_items_to_combinator_description(items)
+        parts.provide_io.combinator_description = lib.provide_items_to_combinator_description(items)
     end
 
     if parts.request_io then
@@ -575,14 +629,14 @@ function gui.update_station_after_change(player_id)
         )
         if station then
             station.request_items = items
-            ensure_hidden_combs(station.request_io, station.request_hidden_combs, items)
+            lib.ensure_hidden_combs(station.request_io, station.request_hidden_combs, items)
         end
-        parts.request_io.combinator_description = request_items_to_combinator_description(items)
+        parts.request_io.combinator_description = lib.request_items_to_combinator_description(items)
     end
 
-    if station and not read_stop_flag(station.stop, e_stop_flags.custom_name) then
+    if station and not lib.read_stop_flag(station.stop, e_stop_flags.custom_name) then
         local old_stop_name = station.stop.backer_name ---@type string
-        local new_stop_name = compute_stop_name(station.provide_items, station.request_items)
+        local new_stop_name = lib.generate_stop_name(station.provide_items, station.request_items)
         if old_stop_name ~= new_stop_name then
             rename_haulers_stop(station.provide_deliveries, old_stop_name, new_stop_name)
             rename_haulers_stop(station.request_deliveries, old_stop_name, new_stop_name)
@@ -615,7 +669,7 @@ function gui.station_poll_finished(player_gui)
 
         for i = 0, #table_children - 1, elements.provide_table.column_count do
             if table_children[i + 1].children[2].sprite == "" then
-                local _, quality, item_key = gui.extract_elem_value_fields(table_children[i + 2].elem_value)
+                local _, quality, item_key = extract_elem_value_fields(table_children[i + 2].elem_value)
                 local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
 
                 local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.provide-mode-tooltip-dynamic" }
@@ -642,7 +696,7 @@ function gui.station_poll_finished(player_gui)
 
             for _, hauler_id in pairs(hauler_ids) do
                 new_length = new_length + 1
-                local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
+                local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
                 local train = storage.haulers[hauler_id].train
                 minimap.entity = train.front_stock
                 top.caption = "[img=virtual-signal/up-arrow]"
@@ -657,7 +711,7 @@ function gui.station_poll_finished(player_gui)
 
         for i = 0, #table_children - 1, elements.request_table.column_count do
             if table_children[i + 1].children[2].sprite == "" then
-                local _, quality, item_key = gui.extract_elem_value_fields(table_children[i + 2].elem_value)
+                local _, quality, item_key = extract_elem_value_fields(table_children[i + 2].elem_value)
                 local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
 
                 local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.request-mode-tooltip-dynamic" }
@@ -684,7 +738,7 @@ function gui.station_poll_finished(player_gui)
 
             for _, hauler_id in pairs(hauler_ids) do
                 new_length = new_length + 1
-                local minimap, top, bottom = gui.next_minimap(grid_table, grid_children, old_length, new_length)
+                local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
                 local train = storage.haulers[hauler_id].train
                 minimap.entity = train.front_stock
                 top.caption = "[img=virtual-signal/down-arrow]"
@@ -732,12 +786,12 @@ local handle_clear_name = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
     local parts = player_gui.parts --[[@as StationParts]]
 
-    write_stop_flag(parts.stop, e_stop_flags.custom_name, false)
+    lib.write_stop_flag(parts.stop, e_stop_flags.custom_name, false)
 
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
     local stop_name ---@type string
     if station then
-        stop_name = compute_stop_name(station.provide_items, station.request_items)
+        stop_name = lib.generate_stop_name(station.provide_items, station.request_items)
         rename_haulers_stop(station.provide_deliveries, station.stop.backer_name, stop_name)
         rename_haulers_stop(station.request_deliveries, station.stop.backer_name, stop_name)
     else
@@ -763,12 +817,12 @@ handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
     local stop_name = gui.truncate_input(event.element, 199)
     local has_custom_name = stop_name ~= ""
     player_gui.elements.stop_name_clear_button.enabled = has_custom_name
-    write_stop_flag(parts.stop, e_stop_flags.custom_name, has_custom_name)
+    lib.write_stop_flag(parts.stop, e_stop_flags.custom_name, has_custom_name)
 
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
     if station then
         if not has_custom_name then
-            stop_name = compute_stop_name(station.provide_items, station.request_items)
+            stop_name = lib.generate_stop_name(station.provide_items, station.request_items)
         end
         rename_haulers_stop(station.provide_deliveries, station.stop.backer_name, stop_name)
         rename_haulers_stop(station.request_deliveries, station.stop.backer_name, stop_name)
@@ -797,7 +851,7 @@ local handle_disable_toggled = { [events.on_gui_click] = function(event)
 
     local toggled = event.element.toggled
     event.element.tooltip = { toggled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
-    write_stop_flag(parts.stop, e_stop_flags.disable, toggled)
+    lib.write_stop_flag(parts.stop, e_stop_flags.disable, toggled)
 end }
 
 ---@param event EventData.on_gui_value_changed
@@ -824,7 +878,7 @@ local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
     end
 
     event.element.tooltip = { toggled and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
-    write_stop_flag(parts.stop, e_stop_flags.bufferless, toggled)
+    lib.write_stop_flag(parts.stop, e_stop_flags.bufferless, toggled)
 
     if total_rows > 0 then
         local provide_table, request_table = player_gui.elements.provide_table, player_gui.elements.request_table
@@ -842,8 +896,8 @@ local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
                             if to_provide.buffer then
                                 local network = storage.networks[station.network]
                                 to_provide.buffer = nil
-                                list_remove_value_or_destroy(network.buffer_haulers, item_key, hauler_id)
-                                list_append_or_create(network.provide_haulers, item_key, hauler_id)
+                                lib.list_destroy_or_remove(network.buffer_haulers, item_key, hauler_id)
+                                lib.list_create_or_append(network.provide_haulers, item_key, hauler_id)
                             end
                         end
                     end
@@ -898,12 +952,12 @@ end }
 ---@param parts StationParts
 ---@return {[string]: LuaGuiElement} elements, LuaGuiElement window
 local function add_gui_complete(player, parts)
-    local is_disabled = read_stop_flag(parts.stop, e_stop_flags.disable)
+    local is_disabled = lib.read_stop_flag(parts.stop, e_stop_flags.disable)
     local disable_tooltip = { is_disabled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
     local name = parts.stop.backer_name
-    local has_custom_name = read_stop_flag(parts.stop, e_stop_flags.custom_name)
+    local has_custom_name = lib.read_stop_flag(parts.stop, e_stop_flags.custom_name)
     local limit = parts.stop.trains_limit
-    local is_bufferless = read_stop_flag(parts.stop, e_stop_flags.bufferless)
+    local is_bufferless = lib.read_stop_flag(parts.stop, e_stop_flags.bufferless)
     local bufferless_tooltip = { is_bufferless and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
     local no_provide = not parts.provide_io and {}
     local no_request = not parts.request_io and {}
@@ -1032,15 +1086,15 @@ function gui.station_open(player_id, entity)
     if parts then
         local provide_table, request_table = elements.provide_table, elements.request_table
         local network_items = storage.networks[network_name].items
-        local buffered = not read_stop_flag(parts.stop, e_stop_flags.bufferless)
+        local buffered = not lib.read_stop_flag(parts.stop, e_stop_flags.bufferless)
         if provide_table then
-            for item_key, item in pairs(combinator_description_to_provide_items(parts.provide_io)) do
+            for item_key, item in pairs(lib.combinator_description_to_provide_items(parts.provide_io)) do
                 provide_init_row(network_items, provide_table, item_key, item)
             end
             set_buffer_settings_enabled(provide_table, buffered)
         end
         if request_table then
-            for item_key, item in pairs(combinator_description_to_request_items(parts.request_io)) do
+            for item_key, item in pairs(lib.combinator_description_to_request_items(parts.request_io)) do
                 request_init_row(network_items, request_table, item_key, item)
             end
             set_buffer_settings_enabled(request_table, buffered)
