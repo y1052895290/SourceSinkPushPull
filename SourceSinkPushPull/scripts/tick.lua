@@ -1,6 +1,7 @@
 -- SSPP by jagoly
 
-local lib = require("scripts.lib")
+local lib = require("__SourceSinkPushPull__.scripts.lib")
+local gui = require("__SourceSinkPushPull__.scripts.gui")
 
 local s_match = string.match
 
@@ -11,8 +12,7 @@ local list_create_or_append, list_create_or_extend = lib.list_create_or_append, 
 local list_destroy_or_remove, list_remove_all = lib.list_destroy_or_remove, lib.list_remove_all
 local compute_storage_needed, compute_buffer = lib.compute_storage_needed, lib.compute_buffer
 local read_stop_flag, get_train_item_count = lib.read_stop_flag, lib.get_train_item_count
-local set_hauler_status, send_train_to_station = lib.set_hauler_status, lib.send_train_to_station
-local assign_network_hauler_job = lib.assign_network_hauler_job
+local send_train_to_station, assign_job_index = lib.send_train_to_station, lib.assign_job_index
 
 --------------------------------------------------------------------------------
 
@@ -91,24 +91,20 @@ local function prepare_for_tick_poll()
     storage.tick_state = "POLL"
 end
 
----@param hauler Hauler
----@param to_station HaulerToStation
----@return boolean? done
-local function disable_if_wrong_cargo_else_check_if_done(hauler, to_station)
-    local train = hauler.train
+---@param train LuaTrain
+---@param item_key ItemKey
+---@return boolean
+local function check_if_loaded_wrong_cargo(train, item_key)
+    -- TODO: this wasn't accounting for spoil results, oops
 
-    for _, item in pairs(train.get_contents()) do
-        if item.name .. ":" .. (item.quality or "normal") ~= to_station.item then goto wrong_cargo_found end
-    end
-    for fluid, _ in pairs(train.get_fluid_contents()) do
-        if fluid ~= to_station.item then goto wrong_cargo_found end
-    end
-    do return to_station.phase == "DONE" end
+    -- for _, item in pairs(train.get_contents()) do
+    --     if item.name .. ":" .. (item.quality or "normal") ~= item_key then return true end
+    -- end
+    -- for fluid, _ in pairs(train.get_fluid_contents()) do
+    --     if fluid ~= item_key then return true end
+    -- end
 
-    ::wrong_cargo_found::
-    lib.set_hauler_status(hauler, { "sspp-alert.loaded-wrong-cargo" })
-    lib.show_train_alert(train, hauler.status)
-    train.manual_mode = true
+    return false
 end
 
 ---@param network_items {[ItemKey]: NetworkItem}
@@ -228,18 +224,26 @@ local function tick_poll()
     local hauler_id = station.hauler
     if hauler_id then
         local hauler = storage.haulers[hauler_id]
-        if hauler.to_provide then
-            if disable_if_wrong_cargo_else_check_if_done(hauler, hauler.to_provide) then
-                if hauler.to_provide.buffer then
-                    hauler_buffer_item_key = hauler.to_provide.item
-                else
-                    hauler_provide_item_key = hauler.to_provide.item
-                    list_create_or_append(network.provide_done_tickets, hauler_provide_item_key, station_id)
-                end
+        local job = network.jobs[hauler.job] --[[@as Job.Pickup|Job.Dropoff|Job.Combined]]
+        local item_key = job.item
+
+        if check_if_loaded_wrong_cargo(hauler.train, item_key) then
+            hauler.status = { message = { "sspp-alert.loaded-wrong-cargo" } }
+            lib.show_train_alert(hauler.train, hauler.status.message)
+            hauler.train.manual_mode = true
+        elseif job.finish_tick then
+            if job.type ~= "PICKUP" then
+                hauler_request_item_key = item_key
+                list_create_or_append(network.request_done_tickets, item_key, station_id)
+            elseif station.bufferless_dispatch then
+                hauler_provide_item_key = item_key
+                list_create_or_append(network.provide_done_tickets, item_key, station_id)
+            else
+                hauler_buffer_item_key = item_key
             end
-        elseif disable_if_wrong_cargo_else_check_if_done(hauler, hauler.to_request) then
-            hauler_request_item_key = hauler.to_request.item
-            list_create_or_append(network.request_done_tickets, hauler_request_item_key, station_id)
+        elseif job.provide_done_tick and not job.request_arrive_tick then
+            hauler_provide_item_key = item_key
+            list_create_or_append(network.provide_done_tickets, item_key, station_id)
         end
     end
 
@@ -279,11 +283,11 @@ local function tick_poll()
                 local count, mode = provide_counts[item_key], provide_modes[item_key]
 
                 if hauler_provide_item_key == item_key then
-                    local minimum_count = station.provide_minimum_active_count ---@type integer
+                    local minimum_count = station.minimum_active_count ---@type integer
                     if minimum_count > count then
                         count = minimum_count
                     elseif minimum_count < count then
-                        station.provide_minimum_active_count = count
+                        station.minimum_active_count = count
                     end
                     hauler_provide_item_key = nil
                 elseif hauler_buffer_item_key == item_key then
@@ -333,11 +337,11 @@ local function tick_poll()
                 local count, mode = request_counts[item_key], request_modes[item_key]
 
                 if hauler_request_item_key == item_key then
-                    local minimum_count = station.request_minimum_active_count ---@type integer
+                    local minimum_count = station.minimum_active_count ---@type integer
                     if minimum_count > count then
                         count = minimum_count
                     elseif minimum_count < count then
-                        station.request_minimum_active_count = count
+                        station.minimum_active_count = count
                     end
                     hauler_request_item_key = nil
                 end
@@ -434,7 +438,6 @@ local function pop_best_dispatch_hauler_if_any(network, item_key)
 
     return extract_id(dict, class_name, list, m_random(#list))
 end
-
 
 ---@param first_dict {[ItemKey]: StationId[]}
 ---@param second_dict {[ItemKey]: StationId[]}
@@ -570,10 +573,9 @@ local function tick_request_done()
 
     list_destroy_or_remove(network.request_haulers, item_key, hauler_id)
     list_destroy_or_remove(request_station.request_deliveries, item_key, hauler_id)
-    hauler.to_request = nil
-    request_station.request_minimum_active_count = nil
-    request_station.hauler = nil
     request_station.total_deliveries = request_station.total_deliveries - 1
+    request_station.hauler = nil
+    request_station.minimum_active_count = nil
 
     hauler.job = nil
 
@@ -644,14 +646,15 @@ local function tick_liquidate()
 
     list_create_or_append(network.request_haulers, item_key, hauler_id)
     list_create_or_append(request_station.request_deliveries, item_key, hauler_id)
-    hauler.to_request = { item = item_key, station = request_station_id, phase = "TRAVEL" }
     request_station.total_deliveries = request_station.total_deliveries + 1
 
-    set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
-    send_train_to_station(hauler.train, e_train_colors.request, request_station.stop)
+    local request_stop = request_station.stop
+    send_train_to_station(hauler.train, e_train_colors.request, request_stop)
 
-    assign_network_hauler_job(network, hauler, { hauler = hauler_id, type = item_key, start_tick = game.tick, request_stop = request_station.stop })
-    gui.on_job_created(network_name, network.job_index_counter)
+    assign_job_index(network, hauler, { type = "DROPOFF", hauler = hauler_id, start_tick = game.tick, item = item_key, request_stop = request_stop })
+    gui.on_job_created(network_name)
+    hauler.status = { message = { "sspp-alert.dropping-off-cargo" }, item = item_key, stop = request_stop }
+    gui.on_status_changed(hauler_id)
 
     return false
 end
@@ -698,24 +701,36 @@ local function tick_provide_done()
     local hauler_id = provide_station.hauler ---@type HaulerId
     local hauler = storage.haulers[hauler_id]
 
-    list_destroy_or_remove(network.provide_haulers, item_key, hauler_id)
+    local job_index = hauler.job --[[@as JobIndex]]
+    local job = network.jobs[job_index]
+    local bufferless = job.type == "PICKUP"
+
+    if bufferless then
+        list_destroy_or_remove(network.buffer_haulers, item_key, hauler_id)
+    else
+        list_destroy_or_remove(network.provide_haulers, item_key, hauler_id)
+    end
     list_destroy_or_remove(provide_station.provide_deliveries, item_key, hauler_id)
-    hauler.to_provide = nil
-    provide_station.provide_minimum_active_count = nil
-    provide_station.hauler = nil
     provide_station.total_deliveries = provide_station.total_deliveries - 1
+    provide_station.hauler = nil
+    provide_station.minimum_active_count = nil
 
     list_create_or_append(network.request_haulers, item_key, hauler_id)
     list_create_or_append(request_station.request_deliveries, item_key, hauler_id)
-    hauler.to_request = { item = item_key, station = request_station_id, phase = "TRAVEL" }
     request_station.total_deliveries = request_station.total_deliveries + 1
 
-    set_hauler_status(hauler, { "sspp-alert.dropping-off-cargo" }, item_key, request_station.stop)
-    send_train_to_station(hauler.train, e_train_colors.request, request_station.stop)
+    local request_stop = request_station.stop
+    send_train_to_station(hauler.train, e_train_colors.request, request_stop)
 
-    local job_index = hauler.job --[[@as JobIndex]]
-    network.jobs[job_index].request_stop = request_station.stop
-    gui.on_job_updated(network_name, job_index)
+    if bufferless then
+        assign_job_index(network, hauler, { type = "DROPOFF", hauler = hauler_id, start_tick = game.tick, item = item_key, request_stop = request_stop })
+        gui.on_job_created(network_name)
+    else
+        job.request_stop = request_stop
+        gui.on_job_updated(network_name, job_index)
+    end
+    hauler.status = { message = { "sspp-alert.dropping-off-cargo" }, item = item_key, stop = request_stop }
+    gui.on_status_changed(hauler_id)
 
     return false
 end
@@ -773,13 +788,7 @@ local function tick_dispatch()
     local provide_station = storage.stations[provide_station_id]
 
     if read_stop_flag(provide_station.stop, e_stop_flags.bufferless) then
-        local hauler_id = provide_station.hauler --[[@as HaulerId]]
-
-        -- will allow the creation of a PROVIDE_DONE ticket in the next cycle
-        storage.haulers[hauler_id].to_provide.buffer = nil
-
-        list_destroy_or_remove(network.buffer_haulers, item_key, hauler_id)
-        list_create_or_append(network.provide_haulers, item_key, hauler_id)
+        provide_station.bufferless_dispatch = true -- create a provide_done ticket in the next cycle
         return false
     end
 
@@ -795,14 +804,15 @@ local function tick_dispatch()
 
     list_create_or_append(network.provide_haulers, item_key, hauler_id)
     list_create_or_append(provide_station.provide_deliveries, item_key, hauler_id)
-    hauler.to_provide = { item = item_key, station = provide_station_id, phase = "TRAVEL", buffer = nil }
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
-    set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
-    send_train_to_station(hauler.train, e_train_colors.provide, provide_station.stop)
+    local provide_stop = provide_station.stop
+    send_train_to_station(hauler.train, e_train_colors.provide, provide_stop)
 
-    assign_network_hauler_job(network, hauler, { hauler = hauler_id, type = item_key, start_tick = game.tick, provide_stop = provide_station.stop })
-    gui.on_job_created(network_name, network.job_index_counter)
+    assign_job_index(network, hauler, { type = "COMBINED", hauler = hauler_id, start_tick = game.tick, item = item_key, provide_stop = provide_stop })
+    gui.on_job_created(network_name)
+    hauler.status = { message = { "sspp-alert.picking-up-cargo" }, item = item_key, stop = provide_stop }
+    gui.on_status_changed(hauler_id)
 
     return false
 end
@@ -845,14 +855,15 @@ local function tick_buffer()
 
     list_create_or_append(network.buffer_haulers, item_key, hauler_id)
     list_create_or_append(provide_station.provide_deliveries, item_key, hauler_id)
-    hauler.to_provide = { item = item_key, station = provide_station_id, phase = "TRAVEL", buffer = true }
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
-    set_hauler_status(hauler, { "sspp-alert.picking-up-cargo" }, item_key, provide_station.stop)
-    send_train_to_station(hauler.train, e_train_colors.provide, provide_station.stop)
+    local provide_stop = provide_station.stop
+    send_train_to_station(hauler.train, e_train_colors.provide, provide_stop)
 
-    assign_network_hauler_job(network, hauler, { hauler = hauler_id, type = item_key, start_tick = game.tick, provide_stop = provide_station.stop })
-    gui.on_job_created(network_name, network.job_index_counter)
+    assign_job_index(network, hauler, { type = "PICKUP", hauler = hauler_id, start_tick = game.tick, item = item_key, provide_stop = provide_stop })
+    gui.on_job_created(network_name)
+    hauler.status = { message = { "sspp-alert.picking-up-cargo" }, item = item_key, stop = provide_stop }
+    gui.on_status_changed(hauler_id)
 
     return false
 end

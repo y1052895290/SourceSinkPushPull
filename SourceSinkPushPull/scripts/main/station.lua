@@ -1,6 +1,7 @@
 -- SSPP by jagoly
 
-local lib = require("scripts.lib")
+local lib = require("__SourceSinkPushPull__.scripts.lib")
+local gui = require("__SourceSinkPushPull__.scripts.gui")
 
 --------------------------------------------------------------------------------
 
@@ -105,18 +106,6 @@ local function try_create_station(stop, combs)
     storage.stations[station_id] = station
 end
 
----@param unit_number uint
-local function try_close_entity_guis(unit_number)
-    for player_id, player_gui in pairs(storage.player_guis) do
-        if player_gui.unit_number then
-            ---@cast player_gui PlayerStationGui
-            if player_gui.unit_number == unit_number or player_gui.parts and player_gui.parts.ids[unit_number] then
-                gui.station_closed(player_id)
-            end
-        end
-    end
-end
-
 ---@param network_name NetworkName
 ---@param items {[ItemKey]: ProvideItem|RequestItem}?
 ---@param deliveries {[ItemKey]: HaulerId[]}?
@@ -182,7 +171,7 @@ function main.stop_built(stop, ghost_unit_number)
         storage.comb_stop_ids[comb.unit_number] = stop_ids
 
         for _, other_stop in pairs(stops) do
-            try_close_entity_guis(other_stop.unit_number)
+            gui.on_part_broken(other_stop.unit_number)
             try_destroy_station(other_stop)
         end
     end
@@ -214,7 +203,7 @@ function main.comb_built(comb, ghost_unit_number)
     storage.comb_stop_ids[comb.unit_number] = stop_ids
 
     for _, stop in pairs(stops) do
-        try_close_entity_guis(stop.unit_number)
+        gui.on_part_broken(stop.unit_number)
         try_destroy_station(stop)
 
         local comb_ids, combs = find_nearby_combs(stop)
@@ -254,7 +243,7 @@ end
 function main.stop_broken(stop_id, stop)
     local comb_ids = storage.stop_comb_ids[stop_id]
 
-    try_close_entity_guis(stop_id)
+    gui.on_part_broken(stop_id)
     if stop then
         try_destroy_station(stop)
     end
@@ -283,7 +272,7 @@ end
 function main.comb_broken(comb_id, comb)
     local stop_ids = storage.comb_stop_ids[comb_id]
 
-    try_close_entity_guis(comb_id)
+    gui.on_part_broken(comb_id)
     if comb then
         for _, stop_id in pairs(stop_ids) do
             try_destroy_station(storage.entities[stop_id])

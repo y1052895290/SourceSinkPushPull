@@ -1,20 +1,25 @@
 -- SSPP by jagoly
 
 local flib_gui = require("__flib__.gui")
+
+local lib = require("__SourceSinkPushPull__.scripts.lib")
+local glib = require("__SourceSinkPushPull__.scripts.glib")
+local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
+
 local events = defines.events
 
-local lib = require("scripts.lib")
+local gui_hauler = {}
 
 --------------------------------------------------------------------------------
 
----@param player_gui PlayerHaulerGui
-function gui.hauler_status_changed(player_gui)
+---@param player_gui PlayerGui.Hauler
+function gui_hauler.on_status_changed(player_gui)
     local elements = player_gui.elements
-    local hauler = storage.haulers[player_gui.train_id]
+    local status = storage.haulers[player_gui.train_id].status
 
-    elements.status_label.caption = hauler.status
-    if hauler.status_item then
-        local name, quality = lib.split_item_key(hauler.status_item)
+    elements.status_label.caption = status.message
+    if status.item then
+        local name, quality = lib.split_item_key(status.item)
         if quality then
             elements.item_button.elem_value = { name = name, quality = quality, type = "item" }
         else
@@ -23,11 +28,11 @@ function gui.hauler_status_changed(player_gui)
     else
         elements.item_button.elem_value = nil
     end
-    elements.stop_button.enabled = hauler.status_stop ~= nil
+    elements.stop_button.enabled = status.stop ~= nil
 end
 
----@param player_gui PlayerHaulerGui
-function gui.hauler_manual_mode_changed(player_gui)
+---@param player_gui PlayerGui.Hauler
+function gui_hauler.on_manual_mode_changed(player_gui)
     player_gui.elements.class_textbox.enabled = player_gui.train.manual_mode
     player_gui.elements.class_auto_assign_button.enabled = player_gui.train.manual_mode
 end
@@ -39,23 +44,23 @@ local handle_open_network = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local network_name = storage.player_guis[player_id].network
 
-    gui.network_open(player_id, network_name, 1)
+    gui_network.open(player_id, network_name, 1)
 end }
 
 ---@param event EventData.on_gui_click
 local handle_view_on_map = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerHaulerGui]]
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Hauler]]
 
     local hauler = storage.haulers[player_gui.train_id]
-    if hauler and hauler.status_stop and hauler.status_stop.valid then
-        game.get_player(player_id).centered_on = hauler.status_stop
+    if hauler and hauler.status.stop and hauler.status.stop.valid then
+        game.get_player(player_id).centered_on = hauler.status.stop
     end
 end }
 
 ---@param event EventData.on_gui_text_changed
 local handle_class_changed = { [events.on_gui_text_changed] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerHaulerGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Hauler]]
     local train_id, train = player_gui.train_id, player_gui.train
 
     -- disabling textboxes doesn't disable the icon selector, so hope that the user doesn't do that
@@ -67,7 +72,7 @@ local handle_class_changed = { [events.on_gui_text_changed] = function(event)
         return
     end
 
-    local class_name = gui.truncate_input(event.element, 199)
+    local class_name = glib.truncate_input(event.element, 199)
 
     local hauler = storage.haulers[train_id]
     if hauler then
@@ -78,10 +83,10 @@ local handle_class_changed = { [events.on_gui_text_changed] = function(event)
         end
     elseif class_name ~= "" then
         storage.haulers[train_id] = {
-            network = player_gui.network,
-            train_id = train_id,
             train = train,
+            network = player_gui.network,
             class = class_name,
+            status = { message = { "sspp-gui.not-configured" } },
         }
     end
 end }
@@ -96,7 +101,7 @@ end
 
 ---@param event EventData.on_gui_click
 local handle_class_auto_assign = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerHaulerGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Hauler]]
     local network_name = player_gui.network
     local train_id, train = player_gui.train_id, player_gui.train
 
@@ -157,7 +162,7 @@ local handle_class_auto_assign = { [events.on_gui_click] = function(event)
         train = train,
         network = network_name,
         class = matching_class,
-        status = { "sspp-gui.not-configured" },
+        status = { message = { "sspp-gui.not-configured" } },
     }
     player_gui.elements.class_textbox.text = matching_class
 
@@ -168,7 +173,7 @@ end }
 
 ---@param player_id PlayerId
 ---@param train LuaTrain
-function gui.hauler_opened(player_id, train)
+function gui_hauler.open(player_id, train)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
 
     local network_name = train.front_stock.surface.name
@@ -176,7 +181,7 @@ function gui.hauler_opened(player_id, train)
 
     -- mods assigning player.opened to another locomotive won't generate a close event
     if player.gui.screen["sspp-hauler"] then
-        gui.hauler_closed(player_id)
+        gui_hauler.close(player_id)
     end
 
     local elements, window = flib_gui.add(player.gui.screen, {
@@ -205,13 +210,13 @@ function gui.hauler_opened(player_id, train)
     local resolution, scale = player.display_resolution, player.display_scale
     window.location = { x = resolution.width - (244 + 12) * scale, y = resolution.height - (108 + 12) * scale }
 
-    local player_gui = { network = network_name, train_id = train.id, train = train, elements = elements }
+    local player_gui = { type = "HAULER", network = network_name, elements = elements, train_id = train.id, train = train } ---@type PlayerGui.Hauler
     storage.player_guis[player_id] = player_gui
 
     local hauler = storage.haulers[train.id]
     if hauler then
         elements.class_textbox.text = hauler.class
-        gui.hauler_status_changed(player_gui)
+        gui_hauler.on_status_changed(player_gui)
     else
         elements.status_label.caption = { "sspp-gui.not-configured" }
         elements.stop_button.enabled = false
@@ -219,7 +224,7 @@ function gui.hauler_opened(player_id, train)
 end
 
 ---@param player_id PlayerId
-function gui.hauler_closed(player_id)
+function gui_hauler.close(player_id)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
 
     player.gui.screen["sspp-hauler"].destroy()
@@ -229,7 +234,7 @@ end
 
 --------------------------------------------------------------------------------
 
-function gui.hauler_add_flib_handlers()
+function gui_hauler.add_flib_handlers()
     flib_gui.add_handlers({
         ["hauler_open_network"] = handle_open_network[events.on_gui_click],
         ["hauler_view_on_map"] = handle_view_on_map[events.on_gui_click],
@@ -237,3 +242,7 @@ function gui.hauler_add_flib_handlers()
         ["hauler_class_auto_assign"] = handle_class_auto_assign[events.on_gui_click],
     })
 end
+
+--------------------------------------------------------------------------------
+
+return gui_hauler

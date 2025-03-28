@@ -507,6 +507,7 @@ local function set_train_color(train, color_id)
         local color = mod_settings.train_colors[color_id]
         for _, locos in pairs(train.locomotives) do
             for _, loco in pairs(locos) do
+                ---@cast loco LuaEntity
                 loco.copy_color_from_train_stop = false
                 loco.color = color
             end
@@ -544,24 +545,16 @@ function lib.show_train_alert(train, message)
     end
 end
 
---------------------------------------------------------------------------------
-
+---@param network Network
 ---@param hauler Hauler
----@param message LocalisedString
----@param item ItemKey?
----@param stop LuaEntity?
-function lib.set_hauler_status(hauler, message, item, stop)
-    hauler.status = message
-    hauler.status_item = item
-    hauler.status_stop = stop
-    for _, player_gui in pairs(storage.player_guis) do
-        if player_gui.train_id then
-            ---@cast player_gui PlayerHaulerGui
-            if player_gui.train_id == hauler.train.id then
-                gui.hauler_status_changed(player_gui)
-            end
-        end
-    end
+---@param job Job
+function lib.assign_job_index(network, hauler, job)
+    local job_index = network.job_index_counter + 1
+
+    network.job_index_counter = job_index
+    hauler.job = job_index
+
+    network.jobs[job_index] = job
 end
 
 ---@param hauler_ids HaulerId[]?
@@ -572,23 +565,11 @@ function lib.set_haulers_to_manual(hauler_ids, message, item, stop)
     if hauler_ids then
         for i = #hauler_ids, 1, -1 do
             local hauler = storage.haulers[hauler_ids[i]]
-            lib.set_hauler_status(hauler, message, item, stop)
-            lib.send_alert_for_train(hauler.train, message)
+            lib.show_train_alert(hauler.train, message)
+            hauler.status = { message = message, item = item, stop = stop }
             hauler.train.manual_mode = true
         end
     end
-end
-
----@param network Network
----@param hauler Hauler
----@param job Job
-function lib.assign_network_hauler_job(network, hauler, job)
-    local job_index = network.job_index_counter + 1
-
-    network.job_index_counter = job_index
-    hauler.job = job_index
-
-    network.jobs[job_index] = job
 end
 
 --------------------------------------------------------------------------------

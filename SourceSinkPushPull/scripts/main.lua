@@ -1,13 +1,14 @@
 -- SSPP by jagoly
 
-local lib = require("scripts.lib")
+local lib = require("__SourceSinkPushPull__.scripts.lib")
+local gui = require("__SourceSinkPushPull__.scripts.gui")
 
 main = {}
 
 --------------------------------------------------------------------------------
 
-require("main.station")
-require("main.hauler")
+require("__SourceSinkPushPull__.scripts.main.station")
+require("__SourceSinkPushPull__.scripts.main.hauler")
 
 --------------------------------------------------------------------------------
 
@@ -101,42 +102,41 @@ local function on_train_changed_state(event)
         return
     end
 
-    if hauler.to_provide then
-        if hauler.to_provide.phase == "TRAVEL" then
-            if state == defines.train_state.wait_station and train.station then
-                main.hauler_arrived_at_provide_station(hauler)
-            end
-        elseif hauler.to_provide.phase == "TRANSFER" then
-            if state == defines.train_state.arrive_station then
-                main.hauler_done_at_provide_station(hauler)
-            end
-        end
-        return
-    end
+    local job_index = hauler.job
+    if job_index then
+        local job = storage.networks[hauler.network].jobs[job_index]
+        local job_type = job.type
 
-    if hauler.to_request then
-        if hauler.to_request.phase == "TRAVEL" then
-            if state == defines.train_state.wait_station and train.station then
-                main.hauler_arrived_at_request_station(hauler)
+        if job_type == "FUEL" then
+            if job.fuel_arrive_tick then
+                if state == defines.train_state.arrive_station then
+                    main.hauler_done_at_fuel_stop(hauler, job --[[@as Job.Fuel]])
+                end
+            else
+                if state == defines.train_state.wait_station then
+                    main.hauler_arrived_at_fuel_stop(hauler, job --[[@as Job.Fuel]])
+                end
             end
-        elseif hauler.to_request.phase == "TRANSFER" then
-            if state == defines.train_state.arrive_station then
-                main.hauler_done_at_request_station(hauler)
+        else
+            if job.request_arrive_tick then
+                if state == defines.train_state.arrive_station then
+                    main.hauler_done_at_request_station(hauler, job --[[@as Job.Combined|Job.Dropoff]])
+                end
+            elseif job.request_stop then
+                if state == defines.train_state.wait_station and train.station then
+                    main.hauler_arrived_at_request_station(hauler, job --[[@as Job.Combined|Job.Dropoff]])
+                end
+            elseif job.provide_arrive_tick then
+                if state == defines.train_state.arrive_station then
+                    main.hauler_done_at_provide_station(hauler, job --[[@as Job.Combined|Job.Pickup]])
+                end
+            else -- job.provide_stop
+                if state == defines.train_state.wait_station and train.station then
+                    main.hauler_arrived_at_provide_station(hauler, job --[[@as Job.Combined|Job.Pickup]])
+                end
             end
         end
-        return
-    end
 
-    if hauler.to_fuel then
-        if hauler.to_fuel == "TRAVEL" then
-            if state == defines.train_state.wait_station then
-                main.hauler_arrived_at_fuel_stop(hauler)
-            end
-        elseif hauler.to_fuel == "TRANSFER" then
-            if state == defines.train_state.arrive_station then
-                main.hauler_done_at_fuel_stop(hauler)
-            end
-        end
         return
     end
 
@@ -168,8 +168,8 @@ local function on_train_schedule_changed(event)
     local hauler = storage.haulers[train.id]
     if not hauler then return end
 
-    lib.set_hauler_status(hauler, { "sspp-alert.schedule-modified" })
-    lib.show_train_alert(train, hauler.status)
+    hauler.status = { message = { "sspp-alert.schedule-modified" } }
+    lib.show_train_alert(train, hauler.status.message)
     train.manual_mode = true
 end
 
@@ -202,23 +202,6 @@ end
 ---@param event EventData.on_surface_renamed
 local function on_surface_renamed(event)
     assert(false, "TODO: rename surface")
-end
-
---------------------------------------------------------------------------------
-
----@param event EventData.on_lua_shortcut
-local function on_lua_shortcut(event)
-    if event.prototype_name == "sspp" then
-        local player_id = event.player_index
-        local player = game.get_player(player_id) --[[@as LuaPlayer]]
-
-        if player.opened and player.opened.name == "sspp-network" then
-            player.opened = nil
-        else
-            -- TODO: remember some previous state
-            gui.network_open(player_id, player.surface.name, 1)
-        end
-    end
 end
 
 --------------------------------------------------------------------------------
@@ -298,8 +281,6 @@ script.on_event(defines.events.on_surface_imported, on_surface_created)
 script.on_event(defines.events.on_pre_surface_cleared, on_surface_cleared)
 script.on_event(defines.events.on_pre_surface_deleted, on_surface_cleared)
 script.on_event(defines.events.on_surface_renamed, on_surface_renamed)
-
-script.on_event(defines.events.on_lua_shortcut, on_lua_shortcut)
 
 script.on_event(defines.events.on_runtime_mod_setting_changed, on_mod_setting_changed)
 

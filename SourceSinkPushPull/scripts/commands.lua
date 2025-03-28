@@ -1,6 +1,6 @@
 -- SSPP by jagoly
 
-local lib = require("scripts.lib")
+local lib = require("__SourceSinkPushPull__.scripts.lib")
 
 --------------------------------------------------------------------------------
 
@@ -14,16 +14,16 @@ function main.reboot()
         network.at_depot_haulers = {}
         network.to_depot_liquidate_haulers = {}
         network.at_depot_liquidate_haulers = {}
+        network.jobs = {}
+        network.job_index_counter = 0
     end
 
     for hauler_id, hauler in pairs(storage.haulers) do
         local train = hauler.train
         if train.valid then
-            hauler.to_provide = nil
-            hauler.to_request = nil
-            hauler.to_fuel = nil
             hauler.to_depot = nil
             hauler.at_depot = nil
+            hauler.job = nil
             train.manual_mode = true
         else
             storage.haulers[hauler_id] = nil

@@ -2,7 +2,7 @@
 
 local flib_migration = require("__flib__.migration")
 
-local lib = require("scripts.lib")
+local lib = require("__SourceSinkPushPull__.scripts.lib")
 
 --------------------------------------------------------------------------------
 
@@ -149,7 +149,29 @@ local migrations = {
                 end
             end
         end
-    end
+    end,
+    ["0.3.24"] = function()
+        for _, network in pairs(storage.networks) do
+            network.jobs = {}
+            network.job_index_counter = 0
+        end
+        for _, station in pairs(storage.stations) do
+            if station.provide_minimum_active_count or station.request_minimum_active_count then
+                station.minimum_active_count = station.provide_minimum_active_count or station.request_minimum_active_count
+                station.provide_minimum_active_count, station.request_minimum_active_count = nil, nil
+            end
+        end
+        for _, hauler in pairs(storage.haulers) do
+            if hauler.status[1] then
+                hauler.status = { message = hauler.status[1], item = hauler.status_item, stop = hauler.status_stop }
+                hauler.status_item, hauler.status_stop = nil, nil
+            end
+            if hauler.job or hauler.to_fuel or hauler.to_provide or hauler.to_request then
+                hauler.job = -1 -- force reboot
+                hauler.to_fuel, hauler.to_provide, hauler.to_request = nil, nil, nil
+            end
+        end
+    end,
 }
 
 --------------------------------------------------------------------------------
@@ -160,13 +182,13 @@ function on_config_changed(data)
 
     local is_item_key_invalid = lib.is_item_key_invalid
 
-    -- remove invalid network items
+    -- remove all invalid items and jobs from networks
     for _, network in pairs(storage.networks) do
         for item_key, _ in pairs(network.items) do
             if is_item_key_invalid(item_key) then network.items[item_key] = nil end
         end
         for job_index, job in pairs(network.jobs) do
-            if job.type ~= "FUEL" and is_item_key_invalid(job.type) then network.jobs[job_index] = nil end
+            if job.type ~= "FUEL" and is_item_key_invalid(job.item) then network.jobs[job_index] = nil end
         end
     end
 
@@ -187,14 +209,13 @@ function on_config_changed(data)
             end
         end
     end
-    -- check hauler trains and items
+    -- check hauler trains / items / jobs
     for _, hauler in pairs(storage.haulers) do
         if not hauler.train.valid then goto reboot end
-        if hauler.status_item and is_item_key_invalid(hauler.status_item) then goto reboot end
-        if hauler.to_provide and is_item_key_invalid(hauler.to_provide.item) then goto reboot end
-        if hauler.to_request and is_item_key_invalid(hauler.to_request.item) then goto reboot end
+        if hauler.status.item and is_item_key_invalid(hauler.status.item) then goto reboot end
         if hauler.to_depot and hauler.to_depot ~= "" and is_item_key_invalid(hauler.to_depot) then goto reboot end
         if hauler.at_depot and hauler.at_depot ~= "" and is_item_key_invalid(hauler.at_depot) then goto reboot end
+        if hauler.job and not storage.networks[hauler.network].jobs[hauler.job] then goto reboot end
     end
     goto skip_reboot
 

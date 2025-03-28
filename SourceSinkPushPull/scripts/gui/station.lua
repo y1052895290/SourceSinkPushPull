@@ -1,13 +1,18 @@
 -- SSPP by jagoly
 
 local flib_gui = require("__flib__.gui")
-local events = defines.events
 
-local lib = require("scripts.lib")
+local lib = require("__SourceSinkPushPull__.scripts.lib")
+local glib = require("__SourceSinkPushPull__.scripts.glib")
+local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
+
+local events = defines.events
 
 local split_item_key, make_item_icon, get_train_item_count = lib.split_item_key, lib.make_item_icon, lib.get_train_item_count
 
-local cwi, extract_elem_value_fields, acquire_next_minimap = gui.caption_with_info, gui.extract_elem_value_fields, gui.acquire_next_minimap
+local cwi, extract_elem_value_fields, acquire_next_minimap = glib.caption_with_info, glib.extract_elem_value_fields, glib.acquire_next_minimap
+
+local gui_station = {}
 
 --------------------------------------------------------------------------------
 
@@ -104,13 +109,263 @@ function set_buffer_settings_enabled(table, enabled)
     end
 end
 
+---@param deliveries {[ItemKey]: HaulerId[]}?
+---@param old_stop_name string
+---@param new_stop_name string
+local function rename_haulers_stop(deliveries, old_stop_name, new_stop_name)
+    if deliveries then
+        for _, hauler_ids in pairs(deliveries) do
+            for i = #hauler_ids, 1, -1 do
+                local train = storage.haulers[hauler_ids[i]].train
+                local schedule = train.schedule ---@type TrainSchedule
+                for _, record in pairs(schedule.records) do
+                    if record.station == old_stop_name then record.station = new_stop_name end
+                end
+                train.schedule = schedule
+            end
+        end
+    end
+end
+
 --------------------------------------------------------------------------------
+
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@param network_item NetworkItem
+local function provide_to_row_network(table_children, i, network_item)
+    local quality = network_item.quality
+    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+
+    table_children[i + 3].children[1].children[3].caption = network_item.class
+    table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
+    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
+end
+
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@param network_item NetworkItem
+---@param item ProvideItem
+local function provide_to_row_statistics(table_children, i, network_item, item)
+    local name, quality = network_item.name, network_item.quality
+    local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
+    local stack_size = quality and prototypes.item[name].stack_size or 1
+
+    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, lib.compute_storage_needed(network_item, item) / stack_size }
+end
+
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@return ItemKey?, ProvideItem?
+local function provide_from_row(table_children, i)
+    local elem_value = table_children[i + 2].elem_value ---@type (table|string)?
+    if not elem_value then return end
+
+    local _, _, item_key = extract_elem_value_fields(elem_value)
+
+    local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
+    if not throughput then return item_key end
+
+    local latency = tonumber(table_children[i + 4].children[3].children[3].text)
+    if not latency then return item_key end
+
+    local granularity = tonumber(table_children[i + 4].children[4].children[3].text)
+    if not granularity or granularity < 1 then return item_key end
+
+    return item_key, {
+        mode = get_active_mode_button(table_children[i + 4].children[1].children[3]),
+        throughput = throughput,
+        latency = latency,
+        granularity = granularity,
+    } --[[@as ProvideItem]]
+end
+
+---@param player_gui PlayerGui.Station
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@param item_key ItemKey?
+---@param item ProvideItem?
+local function provide_to_row(player_gui, table_children, i, item_key, item)
+    local network_item = item_key and storage.networks[player_gui.network].items[item_key]
+
+    if network_item then
+        provide_to_row_network(table_children, i, network_item)
+    else
+        table_children[i + 3].children[1].children[3].caption = ""
+        table_children[i + 3].children[2].children[3].caption = ""
+        table_children[i + 3].children[3].children[3].caption = ""
+    end
+
+    if network_item and item then
+        provide_to_row_statistics(table_children, i, network_item, item)
+    else
+        table_children[i + 5].children[1].children[3].caption = ""
+        table_children[i + 5].children[2].children[3].caption = ""
+    end
+
+    if item then
+        table_children[i + 1].children[2].sprite = ""
+        table_children[i + 1].children[2].tooltip = nil
+    else
+        table_children[i + 1].children[2].sprite = "utility/achievement_warning"
+        table_children[i + 1].children[2].tooltip = { "sspp-gui.invalid-values-tooltip" }
+    end
+end
+
+---@param player_gui PlayerGui.Station
+---@param item_key ItemKey
+local function provide_remove_key(player_gui, item_key)
+    local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
+    local network = storage.networks[player_gui.network]
+
+    lib.set_haulers_to_manual(station.provide_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
+end
+
+--------------------------------------------------------------------------------
+
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@param network_item NetworkItem
+local function request_to_row_network(table_children, i, network_item)
+    local quality = network_item.quality
+    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
+
+    table_children[i + 3].children[1].children[3].caption = network_item.class
+    table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
+    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
+end
+
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@param network_item NetworkItem
+---@param item RequestItem
+local function request_to_row_statistics(table_children, i, network_item, item)
+    local name, quality = network_item.name, network_item.quality
+    local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
+    local stack_size = quality and prototypes.item[name].stack_size or 1
+
+    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, lib.compute_storage_needed(network_item, item) / stack_size }
+end
+
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@return ItemKey?, RequestItem?
+local function request_from_row(table_children, i)
+    local elem_value = table_children[i + 2].elem_value ---@type (table|string)?
+    if not elem_value then return end
+
+    local _, _, item_key = extract_elem_value_fields(elem_value)
+
+    local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
+    if not throughput then return item_key end
+
+    local latency = tonumber(table_children[i + 4].children[3].children[3].text)
+    if not latency then return item_key end
+
+    return item_key, {
+        mode = get_active_mode_button(table_children[i + 4].children[1].children[3]),
+        throughput = throughput,
+        latency = latency,
+    } --[[@as RequestItem]]
+end
+
+---@param player_gui PlayerGui.Station
+---@param table_children LuaGuiElement[]
+---@param i integer
+---@param item_key ItemKey?
+---@param item RequestItem?
+local function request_to_row(player_gui, table_children, i, item_key, item)
+    local network_item = item_key and storage.networks[player_gui.network].items[item_key]
+
+    if network_item then
+        request_to_row_network(table_children, i, network_item)
+    else
+        table_children[i + 3].children[1].children[3].caption = ""
+        table_children[i + 3].children[2].children[3].caption = ""
+        table_children[i + 3].children[3].children[3].caption = ""
+    end
+
+    if network_item and item then
+        request_to_row_statistics(table_children, i, network_item, item)
+    else
+        table_children[i + 5].children[1].children[3].caption = ""
+        table_children[i + 5].children[2].children[3].caption = ""
+    end
+
+    if item then
+        table_children[i + 1].children[2].sprite = ""
+        table_children[i + 1].children[2].tooltip = nil
+    else
+        table_children[i + 1].children[2].sprite = "utility/achievement_warning"
+        table_children[i + 1].children[2].tooltip = { "sspp-gui.invalid-values-tooltip" }
+    end
+end
+
+---@param player_gui PlayerGui.Station
+---@param item_key ItemKey
+local function request_remove_key(player_gui, item_key)
+    local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
+    local network = storage.networks[player_gui.network]
+
+    lib.set_haulers_to_manual(station.request_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
+end
+
+--------------------------------------------------------------------------------
+
+---@param player_id PlayerId
+local function update_station_after_change(player_id)
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Station]]
+    local parts = player_gui.parts --[[@as StationParts]]
+    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+
+    if parts.provide_io then
+        local items = glib.refresh_table(
+            player_gui.elements.provide_table,
+            provide_from_row,
+            function(b, c, d, e) return provide_to_row(player_gui, b, c, d, e) end,
+            station and station.provide_items,
+            station and function(b) return provide_remove_key(player_gui, b) end
+        )
+        if station then
+            station.provide_items = items
+            lib.ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, items)
+        end
+        parts.provide_io.combinator_description = lib.provide_items_to_combinator_description(items)
+    end
+
+    if parts.request_io then
+        local items = glib.refresh_table(
+            player_gui.elements.request_table,
+            request_from_row,
+            function(b, c, d, e) return request_to_row(player_gui, b, c, d, e) end,
+            station and station.request_items,
+            station and function(b) return request_remove_key(player_gui, b) end
+        )
+        if station then
+            station.request_items = items
+            lib.ensure_hidden_combs(station.request_io, station.request_hidden_combs, items)
+        end
+        parts.request_io.combinator_description = lib.request_items_to_combinator_description(items)
+    end
+
+    if station and not lib.read_stop_flag(station.stop, e_stop_flags.custom_name) then
+        local old_stop_name = station.stop.backer_name ---@type string
+        local new_stop_name = lib.generate_stop_name(station.provide_items, station.request_items)
+        if old_stop_name ~= new_stop_name then
+            rename_haulers_stop(station.provide_deliveries, old_stop_name, new_stop_name)
+            rename_haulers_stop(station.request_deliveries, old_stop_name, new_stop_name)
+            station.stop.backer_name = new_stop_name
+            player_gui.elements.stop_name_label.caption = new_stop_name
+        end
+    end
+end
 
 ---@param event EventData.on_gui_click
 local handle_item_move = { [events.on_gui_click] = function(event)
     local flow = event.element.parent.parent --[[@as LuaGuiElement]]
-    gui.move_row(flow.parent, flow.get_index_in_parent(), event.element.get_index_in_parent())
-    gui.update_station_after_change(event.player_index)
+    glib.move_row(flow.parent, flow.get_index_in_parent(), event.element.get_index_in_parent())
+    update_station_after_change(event.player_index)
 end }
 
 local handle_provide_copy = {} -- defined later
@@ -120,20 +375,20 @@ local handle_request_copy = {} -- defined later
 ---@param event EventData.on_gui_elem_changed
 local handle_item_elem_changed = { [events.on_gui_elem_changed] = function(event)
     if not event.element.elem_value then
-        gui.delete_row(event.element.parent, event.element.get_index_in_parent() - 1)
+        glib.delete_row(event.element.parent, event.element.get_index_in_parent() - 1)
     end
-    gui.update_station_after_change(event.player_index)
+    update_station_after_change(event.player_index)
 end }
 
 ---@param event EventData.on_gui_text_changed
 local handle_item_text_changed = { [events.on_gui_text_changed] = function(event)
-    gui.update_station_after_change(event.player_index)
+    update_station_after_change(event.player_index)
 end }
 
 ---@param event EventData.on_gui_click
 local handle_item_mode_click = { [events.on_gui_click] = function(event)
     set_active_mode_button(event.element.parent, event.element.get_index_in_parent())
-    gui.update_station_after_change(event.player_index)
+    update_station_after_change(event.player_index)
 end }
 
 --------------------------------------------------------------------------------
@@ -279,14 +534,14 @@ end
 ---@param elem_type string
 ---@return boolean success
 local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Station]]
     local table = player_gui.elements[table_name]
 
     if lib.read_stop_flag(player_gui.parts.stop, e_stop_flags.bufferless) then
         if get_total_rows(player_gui.elements) == 0 then
             inner(table, elem_type)
             set_buffer_settings_enabled(table, false)
-            gui.update_station_after_change(player_id)
+            update_station_after_change(player_id)
             return true
         end
     elseif #table.children < table.column_count * 10 then
@@ -310,7 +565,7 @@ handle_provide_copy[events.on_gui_click] = function(event)
     if not try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, elem_type) then return end
 
     local j = i + table.column_count
-    gui.insert_newly_added_row(table, j)
+    glib.insert_newly_added_row(table, j)
 
     local table_children = table.children
     set_active_mode_button(table_children[j + 4].children[1].children[3], get_active_mode_button(table_children[i + 4].children[1].children[3]))
@@ -329,7 +584,7 @@ handle_request_copy[events.on_gui_click] = function(event)
     if not try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, elem_type) then return end
 
     local j = i + table.column_count
-    gui.insert_newly_added_row(table, j)
+    glib.insert_newly_added_row(table, j)
 
     local table_children = table.children
     set_active_mode_button(table_children[j + 4].children[1].children[3], get_active_mode_button(table_children[i + 4].children[1].children[3]))
@@ -338,30 +593,6 @@ handle_request_copy[events.on_gui_click] = function(event)
 end
 
 --------------------------------------------------------------------------------
-
----@param table_children LuaGuiElement[]
----@param i integer
----@param network_item NetworkItem
-local function provide_to_row_network(table_children, i, network_item)
-    local quality = network_item.quality
-    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
-
-    table_children[i + 3].children[1].children[3].caption = network_item.class
-    table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
-    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
-end
-
----@param table_children LuaGuiElement[]
----@param i integer
----@param network_item NetworkItem
----@param item ProvideItem
-local function provide_to_row_statistics(table_children, i, network_item, item)
-    local name, quality = network_item.name, network_item.quality
-    local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
-    local stack_size = quality and prototypes.item[name].stack_size or 1
-
-    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, lib.compute_storage_needed(network_item, item) / stack_size }
-end
 
 ---@param network_items {[ItemKey]: NetworkItem}
 ---@param provide_table LuaGuiElement
@@ -391,100 +622,6 @@ local function provide_init_row(network_items, provide_table, item_key, item)
     table_children[i + 1].children[2].tooltip = nil
 end
 
----@param table_children LuaGuiElement[]
----@param i integer
----@return ItemKey?, ProvideItem?
-local function provide_from_row(table_children, i)
-    local elem_value = table_children[i + 2].elem_value ---@type (table|string)?
-    if not elem_value then return end
-
-    local _, _, item_key = extract_elem_value_fields(elem_value)
-
-    local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
-    if not throughput then return item_key end
-
-    local latency = tonumber(table_children[i + 4].children[3].children[3].text)
-    if not latency then return item_key end
-
-    local granularity = tonumber(table_children[i + 4].children[4].children[3].text)
-    if not granularity or granularity < 1 then return item_key end
-
-    return item_key, {
-        mode = get_active_mode_button(table_children[i + 4].children[1].children[3]),
-        throughput = throughput,
-        latency = latency,
-        granularity = granularity,
-    } --[[@as ProvideItem]]
-end
-
----@param player_gui PlayerStationGui
----@param table_children LuaGuiElement[]
----@param i integer
----@param item_key ItemKey?
----@param item ProvideItem?
-local function provide_to_row(player_gui, table_children, i, item_key, item)
-    local network_item = item_key and storage.networks[player_gui.network].items[item_key]
-
-    if network_item then
-        provide_to_row_network(table_children, i, network_item)
-    else
-        table_children[i + 3].children[1].children[3].caption = ""
-        table_children[i + 3].children[2].children[3].caption = ""
-        table_children[i + 3].children[3].children[3].caption = ""
-    end
-
-    if network_item and item then
-        provide_to_row_statistics(table_children, i, network_item, item)
-    else
-        table_children[i + 5].children[1].children[3].caption = ""
-        table_children[i + 5].children[2].children[3].caption = ""
-    end
-
-    if item then
-        table_children[i + 1].children[2].sprite = ""
-        table_children[i + 1].children[2].tooltip = nil
-    else
-        table_children[i + 1].children[2].sprite = "utility/achievement_warning"
-        table_children[i + 1].children[2].tooltip = { "sspp-gui.invalid-values-tooltip" }
-    end
-end
-
----@param player_gui PlayerStationGui
----@param item_key ItemKey
-local function provide_remove_key(player_gui, item_key)
-    local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
-    local network = storage.networks[player_gui.network]
-
-    lib.set_haulers_to_manual(station.provide_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
-    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
-end
-
---------------------------------------------------------------------------------
-
----@param table_children LuaGuiElement[]
----@param i integer
----@param network_item NetworkItem
-local function request_to_row_network(table_children, i, network_item)
-    local quality = network_item.quality
-    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
-
-    table_children[i + 3].children[1].children[3].caption = network_item.class
-    table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
-    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
-end
-
----@param table_children LuaGuiElement[]
----@param i integer
----@param network_item NetworkItem
----@param item RequestItem
-local function request_to_row_statistics(table_children, i, network_item, item)
-    local name, quality = network_item.name, network_item.quality
-    local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
-    local stack_size = quality and prototypes.item[name].stack_size or 1
-
-    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, lib.compute_storage_needed(network_item, item) / stack_size }
-end
-
 ---@param network_items {[ItemKey]: NetworkItem}
 ---@param request_table LuaGuiElement
 ---@param item_key ItemKey
@@ -512,144 +649,10 @@ local function request_init_row(network_items, request_table, item_key, item)
     table_children[i + 1].children[2].tooltip = nil
 end
 
----@param table_children LuaGuiElement[]
----@param i integer
----@return ItemKey?, RequestItem?
-local function request_from_row(table_children, i)
-    local elem_value = table_children[i + 2].elem_value ---@type (table|string)?
-    if not elem_value then return end
-
-    local _, _, item_key = extract_elem_value_fields(elem_value)
-
-    local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
-    if not throughput then return item_key end
-
-    local latency = tonumber(table_children[i + 4].children[3].children[3].text)
-    if not latency then return item_key end
-
-    return item_key, {
-        mode = get_active_mode_button(table_children[i + 4].children[1].children[3]),
-        throughput = throughput,
-        latency = latency,
-    } --[[@as RequestItem]]
-end
-
----@param player_gui PlayerStationGui
----@param table_children LuaGuiElement[]
----@param i integer
----@param item_key ItemKey?
----@param item RequestItem?
-local function request_to_row(player_gui, table_children, i, item_key, item)
-    local network_item = item_key and storage.networks[player_gui.network].items[item_key]
-
-    if network_item then
-        request_to_row_network(table_children, i, network_item)
-    else
-        table_children[i + 3].children[1].children[3].caption = ""
-        table_children[i + 3].children[2].children[3].caption = ""
-        table_children[i + 3].children[3].children[3].caption = ""
-    end
-
-    if network_item and item then
-        request_to_row_statistics(table_children, i, network_item, item)
-    else
-        table_children[i + 5].children[1].children[3].caption = ""
-        table_children[i + 5].children[2].children[3].caption = ""
-    end
-
-    if item then
-        table_children[i + 1].children[2].sprite = ""
-        table_children[i + 1].children[2].tooltip = nil
-    else
-        table_children[i + 1].children[2].sprite = "utility/achievement_warning"
-        table_children[i + 1].children[2].tooltip = { "sspp-gui.invalid-values-tooltip" }
-    end
-end
-
----@param player_gui PlayerStationGui
----@param item_key ItemKey
-local function request_remove_key(player_gui, item_key)
-    local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
-    local network = storage.networks[player_gui.network]
-
-    lib.set_haulers_to_manual(station.request_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
-    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
-end
-
 --------------------------------------------------------------------------------
 
----@param deliveries {[ItemKey]: HaulerId[]}?
----@param old_stop_name string
----@param new_stop_name string
-local function rename_haulers_stop(deliveries, old_stop_name, new_stop_name)
-    if deliveries then
-        for _, hauler_ids in pairs(deliveries) do
-            for i = #hauler_ids, 1, -1 do
-                local train = storage.haulers[hauler_ids[i]].train
-                local schedule = train.schedule ---@type TrainSchedule
-                for _, record in pairs(schedule.records) do
-                    if record.station == old_stop_name then record.station = new_stop_name end
-                end
-                train.schedule = schedule
-            end
-        end
-    end
-end
-
---------------------------------------------------------------------------------
-
----@param player_id PlayerId
-function gui.update_station_after_change(player_id)
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
-    local parts = player_gui.parts --[[@as StationParts]]
-    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
-
-    if parts.provide_io then
-        local items = gui.refresh_table(
-            player_gui.elements.provide_table,
-            provide_from_row,
-            function(b, c, d, e) return provide_to_row(player_gui, b, c, d, e) end,
-            station and station.provide_items,
-            station and function(b) return provide_remove_key(player_gui, b) end
-        )
-        if station then
-            station.provide_items = items
-            lib.ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, items)
-        end
-        parts.provide_io.combinator_description = lib.provide_items_to_combinator_description(items)
-    end
-
-    if parts.request_io then
-        local items = gui.refresh_table(
-            player_gui.elements.request_table,
-            request_from_row,
-            function(b, c, d, e) return request_to_row(player_gui, b, c, d, e) end,
-            station and station.request_items,
-            station and function(b) return request_remove_key(player_gui, b) end
-        )
-        if station then
-            station.request_items = items
-            lib.ensure_hidden_combs(station.request_io, station.request_hidden_combs, items)
-        end
-        parts.request_io.combinator_description = lib.request_items_to_combinator_description(items)
-    end
-
-    if station and not lib.read_stop_flag(station.stop, e_stop_flags.custom_name) then
-        local old_stop_name = station.stop.backer_name ---@type string
-        local new_stop_name = lib.generate_stop_name(station.provide_items, station.request_items)
-        if old_stop_name ~= new_stop_name then
-            rename_haulers_stop(station.provide_deliveries, old_stop_name, new_stop_name)
-            rename_haulers_stop(station.request_deliveries, old_stop_name, new_stop_name)
-            station.stop.backer_name = new_stop_name
-            player_gui.elements.stop_name_label.caption = new_stop_name
-        end
-    end
-end
-
---------------------------------------------------------------------------------
-
----@param player_gui PlayerStationGui
-function gui.station_poll_finished(player_gui)
+---@param player_gui PlayerGui.Station
+function gui_station.on_poll_finished(player_gui)
     local parts = player_gui.parts
     if not parts then return end
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
@@ -759,12 +762,12 @@ local handle_open_network = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local network_name = storage.player_guis[player_id].network
 
-    gui.network_open(player_id, network_name, 2)
+    gui_network.open(player_id, network_name, 2)
 end }
 
 ---@param event EventData.on_gui_click
 local handle_edit_name_toggled = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local parts = player_gui.parts --[[@as StationParts]]
 
     if event.element.toggled then
@@ -783,7 +786,7 @@ end }
 
 ---@param event EventData.on_gui_click
 local handle_clear_name = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local parts = player_gui.parts --[[@as StationParts]]
 
     lib.write_stop_flag(parts.stop, e_stop_flags.custom_name, false)
@@ -811,10 +814,10 @@ local handle_name_changed_or_confirmed = {}
 
 ---@param event EventData.on_gui_text_changed
 handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local parts = player_gui.parts --[[@as StationParts]]
 
-    local stop_name = gui.truncate_input(event.element, 199)
+    local stop_name = glib.truncate_input(event.element, 199)
     local has_custom_name = stop_name ~= ""
     player_gui.elements.stop_name_clear_button.enabled = has_custom_name
     lib.write_stop_flag(parts.stop, e_stop_flags.custom_name, has_custom_name)
@@ -834,7 +837,7 @@ end
 
 ---@param event EventData.on_gui_confirmed
 handle_name_changed_or_confirmed[events.on_gui_confirmed] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local parts = player_gui.parts --[[@as StationParts]]
 
     player_gui.elements.stop_name_label.caption = parts.stop.backer_name
@@ -846,7 +849,7 @@ end
 
 ---@param event EventData.on_gui_click
 local handle_disable_toggled = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local parts = player_gui.parts --[[@as StationParts]]
 
     local toggled = event.element.toggled
@@ -856,7 +859,7 @@ end }
 
 ---@param event EventData.on_gui_value_changed
 local handle_limit_changed = { [events.on_gui_value_changed] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local parts = player_gui.parts --[[@as StationParts]]
 
     parts.stop.trains_limit = event.element.slider_value
@@ -865,7 +868,7 @@ end }
 
 ---@param event EventData.on_gui_click
 local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerStationGui]]
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local parts = player_gui.parts --[[@as StationParts]]
 
     local toggled = event.element.toggled
@@ -885,27 +888,34 @@ local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
         if provide_table then set_buffer_settings_enabled(provide_table, not toggled) end
         if request_table then set_buffer_settings_enabled(request_table, not toggled) end
 
-        if not toggled then
-            local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
-            if station then
-                local provide_deliveries = station.provide_deliveries
-                if provide_deliveries then
-                    for item_key, hauler_ids in pairs(provide_deliveries) do
-                        for _, hauler_id in pairs(hauler_ids) do
-                            local to_provide = storage.haulers[hauler_id].to_provide --[[@as HaulerToStation]]
-                            if to_provide.buffer then
-                                local network = storage.networks[station.network]
-                                to_provide.buffer = nil
-                                lib.list_destroy_or_remove(network.buffer_haulers, item_key, hauler_id)
-                                lib.list_create_or_append(network.provide_haulers, item_key, hauler_id)
-                            end
+        local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+        if station then
+            local provide_deliveries = station.provide_deliveries
+            if provide_deliveries then
+                for item_key, hauler_ids in pairs(provide_deliveries) do
+                    for _, hauler_id in pairs(hauler_ids) do
+                        local network, hauler = storage.networks[station.network], storage.haulers[hauler_id]
+                        local job = network.jobs[hauler.job] --[[@as Job]]
+                        if toggled then
+                            lib.list_destroy_or_remove(network.provide_haulers, item_key, hauler_id)
+                            lib.list_create_or_append(network.buffer_haulers, item_key, hauler_id)
+                            job.type = "PICKUP"
+                            job.finish_tick = job.provide_done_tick
+                            job.provide_done_tick = nil
+                        else
+                            station.bufferless_dispatch = nil
+                            lib.list_destroy_or_remove(network.buffer_haulers, item_key, hauler_id)
+                            lib.list_create_or_append(network.provide_haulers, item_key, hauler_id)
+                            job.type = "COMBINED"
+                            job.provide_done_tick = job.finish_tick
+                            job.finish_tick = nil
                         end
                     end
                 end
             end
         end
 
-        gui.update_station_after_change(event.player_index)
+        update_station_after_change(event.player_index)
     end
 end }
 
@@ -1065,7 +1075,7 @@ end
 
 ---@param player_id PlayerId
 ---@param entity LuaEntity
-function gui.station_open(player_id, entity)
+function gui_station.open(player_id, entity)
     local player = assert(game.get_player(player_id))
     local unit_number = entity.unit_number --[[@as uint]]
     local parts = get_station_parts(entity)
@@ -1081,7 +1091,7 @@ function gui.station_open(player_id, entity)
     end
 
     window.force_auto_center()
-    storage.player_guis[player_id] = { network = network_name, unit_number = unit_number, parts = parts, elements = elements }
+    storage.player_guis[player_id] = { type = "STATION", network = network_name, elements = elements, unit_number = unit_number, parts = parts }
 
     if parts then
         local provide_table, request_table = elements.provide_table, elements.request_table
@@ -1105,8 +1115,8 @@ function gui.station_open(player_id, entity)
 end
 
 ---@param player_id PlayerId
-function gui.station_closed(player_id)
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerStationGui]]
+function gui_station.close(player_id)
+    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Station]]
     player_gui.elements["sspp-station"].destroy()
 
     local entity = storage.entities[player_gui.unit_number]
@@ -1121,7 +1131,7 @@ end
 
 --------------------------------------------------------------------------------
 
-function gui.station_add_flib_handlers()
+function gui_station.add_flib_handlers()
     flib_gui.add_handlers({
         ["station_item_move"] = handle_item_move[events.on_gui_click],
         ["station_provide_copy"] = handle_provide_copy[events.on_gui_click],
@@ -1145,3 +1155,7 @@ function gui.station_add_flib_handlers()
         ["station_close_window"] = handle_close_window[events.on_gui_click],
     })
 end
+
+--------------------------------------------------------------------------------
+
+return gui_station
