@@ -160,6 +160,22 @@ local migrations = {
                 station.minimum_active_count = station.provide_minimum_active_count or station.request_minimum_active_count
                 station.provide_minimum_active_count, station.request_minimum_active_count = nil, nil
             end
+            if station.provide_io then
+                station.provide = {
+                    comb = station.provide_io, items = station.provide_items, deliveries = station.provide_deliveries, hidden_combs = station.provide_hidden_combs,
+                    counts = {}, modes = {},
+                }
+                station.provide_io, station.provide_items, station.provide_deliveries, station.provide_hidden_combs = nil, nil, nil, nil
+                station.provide_counts, station.provide_modes = nil, nil
+            end
+            if station.request_io then
+                station.request = {
+                    comb = station.request_io, items = station.request_items, deliveries = station.request_deliveries, hidden_combs = station.request_hidden_combs,
+                    counts = {}, modes = {},
+                }
+                station.request_io, station.request_items, station.request_deliveries, station.request_hidden_combs = nil, nil, nil, nil
+                station.request_counts, station.request_modes = nil, nil
+            end
         end
         for _, hauler in pairs(storage.haulers) do
             if hauler.status[1] then
@@ -177,7 +193,7 @@ local migrations = {
 --------------------------------------------------------------------------------
 
 ---@param data ConfigurationChangedData
-function on_config_changed(data)
+local function on_configuration_changed(data)
     flib_migration.on_config_changed(data, migrations)
 
     local is_item_key_invalid = lib.is_item_key_invalid
@@ -198,13 +214,13 @@ function on_config_changed(data)
     end
     -- check station items
     for _, station in pairs(storage.stations) do
-        if station.provide_items then
-            for item_key, _ in pairs(station.provide_items) do
+        if station.provide then
+            for item_key, _ in pairs(station.provide.items) do
                 if is_item_key_invalid(item_key) then goto reboot end
             end
         end
-        if station.request_items then
-            for item_key, _ in pairs(station.request_items) do
+        if station.request then
+            for item_key, _ in pairs(station.request.items) do
                 if is_item_key_invalid(item_key) then goto reboot end
             end
         end
@@ -225,3 +241,5 @@ function on_config_changed(data)
 
     storage.tick_state = "INITIAL"
 end
+
+script.on_configuration_changed(on_configuration_changed)

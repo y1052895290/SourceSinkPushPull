@@ -4,6 +4,8 @@ local flib_gui = require("__flib__.gui")
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local glib = require("__SourceSinkPushPull__.scripts.glib")
+local enums = require("__SourceSinkPushPull__.scripts.enums")
+
 local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
 
 local events = defines.events
@@ -109,20 +111,18 @@ function set_buffer_settings_enabled(table, enabled)
     end
 end
 
----@param deliveries {[ItemKey]: HaulerId[]}?
+---@param deliveries {[ItemKey]: HaulerId[]}
 ---@param old_stop_name string
 ---@param new_stop_name string
-local function rename_haulers_stop(deliveries, old_stop_name, new_stop_name)
-    if deliveries then
-        for _, hauler_ids in pairs(deliveries) do
-            for i = #hauler_ids, 1, -1 do
-                local train = storage.haulers[hauler_ids[i]].train
-                local schedule = train.schedule ---@type TrainSchedule
-                for _, record in pairs(schedule.records) do
-                    if record.station == old_stop_name then record.station = new_stop_name end
-                end
-                train.schedule = schedule
+local function rename_schedules_stop(deliveries, old_stop_name, new_stop_name)
+    for _, hauler_ids in pairs(deliveries) do
+        for i = #hauler_ids, 1, -1 do
+            local train = storage.haulers[hauler_ids[i]].train
+            local schedule = train.schedule --[[@as TrainSchedule]]
+            for _, record in pairs(schedule.records) do
+                if record.station == old_stop_name then record.station = new_stop_name end
             end
+            train.schedule = schedule
         end
     end
 end
@@ -157,7 +157,7 @@ end
 ---@param i integer
 ---@return ItemKey?, ProvideItem?
 local function provide_from_row(table_children, i)
-    local elem_value = table_children[i + 2].elem_value ---@type (table|string)?
+    local elem_value = table_children[i + 2].elem_value --[[@as (table|string)?]]
     if not elem_value then return end
 
     local _, _, item_key = extract_elem_value_fields(elem_value)
@@ -217,7 +217,7 @@ local function provide_remove_key(player_gui, item_key)
     local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
     local network = storage.networks[player_gui.network]
 
-    lib.set_haulers_to_manual(station.provide_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+    lib.set_haulers_to_manual(station.provide.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
     storage.disabled_items[network.surface.name .. ":" .. item_key] = true
 end
 
@@ -251,7 +251,7 @@ end
 ---@param i integer
 ---@return ItemKey?, RequestItem?
 local function request_from_row(table_children, i)
-    local elem_value = table_children[i + 2].elem_value ---@type (table|string)?
+    local elem_value = table_children[i + 2].elem_value --[[@as (table|string)?]]
     if not elem_value then return end
 
     local _, _, item_key = extract_elem_value_fields(elem_value)
@@ -307,7 +307,7 @@ local function request_remove_key(player_gui, item_key)
     local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
     local network = storage.networks[player_gui.network]
 
-    lib.set_haulers_to_manual(station.request_deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+    lib.set_haulers_to_manual(station.request.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
     storage.disabled_items[network.surface.name .. ":" .. item_key] = true
 end
 
@@ -317,45 +317,47 @@ end
 local function update_station_after_change(player_id)
     local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Station]]
     local parts = player_gui.parts --[[@as StationParts]]
-    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+    local stop, provide_io, request_io = parts.stop, parts.provide_io, parts.request_io
+    local station = storage.stations[stop.unit_number] --[[@as Station?]]
 
-    if parts.provide_io then
+    if provide_io then
         local items = glib.refresh_table(
             player_gui.elements.provide_table,
             provide_from_row,
             function(b, c, d, e) return provide_to_row(player_gui, b, c, d, e) end,
-            station and station.provide_items,
+            station and station.provide.items,
             station and function(b) return provide_remove_key(player_gui, b) end
         )
         if station then
-            station.provide_items = items
-            lib.ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, items)
+            station.provide.items = items
+            lib.ensure_hidden_combs(station.provide.comb, station.provide.hidden_combs, items)
         end
-        parts.provide_io.combinator_description = lib.provide_items_to_combinator_description(items)
+        provide_io.combinator_description = lib.provide_items_to_combinator_description(items)
     end
 
-    if parts.request_io then
+    if request_io then
         local items = glib.refresh_table(
             player_gui.elements.request_table,
             request_from_row,
             function(b, c, d, e) return request_to_row(player_gui, b, c, d, e) end,
-            station and station.request_items,
+            station and station.request.items,
             station and function(b) return request_remove_key(player_gui, b) end
         )
         if station then
-            station.request_items = items
-            lib.ensure_hidden_combs(station.request_io, station.request_hidden_combs, items)
+            station.request.items = items
+            lib.ensure_hidden_combs(station.request.comb, station.request.hidden_combs, items)
         end
-        parts.request_io.combinator_description = lib.request_items_to_combinator_description(items)
+        request_io.combinator_description = lib.request_items_to_combinator_description(items)
     end
 
-    if station and not lib.read_stop_flag(station.stop, e_stop_flags.custom_name) then
-        local old_stop_name = station.stop.backer_name ---@type string
-        local new_stop_name = lib.generate_stop_name(station.provide_items, station.request_items)
+    if station and not lib.read_stop_flag(stop, enums.stop_flags.custom_name) then
+        local provide, request = station.provide, station.request
+        local old_stop_name = stop.backer_name --[[@as string]]
+        local new_stop_name = lib.generate_stop_name(provide and provide.items, request and request.items)
         if old_stop_name ~= new_stop_name then
-            rename_haulers_stop(station.provide_deliveries, old_stop_name, new_stop_name)
-            rename_haulers_stop(station.request_deliveries, old_stop_name, new_stop_name)
-            station.stop.backer_name = new_stop_name
+            if provide then rename_schedules_stop(provide.deliveries, old_stop_name, new_stop_name) end
+            if request then rename_schedules_stop(request.deliveries, old_stop_name, new_stop_name) end
+            stop.backer_name = new_stop_name
             player_gui.elements.stop_name_label.caption = new_stop_name
         end
     end
@@ -535,9 +537,10 @@ end
 ---@return boolean success
 local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
     local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Station]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
     local table = player_gui.elements[table_name]
 
-    if lib.read_stop_flag(player_gui.parts.stop, e_stop_flags.bufferless) then
+    if lib.read_stop_flag(stop, enums.stop_flags.bufferless) then
         if get_total_rows(player_gui.elements) == 0 then
             inner(table, elem_type)
             set_buffer_settings_enabled(table, false)
@@ -657,6 +660,7 @@ function gui_station.on_poll_finished(player_gui)
     if not parts then return end
     local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
     if not station then return end
+    local provide, request = station.provide, station.request
 
     local elements = player_gui.elements
 
@@ -666,7 +670,7 @@ function gui_station.on_poll_finished(player_gui)
     -- minimap reuse doesn't really matter for stations, but the code already exists for networks
     local old_length, new_length = #grid_children, 0
 
-    if station.provide_counts then
+    if provide then
         local table_children = elements.provide_table.children
         local dynamic_index = -1 -- zero based
 
@@ -679,21 +683,21 @@ function gui_station.on_poll_finished(player_gui)
                 if dynamic_button.toggled then
                     dynamic_index = dynamic_index + 1
                     dynamic_sprite = "virtual-signal/sspp-signal-" .. tostring(dynamic_index)
-                    local provide_mode = station.provide_modes[item_key]
+                    local provide_mode = provide.modes[item_key]
                     if provide_mode then
                         dynamic_tooltip = { "sspp-gui.fmt-dynamic-mode-active-tooltip", dynamic_tooltip, provide_mode }
                     end
                 end
                 dynamic_button.sprite, dynamic_button.tooltip = dynamic_sprite, dynamic_tooltip
 
-                local provide_count = station.provide_counts[item_key]
+                local provide_count = provide.counts[item_key]
                 if provide_count then
                     table_children[i + 5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", provide_count }
                 end
             end
         end
 
-        for item_key, hauler_ids in pairs(station.provide_deliveries) do
+        for item_key, hauler_ids in pairs(provide.deliveries) do
             local name, quality = split_item_key(item_key)
             local icon = make_item_icon(name, quality)
 
@@ -708,7 +712,7 @@ function gui_station.on_poll_finished(player_gui)
         end
     end
 
-    if station.request_counts then
+    if request then
         local table_children = elements.request_table.children
         local dynamic_index = -1 -- zero based
 
@@ -721,21 +725,21 @@ function gui_station.on_poll_finished(player_gui)
                 if dynamic_button.toggled then
                     dynamic_index = dynamic_index + 1
                     dynamic_sprite = "virtual-signal/sspp-signal-" .. tostring(dynamic_index)
-                    local request_mode = station.request_modes[item_key]
+                    local request_mode = request.modes[item_key]
                     if request_mode then
                         dynamic_tooltip = { "sspp-gui.fmt-dynamic-mode-active-tooltip", dynamic_tooltip, request_mode }
                     end
                 end
                 dynamic_button.sprite, dynamic_button.tooltip = dynamic_sprite, dynamic_tooltip
 
-                local request_count = station.request_counts[item_key]
+                local request_count = request.counts[item_key]
                 if request_count then
                     table_children[i + 5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", request_count }
                 end
             end
         end
 
-        for item_key, hauler_ids in pairs(station.request_deliveries) do
+        for item_key, hauler_ids in pairs(request.deliveries) do
             local name, quality = split_item_key(item_key)
             local icon = make_item_icon(name, quality)
 
@@ -768,17 +772,17 @@ end }
 ---@param event EventData.on_gui_click
 local handle_edit_name_toggled = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local parts = player_gui.parts --[[@as StationParts]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
     if event.element.toggled then
         if not player_gui.elements.stop_name_clear_button.enabled then
-            player_gui.elements.stop_name_input.text = parts.stop.backer_name
+            player_gui.elements.stop_name_input.text = stop.backer_name
         end
         player_gui.elements.stop_name_label.visible = false
         player_gui.elements.stop_name_input.visible = true
         player_gui.elements.stop_name_input.focus()
     else
-        player_gui.elements.stop_name_label.caption = parts.stop.backer_name
+        player_gui.elements.stop_name_label.caption = stop.backer_name
         player_gui.elements.stop_name_input.visible = false
         player_gui.elements.stop_name_label.visible = true
     end
@@ -787,21 +791,23 @@ end }
 ---@param event EventData.on_gui_click
 local handle_clear_name = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local parts = player_gui.parts --[[@as StationParts]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
-    lib.write_stop_flag(parts.stop, e_stop_flags.custom_name, false)
+    lib.write_stop_flag(stop, enums.stop_flags.custom_name, false)
 
-    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
-    local stop_name ---@type string
+    local station = storage.stations[stop.unit_number] --[[@as Station?]]
+    local new_stop_name ---@type string
     if station then
-        stop_name = lib.generate_stop_name(station.provide_items, station.request_items)
-        rename_haulers_stop(station.provide_deliveries, station.stop.backer_name, stop_name)
-        rename_haulers_stop(station.request_deliveries, station.stop.backer_name, stop_name)
+        local provide, request = station.provide, station.request
+        local old_stop_name = stop.backer_name --[[@as string]]
+        new_stop_name = lib.generate_stop_name(provide and provide.items, request and request.items)
+        if provide then rename_schedules_stop(provide.deliveries, old_stop_name, new_stop_name) end
+        if request then rename_schedules_stop(request.deliveries, old_stop_name, new_stop_name) end
     else
-        stop_name = "[virtual-signal=signal-ghost]"
+        new_stop_name = "[virtual-signal=signal-ghost]"
     end
-    parts.stop.backer_name = stop_name
-    player_gui.elements.stop_name_label.caption = stop_name
+    stop.backer_name = new_stop_name
+    player_gui.elements.stop_name_label.caption = new_stop_name
 
     player_gui.elements.stop_name_input.visible = false
     player_gui.elements.stop_name_label.visible = true
@@ -815,32 +821,34 @@ local handle_name_changed_or_confirmed = {}
 ---@param event EventData.on_gui_text_changed
 handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local parts = player_gui.parts --[[@as StationParts]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
-    local stop_name = glib.truncate_input(event.element, 199)
-    local has_custom_name = stop_name ~= ""
+    local new_stop_name = glib.truncate_input(event.element, 199)
+    local has_custom_name = new_stop_name ~= ""
     player_gui.elements.stop_name_clear_button.enabled = has_custom_name
-    lib.write_stop_flag(parts.stop, e_stop_flags.custom_name, has_custom_name)
+    lib.write_stop_flag(stop, enums.stop_flags.custom_name, has_custom_name)
 
-    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+    local station = storage.stations[stop.unit_number] --[[@as Station?]]
     if station then
+        local provide, request = station.provide, station.request
+        local old_stop_name = stop.backer_name --[[@as string]]
         if not has_custom_name then
-            stop_name = lib.generate_stop_name(station.provide_items, station.request_items)
+            new_stop_name = lib.generate_stop_name(provide and provide.items, request and request.items)
         end
-        rename_haulers_stop(station.provide_deliveries, station.stop.backer_name, stop_name)
-        rename_haulers_stop(station.request_deliveries, station.stop.backer_name, stop_name)
+        if provide then rename_schedules_stop(provide.deliveries, old_stop_name, new_stop_name) end
+        if request then rename_schedules_stop(request.deliveries, old_stop_name, new_stop_name) end
     elseif not has_custom_name then
-        stop_name = "[virtual-signal=signal-ghost]"
+        new_stop_name = "[virtual-signal=signal-ghost]"
     end
-    parts.stop.backer_name = stop_name
+    stop.backer_name = new_stop_name
 end
 
 ---@param event EventData.on_gui_confirmed
 handle_name_changed_or_confirmed[events.on_gui_confirmed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local parts = player_gui.parts --[[@as StationParts]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
-    player_gui.elements.stop_name_label.caption = parts.stop.backer_name
+    player_gui.elements.stop_name_label.caption = stop.backer_name
     player_gui.elements.stop_name_input.visible = false
     player_gui.elements.stop_name_label.visible = true
 
@@ -850,26 +858,26 @@ end
 ---@param event EventData.on_gui_click
 local handle_disable_toggled = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local parts = player_gui.parts --[[@as StationParts]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
     local toggled = event.element.toggled
     event.element.tooltip = { toggled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
-    lib.write_stop_flag(parts.stop, e_stop_flags.disable, toggled)
+    lib.write_stop_flag(stop, enums.stop_flags.disable, toggled)
 end }
 
 ---@param event EventData.on_gui_value_changed
 local handle_limit_changed = { [events.on_gui_value_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local parts = player_gui.parts --[[@as StationParts]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
-    parts.stop.trains_limit = event.element.slider_value
+    stop.trains_limit = event.element.slider_value
     player_gui.elements.limit_value.caption = tostring(event.element.slider_value)
 end }
 
 ---@param event EventData.on_gui_click
 local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local parts = player_gui.parts --[[@as StationParts]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
     local toggled = event.element.toggled
     local total_rows = get_total_rows(player_gui.elements)
@@ -881,35 +889,32 @@ local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
     end
 
     event.element.tooltip = { toggled and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
-    lib.write_stop_flag(parts.stop, e_stop_flags.bufferless, toggled)
+    lib.write_stop_flag(stop, enums.stop_flags.bufferless, toggled)
 
     if total_rows > 0 then
         local provide_table, request_table = player_gui.elements.provide_table, player_gui.elements.request_table
         if provide_table then set_buffer_settings_enabled(provide_table, not toggled) end
         if request_table then set_buffer_settings_enabled(request_table, not toggled) end
 
-        local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
-        if station then
-            local provide_deliveries = station.provide_deliveries
-            if provide_deliveries then
-                for item_key, hauler_ids in pairs(provide_deliveries) do
-                    for _, hauler_id in pairs(hauler_ids) do
-                        local network, hauler = storage.networks[station.network], storage.haulers[hauler_id]
-                        local job = network.jobs[hauler.job] --[[@as Job]]
-                        if toggled then
-                            lib.list_destroy_or_remove(network.provide_haulers, item_key, hauler_id)
-                            lib.list_create_or_append(network.buffer_haulers, item_key, hauler_id)
-                            job.type = "PICKUP"
-                            job.finish_tick = job.provide_done_tick
-                            job.provide_done_tick = nil
-                        else
-                            station.bufferless_dispatch = nil
-                            lib.list_destroy_or_remove(network.buffer_haulers, item_key, hauler_id)
-                            lib.list_create_or_append(network.provide_haulers, item_key, hauler_id)
-                            job.type = "COMBINED"
-                            job.provide_done_tick = job.finish_tick
-                            job.finish_tick = nil
-                        end
+        local station = storage.stations[stop.unit_number] --[[@as Station?]]
+        if station and station.provide then
+            for item_key, hauler_ids in pairs(station.provide.deliveries) do
+                for _, hauler_id in pairs(hauler_ids) do
+                    local network, hauler = storage.networks[station.network], storage.haulers[hauler_id]
+                    local job = network.jobs[hauler.job] --[[@as NetworkJob]]
+                    if toggled then
+                        lib.list_destroy_or_remove(network.provide_haulers, item_key, hauler_id)
+                        lib.list_create_or_append(network.buffer_haulers, item_key, hauler_id)
+                        job.type = "PICKUP"
+                        job.finish_tick = job.provide_done_tick
+                        job.provide_done_tick = nil
+                    else
+                        station.bufferless_dispatch = nil
+                        lib.list_destroy_or_remove(network.buffer_haulers, item_key, hauler_id)
+                        lib.list_create_or_append(network.provide_haulers, item_key, hauler_id)
+                        job.type = "COMBINED"
+                        job.provide_done_tick = job.finish_tick
+                        job.finish_tick = nil
                     end
                 end
             end
@@ -962,12 +967,12 @@ end }
 ---@param parts StationParts
 ---@return {[string]: LuaGuiElement} elements, LuaGuiElement window
 local function add_gui_complete(player, parts)
-    local is_disabled = lib.read_stop_flag(parts.stop, e_stop_flags.disable)
+    local is_disabled = lib.read_stop_flag(parts.stop, enums.stop_flags.disable)
     local disable_tooltip = { is_disabled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
     local name = parts.stop.backer_name
-    local has_custom_name = lib.read_stop_flag(parts.stop, e_stop_flags.custom_name)
+    local has_custom_name = lib.read_stop_flag(parts.stop, enums.stop_flags.custom_name)
     local limit = parts.stop.trains_limit
-    local is_bufferless = lib.read_stop_flag(parts.stop, e_stop_flags.bufferless)
+    local is_bufferless = lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
     local bufferless_tooltip = { is_bufferless and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
     local no_provide = not parts.provide_io and {}
     local no_request = not parts.request_io and {}
@@ -1096,7 +1101,7 @@ function gui_station.open(player_id, entity)
     if parts then
         local provide_table, request_table = elements.provide_table, elements.request_table
         local network_items = storage.networks[network_name].items
-        local buffered = not lib.read_stop_flag(parts.stop, e_stop_flags.bufferless)
+        local buffered = not lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
         if provide_table then
             for item_key, item in pairs(lib.combinator_description_to_provide_items(parts.provide_io)) do
                 provide_init_row(network_items, provide_table, item_key, item)

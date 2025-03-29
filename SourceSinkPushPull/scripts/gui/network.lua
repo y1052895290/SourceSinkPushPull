@@ -66,7 +66,7 @@ end
 
 ---@param table_children LuaGuiElement[]
 ---@param i integer
----@return ClassName?, Class?
+---@return ClassName?, NetworkClass?
 local function class_from_row(table_children, i)
     local class_name = table_children[i + 2].text
     if class_name == "" then return end
@@ -81,14 +81,14 @@ local function class_from_row(table_children, i)
         depot_name = depot_name,
         fueler_name = fueler_name,
         bypass_depot = table_children[i + 5].state,
-    } --[[@as Class]]
+    } --[[@as NetworkClass]]
 end
 
 ---@param player_gui PlayerGui.Network
 ---@param table_children LuaGuiElement[]
 ---@param i integer
 ---@param class_name ClassName?
----@param class Class?
+---@param class NetworkClass?
 local function class_to_row(player_gui, table_children, i, class_name, class)
     if class_name then
         table_children[i + 1].children[4].sprite = ""
@@ -124,7 +124,7 @@ end
 ---@param i integer
 ---@return ItemKey?, NetworkItem?
 local function item_from_row(table_children, i)
-    local elem_value = table_children[i + 1].children[3].elem_value ---@type (table|string)?
+    local elem_value = table_children[i + 1].children[3].elem_value --[[@as (table|string)?]]
     if not elem_value then return end
 
     local class = table_children[i + 2].text
@@ -475,7 +475,7 @@ end
 
 ---@param class_table LuaGuiElement
 ---@param class_name ClassName
----@param class Class
+---@param class NetworkClass
 local function class_init_row(class_table, class_name, class)
     add_new_class_row(class_table)
 
@@ -515,7 +515,7 @@ end
 ---@param history_table LuaGuiElement
 ---@param row_index integer
 ---@param job_index JobIndex
----@param job Job
+---@param job NetworkJob
 local function insert_history_row(history_table, row_index, job_index, job)
     local hauler = storage.haulers[job.hauler] --[[@as Hauler?]]
     local job_type = job.type
@@ -954,26 +954,28 @@ function gui_network.on_poll_finished(player_gui)
         end
         for _, station in pairs(storage.stations) do
             if station.network == network_name then
-                if provide_enabled and station.provide_items and station.provide_items[stations_item_key] then
+                local provide = station.provide
+                if provide and provide_enabled and provide.items[stations_item_key] then
                     new_length = new_length + 1
                     local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = station.stop
                     top.caption = station.stop.backer_name
                     if item_icon then
-                        bottom.caption = "+" .. tostring(station.provide_counts[stations_item_key]) .. item_icon
+                        bottom.caption = "+" .. tostring(provide.counts[stations_item_key]) .. item_icon
                     else
-                        bottom.caption = tostring(len_or_zero(station.provide_deliveries[stations_item_key])) .. "[img=virtual-signal/up-arrow]"
+                        bottom.caption = tostring(len_or_zero(provide.deliveries[stations_item_key])) .. "[img=virtual-signal/up-arrow]"
                     end
                 end
-                if request_enabled and station.request_items and station.request_items[stations_item_key] then
+                local request = station.request
+                if request and request_enabled and request.items[stations_item_key] then
                     new_length = new_length + 1
                     local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
                     minimap.entity = station.stop
                     top.caption = station.stop.backer_name
                     if item_icon then
-                        bottom.caption = "-" .. tostring(station.request_counts[stations_item_key]) .. item_icon
+                        bottom.caption = "-" .. tostring(request.counts[stations_item_key]) .. item_icon
                     else
-                        bottom.caption = tostring(len_or_zero(station.request_deliveries[stations_item_key])) .. "[img=virtual-signal/down-arrow]"
+                        bottom.caption = tostring(len_or_zero(request.deliveries[stations_item_key])) .. "[img=virtual-signal/down-arrow]"
                     end
                 end
             end
@@ -1029,7 +1031,7 @@ local handle_import_import = { [events.on_gui_click] = function(event)
         local version = json.sspp_network_version
         if version ~= 1 then goto failure end
 
-        local classes = json.classes ---@type {[ClassName]: Class}
+        local classes = json.classes ---@type {[ClassName]: NetworkClass}
         if type(classes) ~= "table" then goto failure end
 
         local items = json.items ---@type {[ItemKey]: NetworkItem}
@@ -1184,7 +1186,7 @@ function gui_network.open(player_id, network_name, tab_index)
 
     player.opened = nil
 
-    local localised_name = network_name ---@type string|LocalisedString
+    local localised_name = network_name ---@type LocalisedString
     if network.surface.planet then
         localised_name = network.surface.planet.prototype.localised_name
     elseif network.surface.localised_name then

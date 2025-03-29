@@ -2,6 +2,7 @@
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
+local enums = require("__SourceSinkPushPull__.scripts.enums")
 
 main = {}
 
@@ -110,29 +111,29 @@ local function on_train_changed_state(event)
         if job_type == "FUEL" then
             if job.fuel_arrive_tick then
                 if state == defines.train_state.arrive_station then
-                    main.hauler_done_at_fuel_stop(hauler, job --[[@as Job.Fuel]])
+                    main.hauler_done_at_fuel_stop(hauler, job --[[@as NetworkJob.Fuel]])
                 end
             else
                 if state == defines.train_state.wait_station then
-                    main.hauler_arrived_at_fuel_stop(hauler, job --[[@as Job.Fuel]])
+                    main.hauler_arrived_at_fuel_stop(hauler, job --[[@as NetworkJob.Fuel]])
                 end
             end
         else
             if job.request_arrive_tick then
                 if state == defines.train_state.arrive_station then
-                    main.hauler_done_at_request_station(hauler, job --[[@as Job.Combined|Job.Dropoff]])
+                    main.hauler_done_at_request_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Dropoff]])
                 end
             elseif job.request_stop then
                 if state == defines.train_state.wait_station and train.station then
-                    main.hauler_arrived_at_request_station(hauler, job --[[@as Job.Combined|Job.Dropoff]])
+                    main.hauler_arrived_at_request_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Dropoff]])
                 end
             elseif job.provide_arrive_tick then
                 if state == defines.train_state.arrive_station then
-                    main.hauler_done_at_provide_station(hauler, job --[[@as Job.Combined|Job.Pickup]])
+                    main.hauler_done_at_provide_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Pickup]])
                 end
             else -- job.provide_stop
                 if state == defines.train_state.wait_station and train.station then
-                    main.hauler_arrived_at_provide_station(hauler, job --[[@as Job.Combined|Job.Pickup]])
+                    main.hauler_arrived_at_provide_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Pickup]])
                 end
             end
         end
@@ -175,10 +176,36 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param surface LuaSurface
+local function init_network_for_surface(surface)
+    storage.networks[surface.name] = {
+        surface = surface,
+        classes = {},
+        items = {},
+        job_index_counter = 0,
+        jobs = {},
+        buffer_haulers = {},
+        provide_haulers = {},
+        request_haulers = {},
+        fuel_haulers = {},
+        to_depot_haulers = {},
+        at_depot_haulers = {},
+        to_depot_liquidate_haulers = {},
+        at_depot_liquidate_haulers = {},
+        push_tickets = {},
+        provide_tickets = {},
+        pull_tickets = {},
+        request_tickets = {},
+        provide_done_tickets = {},
+        request_done_tickets = {},
+        buffer_tickets = {},
+    }
+end
+
 ---@param event EventData.on_surface_created|EventData.on_surface_imported
 local function on_surface_created(event)
     local surface = assert(game.get_surface(event.surface_index))
-    init_network(surface)
+    init_network_for_surface(surface)
 end
 
 ---@param event EventData.on_pre_surface_cleared|EventData.on_pre_surface_deleted
@@ -206,16 +233,51 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param name string
+---@return Color
+local function get_rgb_setting(name)
+    local rgba = settings.global[name].value --[[@as Color]]
+    local a = rgba.a
+    return { r = rgba.r * a, g = rgba.g * a, b = rgba.b * a, a = 1.0 }
+end
+
+local function populate_mod_settings()
+    mod_settings.auto_paint_trains = settings.global["sspp-auto-paint-trains"].value --[[@as boolean]]
+    mod_settings.train_colors = {
+        [enums.train_colors.depot] = get_rgb_setting("sspp-depot-color"),
+        [enums.train_colors.fuel] = get_rgb_setting("sspp-fuel-color"),
+        [enums.train_colors.provide] = get_rgb_setting("sspp-provide-color"),
+        [enums.train_colors.request] = get_rgb_setting("sspp-request-color"),
+        [enums.train_colors.liquidate] = get_rgb_setting("sspp-liquidate-color"),
+    }
+    mod_settings.default_train_limit = settings.global["sspp-default-train-limit"].value --[[@as integer]]
+    mod_settings.stations_per_tick = settings.global["sspp-stations-per-tick"].value --[[@as integer]]
+end
+
 ---@param event EventData.on_runtime_mod_setting_changed
-local function on_mod_setting_changed(event)
+local function on_runtime_mod_setting_changed(event)
     populate_mod_settings()
 end
 
+--------------------------------------------------------------------------------
+
 local function on_init()
-    init_storage()
-    for _, surface in pairs(game.surfaces) do
-        init_network(surface)
-    end
+    storage.tick_state = "INITIAL"
+    storage.entities = {}
+    storage.stop_comb_ids = {}
+    storage.comb_stop_ids = {}
+    storage.networks = {}
+    storage.stations = {}
+    storage.haulers = {}
+    storage.player_guis = {}
+    storage.poll_stations = {}
+    storage.request_done_items = {}
+    storage.liquidate_items = {}
+    storage.provide_done_items = {}
+    storage.dispatch_items = {}
+    storage.buffer_items = {}
+    storage.disabled_items = {}
+    for _, surface in pairs(game.surfaces) do init_network_for_surface(surface) end
 end
 
 local function on_load()
@@ -282,13 +344,9 @@ script.on_event(defines.events.on_pre_surface_cleared, on_surface_cleared)
 script.on_event(defines.events.on_pre_surface_deleted, on_surface_cleared)
 script.on_event(defines.events.on_surface_renamed, on_surface_renamed)
 
-script.on_event(defines.events.on_runtime_mod_setting_changed, on_mod_setting_changed)
-
-script.on_event(defines.events.on_tick, on_tick)
-
-gui.register_event_handlers()
+script.on_event(defines.events.on_runtime_mod_setting_changed, on_runtime_mod_setting_changed)
 
 script.on_init(on_init)
 script.on_load(on_load)
 
-script.on_configuration_changed(on_config_changed)
+gui.register_event_handlers()

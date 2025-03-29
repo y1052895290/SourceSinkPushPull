@@ -4,6 +4,7 @@ local flib_gui = require("__flib__.gui")
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local glib = require("__SourceSinkPushPull__.scripts.glib")
+
 local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
 
 local events = defines.events

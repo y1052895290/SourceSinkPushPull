@@ -2,12 +2,17 @@
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
+local enums = require("__SourceSinkPushPull__.scripts.enums")
+
+local e_train_colors = enums.train_colors
 
 local list_create_or_append, list_destroy_or_remove = lib.list_create_or_append, lib.list_destroy_or_remove
 local compute_load_target, get_train_item_count = lib.compute_load_target, lib.get_train_item_count
 local set_control_behavior, enumerate_spoil_results = lib.set_control_behavior, lib.enumerate_spoil_results
 local clear_control_behavior, clear_hidden_control_behaviors = lib.clear_control_behavior, lib.clear_hidden_control_behaviors
 local send_train_to_named_stop, assign_job_index = lib.send_train_to_named_stop, lib.assign_job_index
+
+local on_status_changed, on_job_created, on_job_updated = gui.on_status_changed, gui.on_job_created, gui.on_job_updated
 
 --------------------------------------------------------------------------------
 
@@ -27,27 +32,29 @@ function main.hauler_disabled_or_destroyed(hauler_id, hauler)
             if job.request_stop then
                 if job.request_stop.valid then
                     local station = storage.stations[job.request_stop.unit_number] --[[@as Station]]
+                    local request = station.request --[[@as StationRequest]]
                     if station.hauler == hauler_id then
-                        clear_control_behavior(station.request_io)
-                        clear_hidden_control_behaviors(station.request_hidden_combs)
+                        clear_control_behavior(request.comb)
+                        clear_hidden_control_behaviors(request.hidden_combs)
                         station.hauler = nil
                         station.minimum_active_count = nil
                     end
-                    list_destroy_or_remove(station.request_deliveries, job.item, hauler_id)
+                    list_destroy_or_remove(request.deliveries, job.item, hauler_id)
                     station.total_deliveries = station.total_deliveries - 1
                 end
                 list_destroy_or_remove(network.request_haulers, job.item, hauler_id)
             else
                 if job.provide_stop.valid then
                     local station = storage.stations[job.provide_stop.unit_number] --[[@as Station]]
+                    local provide = station.provide --[[@as StationProvide]]
                     if station.hauler == hauler_id then
-                        clear_control_behavior(station.provide_io)
-                        clear_hidden_control_behaviors(station.provide_hidden_combs)
+                        clear_control_behavior(provide.comb)
+                        clear_hidden_control_behaviors(provide.hidden_combs)
                         station.hauler = nil
                         station.minimum_active_count = nil
                         station.bufferless_dispatch = nil
                     end
-                    list_destroy_or_remove(station.provide_deliveries, job.item, hauler_id)
+                    list_destroy_or_remove(provide.deliveries, job.item, hauler_id)
                     station.total_deliveries = station.total_deliveries - 1
                 end
                 if job.type == "COMBINED" then
@@ -62,7 +69,7 @@ function main.hauler_disabled_or_destroyed(hauler_id, hauler)
 
         job.abort_tick = game.tick
         hauler.job = nil
-        gui.on_job_updated(hauler.network, job_index)
+        on_job_updated(hauler.network, job_index)
 
         return
     end
@@ -99,7 +106,7 @@ function main.hauler_set_to_manual(hauler)
 
     hauler.train.schedule = nil
 
-    gui.on_status_changed(hauler.train.id)
+    on_status_changed(hauler.train.id)
 end
 
 ---@param hauler Hauler
@@ -120,9 +127,10 @@ end
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
----@param job Job.Pickup|Job.Combined
+---@param job NetworkJob.Pickup|NetworkJob.Combined
 function main.hauler_arrived_at_provide_station(hauler, job)
-    local train, stop = hauler.train, job.provide_stop --[[@as LuaEntity]]
+    local train = hauler.train
+    local stop = job.provide_stop --[[@as LuaEntity]]
 
     if train.station ~= stop then
         hauler.status = { message = { "sspp-alert.arrived-at-wrong-stop" }, item = job.item, stop }
@@ -132,13 +140,14 @@ function main.hauler_arrived_at_provide_station(hauler, job)
     end
 
     local station = storage.stations[stop.unit_number] --[[@as Station]]
+    local provide = station.provide --[[@as StationProvide]]
 
     local network_name, item_key = hauler.network, job.item
     local network = storage.networks[network_name]
     local network_item = network.items[item_key]
     local name, quality = network_item.name, network_item.quality
 
-    local provide_item = station.provide_items[item_key]
+    local provide_item = provide.items[item_key]
     local constant = compute_load_target(network_item, provide_item)
 
     local signal, wait_conditions ---@type SignalID, WaitCondition[]
@@ -149,7 +158,7 @@ function main.hauler_arrived_at_provide_station(hauler, job)
             local spoil_signal = { name = spoil_result.name, quality = quality, type = "item" }
             wait_conditions[i * 2] = { compare_type = "or", type = "item_count", condition = { first_signal = spoil_signal, comparator = ">", constant = 0 } }
             wait_conditions[i * 2 + 1] = { compare_type = "and", type = "inactivity", ticks = 120 }
-            set_control_behavior(station.provide_hidden_combs[i], 0, "-", spoil_signal, signal)
+            set_control_behavior(provide.hidden_combs[i], 0, "-", spoil_signal, signal)
         end
     else
         signal = { name = name, type = "fluid" }
@@ -158,22 +167,23 @@ function main.hauler_arrived_at_provide_station(hauler, job)
             wait_conditions[2] = { compare_type = "and", type = "inactivity", ticks = 60 }
         end
     end
-    set_control_behavior(station.provide_io, constant, "-", signal)
+    set_control_behavior(provide.comb, constant, "-", signal)
 
     station.hauler = train.id
-    station.minimum_active_count = station.provide_counts[item_key]
+    station.minimum_active_count = provide.counts[item_key]
 
     job.target_count = network_item.delivery_size
     job.provide_arrive_tick = game.tick
-    gui.on_job_updated(network_name, hauler.job)
+    on_job_updated(network_name, hauler.job)
 
     train.schedule = { current = 1, records = { { station = stop.backer_name, wait_conditions = wait_conditions }, { rail = stop.connected_rail } } }
 end
 
 ---@param hauler Hauler
----@param job Job.Dropoff|Job.Combined
+---@param job NetworkJob.Dropoff|NetworkJob.Combined
 function main.hauler_arrived_at_request_station(hauler, job)
-    local train, stop = hauler.train, job.request_stop --[[@as LuaEntity]]
+    local train = hauler.train
+    local stop = job.request_stop --[[@as LuaEntity]]
 
     if train.station ~= stop then
         hauler.status = { message = { "sspp-alert.arrived-at-wrong-stop" }, item = job.item, stop }
@@ -183,6 +193,7 @@ function main.hauler_arrived_at_request_station(hauler, job)
     end
 
     local station = storage.stations[stop.unit_number] --[[@as Station]]
+    local request = station.request --[[@as StationRequest]]
 
     local network_name, item_key = hauler.network, job.item
     local network = storage.networks[network_name]
@@ -196,20 +207,20 @@ function main.hauler_arrived_at_request_station(hauler, job)
         for i, spoil_result in enumerate_spoil_results(prototypes.item[name]) do
             local spoil_signal = { name = spoil_result.name, quality = quality, type = "item" }
             wait_conditions[i + 1] = { compare_type = "and", type = "item_count", condition = { first_signal = spoil_signal, comparator = "=", constant = 0 } }
-            set_control_behavior(station.request_hidden_combs[i], 0, "+", spoil_signal)
+            set_control_behavior(request.hidden_combs[i], 0, "+", spoil_signal)
         end
     else
         signal = { name = name, type = "fluid" }
         wait_conditions = { { type = "fluid_count", condition = { first_signal = signal, comparator = "=", constant = 0 } } }
     end
-    set_control_behavior(station.request_io, 0, "+", signal)
+    set_control_behavior(request.comb, 0, "+", signal)
 
     station.hauler = train.id
-    station.minimum_active_count = station.request_counts[item_key]
+    station.minimum_active_count = request.counts[item_key]
 
     job.loaded_count = get_train_item_count(train, name, quality)
     job.request_arrive_tick = game.tick
-    gui.on_job_updated(network_name, hauler.job)
+    on_job_updated(network_name, hauler.job)
 
     train.schedule = { current = 1, records = { { station = stop.backer_name, wait_conditions = wait_conditions }, { rail = stop.connected_rail } } }
 end
@@ -217,39 +228,41 @@ end
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
----@param job Job.Pickup|Job.Combined
+---@param job NetworkJob.Pickup|NetworkJob.Combined
 function main.hauler_done_at_provide_station(hauler, job)
-    local train, stop = hauler.train, job.provide_stop --[[@as LuaEntity]]
-    local station = storage.stations[stop.unit_number] --[[@as Station]]
+    local train = hauler.train
+    local stop = job.provide_stop --[[@as LuaEntity]]
+    local provide = storage.stations[stop.unit_number].provide --[[@as StationProvide]]
 
-    clear_control_behavior(station.provide_io)
-    clear_hidden_control_behaviors(station.provide_hidden_combs)
-
-    if job.type == "COMBINED" then job.provide_done_tick = game.tick else job.finish_tick = game.tick end
-    gui.on_job_updated(hauler.network, hauler.job)
-    hauler.status = { message = { "sspp-alert.waiting-for-request" }, item = job.item }
-    gui.on_status_changed(train.id)
+    clear_control_behavior(provide.comb)
+    clear_hidden_control_behaviors(provide.hidden_combs)
 
     -- TODO: wait in exit block
     train.schedule = { current = 1, records = { { rail = stop.connected_rail } } }
+
+    if job.type == "COMBINED" then job.provide_done_tick = game.tick else job.finish_tick = game.tick end
+    on_job_updated(hauler.network, hauler.job)
+    hauler.status = { message = { "sspp-alert.waiting-for-request" }, item = job.item }
+    on_status_changed(train.id)
 end
 
 ---@param hauler Hauler
----@param job Job.Dropoff|Job.Combined
+---@param job NetworkJob.Dropoff|NetworkJob.Combined
 function main.hauler_done_at_request_station(hauler, job)
-    local train, stop = hauler.train, job.request_stop --[[@as LuaEntity]]
-    local station = storage.stations[stop.unit_number] --[[@as Station]]
+    local train = hauler.train
+    local stop = job.request_stop --[[@as LuaEntity]]
+    local request = storage.stations[stop.unit_number].request --[[@as StationRequest]]
 
-    clear_control_behavior(station.request_io)
-    clear_hidden_control_behaviors(station.request_hidden_combs)
-
-    job.finish_tick = game.tick
-    gui.on_job_updated(hauler.network, hauler.job)
-    hauler.status = { message = { "sspp-alert.going-to-depot" } }
-    gui.on_status_changed(train.id)
+    clear_control_behavior(request.comb)
+    clear_hidden_control_behaviors(request.hidden_combs)
 
     -- TODO: wait in exit block
     train.schedule = { current = 1, records = { { rail = stop.connected_rail } } }
+
+    job.finish_tick = game.tick
+    on_job_updated(hauler.network, hauler.job)
+    hauler.status = { message = { "sspp-alert.going-to-depot" } }
+    on_status_changed(train.id)
 end
 
 --------------------------------------------------------------------------------
@@ -284,9 +297,9 @@ function main.hauler_send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
                     list_create_or_append(network.fuel_haulers, class_name, hauler_id)
                     send_train_to_named_stop(train, e_train_colors.fuel, class.fueler_name)
                     assign_job_index(network, hauler, { type = "FUEL", hauler = hauler_id, start_tick = game.tick })
-                    gui.on_job_created(network_name)
+                    on_job_created(network_name)
                     hauler.status = { message = { "sspp-alert.getting-fuel" } }
-                    gui.on_status_changed(hauler_id)
+                    on_status_changed(hauler_id)
                     return
                 end
             end
@@ -312,7 +325,7 @@ function main.hauler_send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
                 send_train_to_named_stop(train, e_train_colors.liquidate, class.depot_name)
                 hauler.to_depot = item_key
                 hauler.status = { message = { class.bypass_depot and "sspp-alert.waiting-for-request" or "sspp-alert.going-to-depot" }, item = item_key }
-                gui.on_status_changed(hauler_id)
+                on_status_changed(hauler_id)
             end
             return
         end
@@ -322,13 +335,13 @@ function main.hauler_send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
     send_train_to_named_stop(train, e_train_colors.depot, class.depot_name)
     hauler.to_depot = ""
     hauler.status = { message = { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" } }
-    gui.on_status_changed(hauler_id)
+    on_status_changed(hauler_id)
 end
 
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
----@param job Job.Fuel
+---@param job NetworkJob.Fuel
 function main.hauler_arrived_at_fuel_stop(hauler, job)
     local train = hauler.train
     local stop = train.station --[[@as LuaEntity]]
@@ -338,11 +351,11 @@ function main.hauler_arrived_at_fuel_stop(hauler, job)
 
     job.fuel_stop = stop
     job.fuel_arrive_tick = game.tick
-    gui.on_job_updated(hauler.network, hauler.job)
+    on_job_updated(hauler.network, hauler.job)
 end
 
 ---@param hauler Hauler
----@param job Job.Fuel
+---@param job NetworkJob.Fuel
 function main.hauler_done_at_fuel_stop(hauler, job)
     local network_name = hauler.network
     local network = storage.networks[network_name]
@@ -350,7 +363,7 @@ function main.hauler_done_at_fuel_stop(hauler, job)
     list_destroy_or_remove(network.fuel_haulers, hauler.class, hauler.train.id)
 
     job.finish_tick = game.tick
-    gui.on_job_updated(network_name, hauler.job)
+    on_job_updated(network_name, hauler.job)
 
     hauler.job = nil
 
@@ -369,13 +382,13 @@ function main.hauler_arrived_at_depot_stop(hauler)
         list_destroy_or_remove(network.to_depot_haulers, class_name, hauler_id)
         list_create_or_append(network.at_depot_haulers, class_name, hauler_id)
         hauler.status = { message = { "sspp-alert.ready-for-dispatch" } }
-        gui.on_status_changed(hauler_id)
+        on_status_changed(hauler_id)
     else
         ---@cast item_key ItemKey
         list_destroy_or_remove(network.to_depot_liquidate_haulers, item_key, hauler_id)
         list_create_or_append(network.at_depot_liquidate_haulers, item_key, hauler_id)
         hauler.status = { message = { "sspp-alert.waiting-for-request" }, item = item_key }
-        gui.on_status_changed(hauler_id)
+        on_status_changed(hauler_id)
     end
 
     hauler.to_depot = nil

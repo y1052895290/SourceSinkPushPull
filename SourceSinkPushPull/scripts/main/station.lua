@@ -2,6 +2,9 @@
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
+local enums = require("__SourceSinkPushPull__.scripts.enums")
+
+local e_stop_flags = enums.stop_flags
 
 --------------------------------------------------------------------------------
 
@@ -78,12 +81,12 @@ local function try_create_station(stop, combs)
         local io_connector = provide_io.get_wire_connector(defines.wire_connector_id.combinator_input_red, true)
         stop_connector.connect_to(io_connector, true)
 
-        station.provide_io = provide_io
-        station.provide_items = lib.combinator_description_to_provide_items(provide_io)
-        station.provide_deliveries = {}
-        station.provide_hidden_combs = {}
+        station.provide = {
+            comb = provide_io, items = lib.combinator_description_to_provide_items(provide_io),
+            deliveries = {}, hidden_combs = {}, counts = {}, modes = {},
+        }
 
-        lib.ensure_hidden_combs(station.provide_io, station.provide_hidden_combs, station.provide_items)
+        lib.ensure_hidden_combs(provide_io, station.provide.hidden_combs, station.provide.items)
     end
 
     if request_io then
@@ -91,31 +94,29 @@ local function try_create_station(stop, combs)
         local io_connector = request_io.get_wire_connector(defines.wire_connector_id.combinator_input_green, true)
         stop_connector.connect_to(io_connector, true)
 
-        station.request_io = request_io
-        station.request_items = lib.combinator_description_to_request_items(request_io)
-        station.request_deliveries = {}
-        station.request_hidden_combs = {}
+        station.request = {
+            comb = request_io, items = lib.combinator_description_to_request_items(request_io),
+            deliveries = {}, hidden_combs = {}, counts = {}, modes = {},
+        }
 
-        lib.ensure_hidden_combs(station.request_io, station.request_hidden_combs, station.request_items)
+        lib.ensure_hidden_combs(request_io, station.request.hidden_combs, station.request.items)
     end
 
     if not lib.read_stop_flag(stop, e_stop_flags.custom_name) then
-        stop.backer_name = lib.generate_stop_name(station.provide_items, station.request_items)
+        local provide, request = station.provide, station.request
+        stop.backer_name = lib.generate_stop_name(provide and provide.items, request and request.items)
     end
 
     storage.stations[station_id] = station
 end
 
 ---@param network_name NetworkName
----@param items {[ItemKey]: ProvideItem|RequestItem}?
----@param deliveries {[ItemKey]: HaulerId[]}?
+---@param items {[ItemKey]: StationItem}
+---@param deliveries {[ItemKey]: HaulerId[]}
 local function disable_items_and_haulers(network_name, items, deliveries)
-    if items then
-        ---@cast deliveries {[ItemKey]: HaulerId[]}
-        for item_key, _ in pairs(items) do
-            storage.disabled_items[network_name .. ":" .. item_key] = true
-            lib.set_haulers_to_manual(deliveries[item_key], { "sspp-alert.station-broken" })
-        end
+    for item_key, _ in pairs(items) do
+        storage.disabled_items[network_name .. ":" .. item_key] = true
+        lib.set_haulers_to_manual(deliveries[item_key], { "sspp-alert.station-broken" })
     end
 end
 
@@ -123,16 +124,20 @@ end
 local function try_destroy_station(stop)
     if stop.name == "entity-ghost" then return end
 
-    local station_id = stop.unit_number ---@type StationId
+    local station_id = stop.unit_number --[[@as StationId]]
     local station = storage.stations[station_id]
     if station then
         lib.list_remove_if_exists(storage.poll_stations, station_id)
 
-        disable_items_and_haulers(station.network, station.provide_items, station.provide_deliveries)
-        disable_items_and_haulers(station.network, station.request_items, station.request_deliveries)
+        if station.provide then
+            disable_items_and_haulers(station.network, station.provide.items, station.provide.deliveries)
+            lib.destroy_hidden_combs(station.provide.hidden_combs)
+        end
 
-        lib.destroy_hidden_combs(station.provide_hidden_combs)
-        lib.destroy_hidden_combs(station.request_hidden_combs)
+        if station.request then
+            disable_items_and_haulers(station.network, station.request.items, station.request.deliveries)
+            lib.destroy_hidden_combs(station.request.hidden_combs)
+        end
 
         storage.stations[station_id] = nil
     end

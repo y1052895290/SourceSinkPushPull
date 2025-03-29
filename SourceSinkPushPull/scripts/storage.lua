@@ -2,14 +2,6 @@
 
 --------------------------------------------------------------------------------
 
----@enum StopFlag
-e_stop_flags = { custom_name = 1, disable = 2, bufferless = 4 }
-
----@enum TrainColor
-e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 }
-
---------------------------------------------------------------------------------
-
 ---@alias NetworkName string
 ---@alias ClassName string
 ---@alias ItemKey string
@@ -20,7 +12,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@alias PlayerId uint
 ---@alias JobIndex integer
 ---@alias TickState "INITIAL"|"POLL"|"REQUEST_DONE"|"LIQUIDATE"|"PROVIDE_DONE"|"DISPATCH"|"BUFFER"
----@alias Job Job.Fuel|Job.Pickup|Job.Dropoff|Job.Combined
+---@alias NetworkJob NetworkJob.Fuel|NetworkJob.Pickup|NetworkJob.Dropoff|NetworkJob.Combined
 ---@alias PlayerGui PlayerGui.Network|PlayerGui.Station|PlayerGui.Hauler
 
 ---@class (exact) SourceSinkPushPull.Storage
@@ -50,10 +42,10 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 
 ---@class (exact) Network
 ---@field public surface LuaSurface
----@field public classes {[ClassName]: Class}
+---@field public classes {[ClassName]: NetworkClass}
 ---@field public items {[ItemKey]: NetworkItem}
 ---@field public job_index_counter JobIndex
----@field public jobs {[JobIndex]: Job}
+---@field public jobs {[JobIndex]: NetworkJob}
 ---@field public buffer_haulers {[ItemKey]: HaulerId[]}
 ---@field public provide_haulers {[ItemKey]: HaulerId[]}
 ---@field public request_haulers {[ItemKey]: HaulerId[]}
@@ -70,7 +62,7 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public request_done_tickets {[ItemKey]: StationId[]}
 ---@field public buffer_tickets {[ItemKey]: StationId[]}
 
----@class (exact) Class
+---@class (exact) NetworkClass
 ---@field public depot_name string
 ---@field public fueler_name string
 ---@field public bypass_depot boolean
@@ -84,32 +76,32 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 
 --------------------------------------------------------------------------------
 
----@class (exact) Job.Abstract
+---@class (exact) NetworkJob.Abstract
 ---@field public hauler HaulerId
 ---@field public start_tick MapTick
 ---@field public finish_tick MapTick?
 ---@field public abort_tick MapTick?
 
----@class (exact) Job.Fuel : Job.Abstract
+---@class (exact) NetworkJob.Fuel : NetworkJob.Abstract
 ---@field public type "FUEL"
 ---@field public fuel_stop LuaEntity?
 ---@field public fuel_arrive_tick MapTick?
 
----@class (exact) Job.Pickup : Job.Abstract
+---@class (exact) NetworkJob.Pickup : NetworkJob.Abstract
 ---@field public type "PICKUP"
 ---@field public item ItemKey
 ---@field public provide_stop LuaEntity?
 ---@field public target_count integer?
 ---@field public provide_arrive_tick MapTick?
 
----@class (exact) Job.Dropoff : Job.Abstract
+---@class (exact) NetworkJob.Dropoff : NetworkJob.Abstract
 ---@field public type "DROPOFF"
 ---@field public item ItemKey
 ---@field public request_stop LuaEntity?
 ---@field public loaded_count integer?
 ---@field public request_arrive_tick MapTick?
 
----@class (exact) Job.Combined : Job.Abstract
+---@class (exact) NetworkJob.Combined : NetworkJob.Abstract
 ---@field public type "COMBINED"
 ---@field public item ItemKey
 ---@field public provide_stop LuaEntity?
@@ -126,33 +118,38 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public network NetworkName
 ---@field public stop LuaEntity
 ---@field public general_io LuaEntity
----@field public provide_io LuaEntity?
----@field public request_io LuaEntity?
----@field public provide_items {[ItemKey]: ProvideItem}?
----@field public request_items {[ItemKey]: RequestItem}?
----@field public provide_counts {[ItemKey]: integer}?
----@field public request_counts {[ItemKey]: integer}?
----@field public provide_modes {[ItemKey]: ItemMode}?
----@field public request_modes {[ItemKey]: ItemMode}?
----@field public provide_deliveries {[ItemKey]: HaulerId[]}?
----@field public request_deliveries {[ItemKey]: HaulerId[]}?
----@field public provide_hidden_combs LuaEntity[]?
----@field public request_hidden_combs LuaEntity[]?
 ---@field public total_deliveries integer
 ---@field public hauler HaulerId?
 ---@field public minimum_active_count integer?
 ---@field public bufferless_dispatch true?
+---@field public provide StationProvide?
+---@field public request StationRequest?
 
----@class (exact) ProvideItem
+---@class (exact) StationProvide
+---@field public comb LuaEntity
+---@field public items {[ItemKey]: ProvideItem}
+---@field public deliveries {[ItemKey]: HaulerId[]}
+---@field public hidden_combs LuaEntity[]
+---@field public counts {[ItemKey]: integer}
+---@field public modes {[ItemKey]: ItemMode}
+
+---@class (exact) StationRequest
+---@field public comb LuaEntity
+---@field public items {[ItemKey]: RequestItem}
+---@field public deliveries {[ItemKey]: HaulerId[]}
+---@field public hidden_combs LuaEntity[]
+---@field public counts {[ItemKey]: integer}
+---@field public modes {[ItemKey]: ItemMode}
+
+---@class (exact) StationItem
 ---@field public mode ItemMode
 ---@field public throughput number
 ---@field public latency number
+
+---@class (exact) ProvideItem : StationItem
 ---@field public granularity integer
 
----@class (exact) RequestItem
----@field public mode ItemMode
----@field public throughput number
----@field public latency number
+---@class (exact) RequestItem : StationItem
 
 --------------------------------------------------------------------------------
 
@@ -160,9 +157,9 @@ e_train_colors = { depot = 1, fuel = 2, provide = 3, request = 4, liquidate = 5 
 ---@field public train LuaTrain
 ---@field public network NetworkName
 ---@field public class ClassName
+---@field public job JobIndex?
 ---@field public to_depot (""|ItemKey)?
 ---@field public at_depot (""|ItemKey)?
----@field public job JobIndex?
 ---@field public status HaulerStatus
 
 ---@class (exact) HaulerStatus
@@ -209,70 +206,3 @@ storage = storage
 
 ---@type SourceSinkPushPull.ModSettings
 mod_settings = {}
-
---------------------------------------------------------------------------------
-
-function init_storage()
-    storage.tick_state = "INITIAL"
-    storage.entities = {}
-    storage.stop_comb_ids = {}
-    storage.comb_stop_ids = {}
-    storage.networks = {}
-    storage.stations = {}
-    storage.haulers = {}
-    storage.player_guis = {}
-    storage.poll_stations = {}
-    storage.request_done_items = {}
-    storage.liquidate_items = {}
-    storage.provide_done_items = {}
-    storage.dispatch_items = {}
-    storage.buffer_items = {}
-    storage.disabled_items = {}
-end
-
----@param surface LuaSurface
-function init_network(surface)
-    storage.networks[surface.name] = {
-        surface = surface,
-        classes = {},
-        items = {},
-        job_index_counter = 0,
-        jobs = {},
-        buffer_haulers = {},
-        provide_haulers = {},
-        request_haulers = {},
-        fuel_haulers = {},
-        to_depot_haulers = {},
-        at_depot_haulers = {},
-        to_depot_liquidate_haulers = {},
-        at_depot_liquidate_haulers = {},
-        push_tickets = {},
-        provide_tickets = {},
-        pull_tickets = {},
-        request_tickets = {},
-        provide_done_tickets = {},
-        request_done_tickets = {},
-        buffer_tickets = {},
-    }
-end
-
----@param name string
----@return Color
-local function get_rgb_setting(name)
-    local rgba = settings.global[name].value --[[@as Color]]
-    local a = rgba.a
-    return { r = rgba.r * a, g = rgba.g * a, b = rgba.b * a, a = 1.0 }
-end
-
-function populate_mod_settings()
-    mod_settings.auto_paint_trains = settings.global["sspp-auto-paint-trains"].value --[[@as boolean]]
-    mod_settings.train_colors = {
-        [e_train_colors.depot] = get_rgb_setting("sspp-depot-color"),
-        [e_train_colors.fuel] = get_rgb_setting("sspp-fuel-color"),
-        [e_train_colors.provide] = get_rgb_setting("sspp-provide-color"),
-        [e_train_colors.request] = get_rgb_setting("sspp-request-color"),
-        [e_train_colors.liquidate] = get_rgb_setting("sspp-liquidate-color"),
-    }
-    mod_settings.default_train_limit = settings.global["sspp-default-train-limit"].value --[[@as integer]]
-    mod_settings.stations_per_tick = settings.global["sspp-stations-per-tick"].value --[[@as integer]]
-end

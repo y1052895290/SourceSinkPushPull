@@ -6,6 +6,8 @@ local lib = require("__SourceSinkPushPull__.scripts.lib")
 
 function main.reboot()
     for _, network in pairs(storage.networks) do
+        network.job_index_counter = 0
+        network.jobs = {}
         network.buffer_haulers = {}
         network.provide_haulers = {}
         network.request_haulers = {}
@@ -14,28 +16,25 @@ function main.reboot()
         network.at_depot_haulers = {}
         network.to_depot_liquidate_haulers = {}
         network.at_depot_liquidate_haulers = {}
-        network.jobs = {}
-        network.job_index_counter = 0
     end
 
     for hauler_id, hauler in pairs(storage.haulers) do
-        local train = hauler.train
-        if train.valid then
+        if hauler.train.valid then
+            hauler.job = nil
             hauler.to_depot = nil
             hauler.at_depot = nil
-            hauler.job = nil
-            train.manual_mode = true
+            hauler.train.manual_mode = true
         else
             storage.haulers[hauler_id] = nil
         end
     end
 
     for _, station in pairs(storage.stations) do
-        lib.destroy_hidden_combs(station.provide_hidden_combs)
-        lib.destroy_hidden_combs(station.request_hidden_combs)
+        if station.provide then lib.destroy_hidden_combs(station.provide.hidden_combs) end
+        if station.request then lib.destroy_hidden_combs(station.request.hidden_combs) end
     end
-    storage.stations = {}
 
+    storage.stations = {}
     storage.stop_comb_ids = {}
     storage.comb_stop_ids = {}
     storage.entities = {}

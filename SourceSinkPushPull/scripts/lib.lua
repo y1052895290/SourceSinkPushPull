@@ -182,7 +182,7 @@ lib.enumerate_spoil_results = enumerate_spoil_results
 --------------------------------------------------------------------------------
 
 ---@param network_item NetworkItem
----@param station_item ProvideItem|RequestItem
+---@param station_item StationItem
 ---@return integer
 function lib.compute_storage_needed(network_item, station_item)
     local delivery_size, delivery_time = network_item.delivery_size, network_item.delivery_time
@@ -199,7 +199,7 @@ function lib.compute_storage_needed(network_item, station_item)
 end
 
 ---@param network_item NetworkItem
----@param station_item ProvideItem|RequestItem
+---@param station_item StationItem
 ---@return integer
 function lib.compute_buffer(network_item, station_item)
     local throughput, latency = station_item.throughput, station_item.latency
@@ -237,6 +237,7 @@ end
 
 ---@param provide_items {[ItemKey]: ProvideItem}?
 ---@param request_items {[ItemKey]: RequestItem}?
+---@return string
 function lib.generate_stop_name(provide_items, request_items)
     local provide_icons, p_len = {}, 0 ---@type string[], integer
     local request_icons, r_len = {}, 0 ---@type string[], integer
@@ -354,13 +355,11 @@ function lib.clear_control_behavior(comb)
     cb.parameters = nil
 end
 
----@param hidden_combs LuaEntity[]?
+---@param hidden_combs LuaEntity[]
 function lib.clear_hidden_control_behaviors(hidden_combs)
-    if hidden_combs then
-        for _, hidden_comb in pairs(hidden_combs) do
-            local cb = hidden_comb.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
-            cb.parameters = nil
-        end
+    for _, hidden_comb in pairs(hidden_combs) do
+        local cb = hidden_comb.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
+        cb.parameters = nil
     end
 end
 
@@ -547,7 +546,7 @@ end
 
 ---@param network Network
 ---@param hauler Hauler
----@param job Job
+---@param job NetworkJob
 function lib.assign_job_index(network, hauler, job)
     local job_index = network.job_index_counter + 1
 
@@ -565,9 +564,10 @@ function lib.set_haulers_to_manual(hauler_ids, message, item, stop)
     if hauler_ids then
         for i = #hauler_ids, 1, -1 do
             local hauler = storage.haulers[hauler_ids[i]]
-            lib.show_train_alert(hauler.train, message)
+            local train = hauler.train
             hauler.status = { message = message, item = item, stop = stop }
-            hauler.train.manual_mode = true
+            lib.show_train_alert(train, message)
+            train.manual_mode = true
         end
     end
 end
@@ -585,7 +585,7 @@ end
 
 ---@param comb LuaEntity
 ---@param hidden_combs LuaEntity[]
----@param items {[ItemKey]: ProvideItem|RequestItem}
+---@param items {[ItemKey]: StationItem}
 function lib.ensure_hidden_combs(comb, hidden_combs, items)
     local old_spoil_depth = #hidden_combs
     local new_spoil_depth = 0
