@@ -1,10 +1,11 @@
 -- SSPP by jagoly
 
+local protos = {}
+
 --------------------------------------------------------------------------------
 
 ---@param base_type string
 ---@param short_name string
----@return data.CombinatorPrototype
 local function generate_io_entity(base_type, short_name)
     local base = data.raw[base_type][base_type] --[[@as data.CombinatorPrototype]]
     local full_name = "sspp-" .. short_name .. "-io"
@@ -122,18 +123,18 @@ local function generate_io_entity(base_type, short_name)
     }
 end
 
-stop_entity = flib.copy_prototype(data.raw["train-stop"]["train-stop"], "sspp-stop") --[[@as data.TrainStopPrototype]]
-stop_entity.icon = "__SourceSinkPushPull__/graphics/icons/sspp-stop.png"
-stop_entity.allow_copy_paste = false
+protos.entity_stop = flib.copy_prototype(data.raw["train-stop"]["train-stop"], "sspp-stop") --[[@as data.TrainStopPrototype]]
+protos.entity_stop.icon = "__SourceSinkPushPull__/graphics/icons/sspp-stop.png"
+protos.entity_stop.allow_copy_paste = false
 
-general_io_entity = generate_io_entity("decider-combinator", "general") --[[@as data.DeciderCombinatorPrototype]]
-provide_io_entity = generate_io_entity("arithmetic-combinator", "provide") --[[@as data.ArithmeticCombinatorPrototype]]
-request_io_entity = generate_io_entity("arithmetic-combinator", "request") --[[@as data.ArithmeticCombinatorPrototype]]
+protos.entity_general_io = generate_io_entity("decider-combinator", "general") --[[@as data.DeciderCombinatorPrototype]]
+protos.entity_provide_io = generate_io_entity("arithmetic-combinator", "provide") --[[@as data.ArithmeticCombinatorPrototype]]
+protos.entity_request_io = generate_io_entity("arithmetic-combinator", "request") --[[@as data.ArithmeticCombinatorPrototype]]
 
 ---@type data.ArithmeticCombinatorPrototype
-hidden_io_entity = {
-    sprites = { filename = "__SourceSinkPushPull__/graphics/invisible.png", width = 1, height = 1 },
-    activity_led_sprites = { filename = "__SourceSinkPushPull__/graphics/invisible.png", width = 1, height = 1 },
+protos.entity_hidden_io = {
+    sprites = { filename = "__core__/graphics/empty.png", size = 1 },
+    activity_led_sprites = { filename = "__core__/graphics/empty.png", size = 1 },
 
     input_connection_points = {
         { wire = { 0, 0 }, shadow = { 0, 0 } },
@@ -159,3 +160,7 @@ hidden_io_entity = {
     input_connection_bounding_box = { { 0, 0 }, { 0, 0 } },
     output_connection_bounding_box = { { 0, 0 }, { 0, 0 } },
 }
+
+--------------------------------------------------------------------------------
+
+return protos

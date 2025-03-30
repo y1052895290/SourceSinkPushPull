@@ -2,144 +2,57 @@
 
 --------------------------------------------------------------------------------
 
-data:extend({
-    {
-        type = "sprite", name = "sspp-bufferless-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-bufferless-icon.png",
+---@param short_name string
+local function generate_icon_sprite(short_name)
+    ---@type data.SpritePrototype
+    return {
+        type = "sprite", name = "sspp-" .. short_name .. "-icon",
+        filename = "__SourceSinkPushPull__/graphics/gui/sspp-" .. short_name .. "-icon.png",
         size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-bypass-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-bypass-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-copy-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-copy-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-delete-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-delete-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-disable-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-disable-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-export-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-export-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-grid-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-grid-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-import-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-import-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-map-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-map-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-move-down-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-move-down-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-move-up-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-move-up-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-name-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-name-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-refresh-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-refresh-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-reset-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-reset-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-signal-icon",
-        filename = "__SourceSinkPushPull__/graphics/gui/sspp-signal-icon.png",
-        size = 32, scale = 0.5, flags = { "gui-icon" },
-    },
+    }
+end
 
-    -- provide mode icons ------------------------------------------------------
-    {
-        type = "sprite", name = "sspp-provide-mode-1",
-        filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/1.png",
+---@param what string
+---@param number string
+local function generate_mode_sprite(what, number)
+    ---@type data.SpritePrototype
+    return {
+        type = "sprite", name = "sspp-" .. what .. "-mode-" .. number,
+        filename = "__SourceSinkPushPull__/graphics/gui/" .. what .. "-mode/" .. number .. ".png",
         size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-provide-mode-2",
-        filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/2.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-provide-mode-3",
-        filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/3.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-provide-mode-4",
-        filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/4.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-provide-mode-5",
-        filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/5.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-provide-mode-6",
-        filename = "__SourceSinkPushPull__/graphics/gui/provide-mode/6.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
+    }
+end
 
-    -- request mode icons ------------------------------------------------------
-    {
-        type = "sprite", name = "sspp-request-mode-1",
-        filename = "__SourceSinkPushPull__/graphics/gui/request-mode/1.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-request-mode-2",
-        filename = "__SourceSinkPushPull__/graphics/gui/request-mode/2.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-request-mode-3",
-        filename = "__SourceSinkPushPull__/graphics/gui/request-mode/3.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-request-mode-4",
-        filename = "__SourceSinkPushPull__/graphics/gui/request-mode/4.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-request-mode-5",
-        filename = "__SourceSinkPushPull__/graphics/gui/request-mode/5.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-    {
-        type = "sprite", name = "sspp-request-mode-6",
-        filename = "__SourceSinkPushPull__/graphics/gui/request-mode/6.png",
-        size = { 20, 32 }, scale = 0.5, flags = { "gui-icon" },
-    },
-})
+--------------------------------------------------------------------------------
+
+return {
+    generate_icon_sprite("bufferless"),
+    generate_icon_sprite("bypass"),
+    generate_icon_sprite("copy"),
+    generate_icon_sprite("delete"),
+    generate_icon_sprite("disable"),
+    generate_icon_sprite("export"),
+    generate_icon_sprite("grid"),
+    generate_icon_sprite("import"),
+    generate_icon_sprite("map"),
+    generate_icon_sprite("move-down"),
+    generate_icon_sprite("move-up"),
+    generate_icon_sprite("name"),
+    generate_icon_sprite("refresh"),
+    generate_icon_sprite("reset"),
+    generate_icon_sprite("signal"),
+
+    generate_mode_sprite("provide", "1"),
+    generate_mode_sprite("provide", "2"),
+    generate_mode_sprite("provide", "3"),
+    generate_mode_sprite("provide", "4"),
+    generate_mode_sprite("provide", "5"),
+    generate_mode_sprite("provide", "6"),
+
+    generate_mode_sprite("request", "1"),
+    generate_mode_sprite("request", "2"),
+    generate_mode_sprite("request", "3"),
+    generate_mode_sprite("request", "4"),
+    generate_mode_sprite("request", "5"),
+    generate_mode_sprite("request", "6"),
+}
