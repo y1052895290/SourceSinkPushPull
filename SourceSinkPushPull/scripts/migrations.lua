@@ -151,7 +151,7 @@ local migrations = {
             end
         end
     end,
-    ["0.3.24"] = function()
+    ["0.4.0"] = function()
         -- because the job changes in this version would be annoying to migrate properly, we just force a reboot if there are any active jobs
         for _, network in pairs(storage.networks) do
             network.jobs = {}
