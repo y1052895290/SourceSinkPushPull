@@ -154,9 +154,9 @@ end
 ---@param stop LuaEntity
 ---@param ghost_unit_number uint?
 function main_station.on_stop_built(stop, ghost_unit_number)
-    if ghost_unit_number then
-        main_station.on_stop_broken(ghost_unit_number, nil)
-    end
+    -- if ghost_unit_number then
+    --     main_station.on_stop_broken(ghost_unit_number, nil)
+    -- end
 
     if stop.trains_limit > 10 or stop.trains_limit < 1 then
         stop.trains_limit = mod_settings.default_train_limit
@@ -189,9 +189,9 @@ end
 ---@param comb LuaEntity
 ---@param ghost_unit_number uint?
 function main_station.on_comb_built(comb, ghost_unit_number)
-    if ghost_unit_number then
-        main_station.on_comb_broken(ghost_unit_number, nil)
-    end
+    -- if ghost_unit_number then
+    --     main_station.on_comb_broken(ghost_unit_number, nil)
+    -- end
 
     local name = comb.name
     if comb.name == "entity-ghost" then name = comb.ghost_name end
@@ -313,6 +313,23 @@ function main_station.on_rail_broken(rail, direction)
     if stop.connected_rail ~= rail then return end -- rail is not the last in the segment
 
     try_destroy_station(stop)
+end
+
+--------------------------------------------------------------------------------
+
+function main_station.destory_invalid_ghosts()
+    -- because tags are buggy and unreliable, there's no good way to identify which ghost entity was
+    -- built over, for now we just check every entity and clean up any that became invalid
+    local stop_comb_ids, comb_stop_ids = storage.stop_comb_ids, storage.comb_stop_ids
+    for unit_number, entity in pairs(storage.entities) do
+        if not entity.valid then
+            if stop_comb_ids[unit_number] then
+                main_station.on_stop_broken(unit_number, nil)
+            elseif comb_stop_ids[unit_number] then
+                main_station.on_comb_broken(unit_number, nil)
+            end
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
