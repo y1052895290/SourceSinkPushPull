@@ -7,7 +7,7 @@ local enums = require("__SourceSinkPushPull__.scripts.enums")
 local s_match = string.match
 local m_random, m_min, m_max, m_floor = math.random, math.min, math.max, math.floor
 
-local len_or_zero = lib.len_or_zero
+local len_or_zero, enumerate_spoil_results = lib.len_or_zero, lib.enumerate_spoil_results
 local list_create_or_append, list_create_or_extend = lib.list_create_or_append, lib.list_create_or_extend
 local list_destroy_or_remove, list_remove_all = lib.list_destroy_or_remove, lib.list_remove_all
 local compute_storage_needed, compute_buffer = lib.compute_storage_needed, lib.compute_buffer
@@ -94,17 +94,25 @@ local function prepare_for_tick_poll()
 end
 
 ---@param train LuaTrain
----@param item_key ItemKey
+---@param name string
+---@param quality string?
 ---@return boolean
-local function check_if_loaded_wrong_cargo(train, item_key)
-    -- TODO: this wasn't accounting for spoil results, oops
+local function check_if_loaded_wrong_cargo(train, name, quality)
+    for _, item in pairs(train.get_contents()) do
+        if (item.quality or "normal") == quality then
+            local item_name = item.name
+            if item_name == name then goto continue end
+            for _, result_name in enumerate_spoil_results(name) do
+                if item_name == result_name then goto continue end
+            end
+        end
+        do return true end
+        ::continue::
+    end
 
-    -- for _, item in pairs(train.get_contents()) do
-    --     if item.name .. ":" .. (item.quality or "normal") ~= item_key then return true end
-    -- end
-    -- for fluid, _ in pairs(train.get_fluid_contents()) do
-    --     if fluid ~= item_key then return true end
-    -- end
+    for fluid_name, _ in pairs(train.get_fluid_contents()) do
+        if quality or (fluid_name ~= name) then return true end
+    end
 
     return false
 end
@@ -209,8 +217,11 @@ local function tick_poll()
     local station = storage.stations[station_id]
     local network = storage.networks[station.network]
 
-    local enabled = not read_stop_flag(station.stop, e_stop_flags.disable)
-    local buffered = not read_stop_flag(station.stop, e_stop_flags.bufferless)
+    local network_items, network_classes = network.items, network.classes
+
+    local stop = station.stop
+    local enabled = not read_stop_flag(stop, e_stop_flags.disable)
+    local buffered = not read_stop_flag(stop, e_stop_flags.bufferless)
 
     -- check the active hauler if we have one, then create a done ticket
 
@@ -222,8 +233,9 @@ local function tick_poll()
         local train = hauler.train
         local job = network.jobs[hauler.job] --[[@as NetworkJob.Pickup|NetworkJob.Dropoff|NetworkJob.Combined]]
         local item_key = job.item
+        local network_item = network_items[item_key]
 
-        if check_if_loaded_wrong_cargo(train, item_key) then
+        if check_if_loaded_wrong_cargo(train, network_item.name, network_item.quality) then
             hauler.status = { message = { "sspp-alert.loaded-wrong-cargo" } }
             lib.show_train_alert(train, hauler.status.message)
             train.manual_mode = true
@@ -245,7 +257,6 @@ local function tick_poll()
 
     --- poll counts and modes, then create supply (provide/request) and demand (push/pull) tickets
 
-    local network_items, network_classes = network.items, network.classes
     local provide, request = station.provide, station.request
 
     if provide then
@@ -299,7 +310,7 @@ local function tick_poll()
                             end
                         end
                     else
-                        local want_deliveries = station.stop.trains_limit - station.total_deliveries
+                        local want_deliveries = stop.trains_limit - station.total_deliveries
                         if want_deliveries > 0 then
                             list_create_or_extend(network.buffer_tickets, item_key, station_id, want_deliveries)
                         end
@@ -318,7 +329,7 @@ local function tick_poll()
         if buffered then
             request_counts = poll_item_counts_buffered(network_items, request_items, station.general_io, true)
         else
-            request_counts = poll_item_counts_bufferless(network_items, request_items, request_deliveries, station.stop.trains_limit)
+            request_counts = poll_item_counts_bufferless(network_items, request_items, request_deliveries, stop.trains_limit)
         end
         local request_modes = poll_item_modes(network_items, request_items, request.comb)
 
@@ -355,7 +366,7 @@ local function tick_poll()
                             end
                         end
                     else
-                        local want_deliveries = station.stop.trains_limit - station.total_deliveries
+                        local want_deliveries = stop.trains_limit - station.total_deliveries
                         if want_deliveries > 0 then
                             if mode > 3 then
                                 list_create_or_extend(network.pull_tickets, item_key, station_id, want_deliveries)

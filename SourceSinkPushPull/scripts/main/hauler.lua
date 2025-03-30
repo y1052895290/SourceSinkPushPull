@@ -154,8 +154,8 @@ function main.hauler_arrived_at_provide_station(hauler, job)
     if quality then
         signal = { name = name, quality = quality, type = "item" }
         wait_conditions = { { type = "item_count", condition = { first_signal = signal, comparator = ">=", constant = constant } } }
-        for i, spoil_result in enumerate_spoil_results(prototypes.item[name]) do
-            local spoil_signal = { name = spoil_result.name, quality = quality, type = "item" }
+        for i, result_name in enumerate_spoil_results(name) do
+            local spoil_signal = { name = result_name, quality = quality, type = "item" }
             wait_conditions[i * 2] = { compare_type = "or", type = "item_count", condition = { first_signal = spoil_signal, comparator = ">", constant = 0 } }
             wait_conditions[i * 2 + 1] = { compare_type = "and", type = "inactivity", ticks = 120 }
             set_control_behavior(provide.hidden_combs[i], 0, "-", spoil_signal, signal)
@@ -204,8 +204,8 @@ function main.hauler_arrived_at_request_station(hauler, job)
     if quality then
         signal = { name = name, quality = quality, type = "item" }
         wait_conditions = { { type = "item_count", condition = { first_signal = signal, comparator = "=", constant = 0 } } }
-        for i, spoil_result in enumerate_spoil_results(prototypes.item[name]) do
-            local spoil_signal = { name = spoil_result.name, quality = quality, type = "item" }
+        for i, result_name in enumerate_spoil_results(name) do
+            local spoil_signal = { name = result_name, quality = quality, type = "item" }
             wait_conditions[i + 1] = { compare_type = "and", type = "item_count", condition = { first_signal = spoil_signal, comparator = "=", constant = 0 } }
             set_control_behavior(request.hidden_combs[i], 0, "+", spoil_signal)
         end

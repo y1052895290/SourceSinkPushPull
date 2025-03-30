@@ -165,17 +165,22 @@ local function make_item_icon(name, quality)
 end
 lib.make_item_icon = make_item_icon
 
----@param proto LuaItemPrototype
-local function enumerate_spoil_results(proto)
-    local i = 0
-    return function()
-        proto = proto.spoil_result
-        if proto then
-            i = i + 1
-            return i, proto
-        end
-        return nil, nil
+local spoil_results_cache = {} ---@type {[string]: string[]}
+
+---@param item_name string
+local function enumerate_spoil_results(item_name)
+    local spoil_results = spoil_results_cache[item_name]
+    if not spoil_results then
+        spoil_results = {}
+        local proto = prototypes.item[item_name]
+        repeat
+            proto = proto.spoil_result
+            if not proto then break end
+            spoil_results[#spoil_results+1] = proto.name
+        until false
+        spoil_results_cache[item_name] = spoil_results
     end
+    return pairs(spoil_results)
 end
 lib.enumerate_spoil_results = enumerate_spoil_results
 
@@ -592,12 +597,8 @@ function lib.ensure_hidden_combs(comb, hidden_combs, items)
     for item_key, _ in pairs(items) do
         local name, quality = split_item_key(item_key)
         if quality then
-            local spoil_depth = 0
-            for i, _ in enumerate_spoil_results(prototypes.item[name]) do
-                spoil_depth = i
-            end
-            if spoil_depth > new_spoil_depth then
-                new_spoil_depth = spoil_depth
+            for i, _ in enumerate_spoil_results(name) do
+                if i > new_spoil_depth then new_spoil_depth = i end
             end
         end
     end
