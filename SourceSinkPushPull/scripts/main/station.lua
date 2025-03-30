@@ -198,8 +198,10 @@ function main.comb_built(comb, ghost_unit_number)
         comb.combinator_description = "{}" -- TODO
     elseif name == "sspp-provide-io" then
         comb.combinator_description = lib.provide_items_to_combinator_description(lib.combinator_description_to_provide_items(comb))
+        lib.clear_control_behavior(comb)
     elseif name == "sspp-request-io" then
         comb.combinator_description = lib.request_items_to_combinator_description(lib.combinator_description_to_request_items(comb))
+        lib.clear_control_behavior(comb)
     end
 
     storage.entities[comb.unit_number] = comb
