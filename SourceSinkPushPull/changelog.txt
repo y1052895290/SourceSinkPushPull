@@ -1,4 +1,16 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.0
+Date: 2025-03-31
+  Features:
+    - Minor overhaul of the mod's internals. Active jobs will be reset as part of the migration.
+  Changes:
+    - Updated russian translation.
+    - Replace the depot/fuel icons with two of the new signal icons added in a recent vanilla update.
+  Bugfixes:
+    - Fix copy-pasting combinators from an active station not clearing the output signals.
+    - Fix pasting ghosts over other ghosts could cause crashes if the original ghost is later destroyed.
+    - Fixed the "loaded wrong cargo" check to allow the results of spoilage.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.23
 Date: 2025-03-25
   Features:
