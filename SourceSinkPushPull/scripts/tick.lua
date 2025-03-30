@@ -2,6 +2,7 @@
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
+local main = require("__SourceSinkPushPull__.scripts.main")
 local enums = require("__SourceSinkPushPull__.scripts.enums")
 
 local s_match = string.match
@@ -13,6 +14,7 @@ local list_destroy_or_remove, list_remove_all = lib.list_destroy_or_remove, lib.
 local compute_storage_needed, compute_buffer = lib.compute_storage_needed, lib.compute_buffer
 local read_stop_flag, get_train_item_count = lib.read_stop_flag, lib.get_train_item_count
 local send_train_to_station, assign_job_index = lib.send_train_to_station, lib.assign_job_index
+local send_hauler_to_fuel_or_depot = main.hauler.send_to_fuel_or_depot
 
 local e_train_colors, e_stop_flags = enums.train_colors, enums.stop_flags
 
@@ -585,7 +587,7 @@ local function tick_request_done()
 
     hauler.job = nil
 
-    main.hauler_send_to_fuel_or_depot(hauler, true, false)
+    send_hauler_to_fuel_or_depot(hauler, true, false)
 
     return false
 end

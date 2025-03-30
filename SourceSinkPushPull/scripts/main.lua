@@ -4,12 +4,10 @@ local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
 local enums = require("__SourceSinkPushPull__.scripts.enums")
 
-main = {}
+local main_station = require("__SourceSinkPushPull__.scripts.main.station")
+local main_hauler = require("__SourceSinkPushPull__.scripts.main.hauler")
 
---------------------------------------------------------------------------------
-
-require("__SourceSinkPushPull__.scripts.main.station")
-require("__SourceSinkPushPull__.scripts.main.hauler")
+local main = { station = main_station, hauler = main_hauler }
 
 --------------------------------------------------------------------------------
 
@@ -17,8 +15,8 @@ local function on_entity_built(event)
     local entity = event.entity or event.created_entity ---@type LuaEntity
 
     if entity.type == "straight-rail" then
-        main.rail_built(entity, defines.rail_direction.front)
-        main.rail_built(entity, defines.rail_direction.back)
+        main_station.on_rail_built(entity, defines.rail_direction.front)
+        main_station.on_rail_built(entity, defines.rail_direction.back)
         return
     end
 
@@ -33,9 +31,9 @@ local function on_entity_built(event)
     end
 
     if name == "sspp-stop" then
-        main.stop_built(entity, ghost_unit_number)
+        main_station.on_stop_built(entity, ghost_unit_number)
     elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-        main.comb_built(entity, ghost_unit_number)
+        main_station.on_comb_built(entity, ghost_unit_number)
     end
 end
 
@@ -43,8 +41,8 @@ local function on_entity_broken(event)
     local entity = event.entity or event.ghost ---@type LuaEntity
 
     if entity.type == "straight-rail" then
-        main.rail_broken(entity, defines.rail_direction.front)
-        main.rail_broken(entity, defines.rail_direction.back)
+        main_station.on_rail_broken(entity, defines.rail_direction.front)
+        main_station.on_rail_broken(entity, defines.rail_direction.back)
         return
     end
 
@@ -52,12 +50,12 @@ local function on_entity_broken(event)
     if name == "entity-ghost" then name = entity.ghost_name end
 
     if name == "sspp-stop" then
-        main.stop_broken(entity.unit_number, entity)
+        main_station.on_stop_broken(entity.unit_number, entity)
     elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-        main.comb_broken(entity.unit_number, entity)
+        main_station.on_comb_broken(entity.unit_number, entity)
     elseif entity.train then
         if #entity.train.carriages == 1 then
-            main.train_broken(entity.train.id, nil)
+            main_hauler.on_broken(entity.train.id, nil)
         end
     end
 end
@@ -94,12 +92,12 @@ local function on_train_changed_state(event)
     if not hauler then return end
 
     if is_manual then
-        main.hauler_set_to_manual(hauler)
+        main_hauler.on_set_to_manual(hauler)
         return
     end
 
     if was_manual then
-        main.hauler_set_to_automatic(hauler)
+        main_hauler.on_set_to_automatic(hauler)
         return
     end
 
@@ -111,29 +109,29 @@ local function on_train_changed_state(event)
         if job_type == "FUEL" then
             if job.fuel_arrive_tick then
                 if state == defines.train_state.arrive_station then
-                    main.hauler_done_at_fuel_stop(hauler, job --[[@as NetworkJob.Fuel]])
+                    main_hauler.on_done_at_fuel_stop(hauler, job --[[@as NetworkJob.Fuel]])
                 end
             else
                 if state == defines.train_state.wait_station then
-                    main.hauler_arrived_at_fuel_stop(hauler, job --[[@as NetworkJob.Fuel]])
+                    main_hauler.on_arrived_at_fuel_stop(hauler, job --[[@as NetworkJob.Fuel]])
                 end
             end
         else
             if job.request_arrive_tick then
                 if state == defines.train_state.arrive_station then
-                    main.hauler_done_at_request_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Dropoff]])
+                    main_hauler.on_done_at_request_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Dropoff]])
                 end
             elseif job.request_stop then
                 if state == defines.train_state.wait_station and train.station then
-                    main.hauler_arrived_at_request_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Dropoff]])
+                    main_hauler.on_arrived_at_request_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Dropoff]])
                 end
             elseif job.provide_arrive_tick then
                 if state == defines.train_state.arrive_station then
-                    main.hauler_done_at_provide_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Pickup]])
+                    main_hauler.on_done_at_provide_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Pickup]])
                 end
             else -- job.provide_stop
                 if state == defines.train_state.wait_station and train.station then
-                    main.hauler_arrived_at_provide_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Pickup]])
+                    main_hauler.on_arrived_at_provide_station(hauler, job --[[@as NetworkJob.Combined|NetworkJob.Pickup]])
                 end
             end
         end
@@ -143,7 +141,7 @@ local function on_train_changed_state(event)
 
     if hauler.to_depot then
         if state == defines.train_state.wait_station then
-            main.hauler_arrived_at_depot_stop(hauler)
+            main_hauler.on_arrived_at_depot_stop(hauler)
         end
         return
     end
@@ -152,10 +150,10 @@ end
 ---@param event EventData.on_train_created
 local function on_train_created(event)
     if event.old_train_id_1 then
-        main.train_broken(event.old_train_id_1, event.train)
+        main_hauler.on_broken(event.old_train_id_1, event.train)
     end
     if event.old_train_id_2 then
-        main.train_broken(event.old_train_id_2, event.train)
+        main_hauler.on_broken(event.old_train_id_2, event.train)
     end
 end
 
@@ -217,9 +215,9 @@ local function on_surface_cleared(event)
         if name == "entity-ghost" then name = entity.ghost_name end
 
         if name == "sspp-stop" then
-            main.stop_broken(entity.unit_number, entity)
+            main_station.on_stop_broken(entity.unit_number, entity)
         elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-            main.comb_broken(entity.unit_number, entity)
+            main_station.on_comb_broken(entity.unit_number, entity)
         end
     end
 
@@ -241,7 +239,7 @@ local function get_rgb_setting(name)
     return { r = rgba.r * a, g = rgba.g * a, b = rgba.b * a, a = 1.0 }
 end
 
-local function populate_mod_settings()
+function main.populate_mod_settings()
     mod_settings.auto_paint_trains = settings.global["sspp-auto-paint-trains"].value --[[@as boolean]]
     mod_settings.train_colors = {
         [enums.train_colors.depot] = get_rgb_setting("sspp-depot-color"),
@@ -256,7 +254,7 @@ end
 
 ---@param event EventData.on_runtime_mod_setting_changed
 local function on_runtime_mod_setting_changed(event)
-    populate_mod_settings()
+    main.populate_mod_settings()
 end
 
 --------------------------------------------------------------------------------
@@ -286,67 +284,67 @@ end
 
 --------------------------------------------------------------------------------
 
-local filter_built = {
-    { filter = "name", name = "sspp-stop" },
-    { filter = "name", name = "sspp-general-io" },
-    { filter = "name", name = "sspp-provide-io" },
-    { filter = "name", name = "sspp-request-io" },
-    { filter = "ghost_name", name = "sspp-stop" },
-    { filter = "ghost_name", name = "sspp-general-io" },
-    { filter = "ghost_name", name = "sspp-provide-io" },
-    { filter = "ghost_name", name = "sspp-request-io" },
-    { filter = "type", type = "straight-rail" },
-}
-local filter_broken = {
-    { filter = "name", name = "sspp-stop" },
-    { filter = "name", name = "sspp-general-io" },
-    { filter = "name", name = "sspp-provide-io" },
-    { filter = "name", name = "sspp-request-io" },
-    { filter = "ghost_name", name = "sspp-stop" },
-    { filter = "ghost_name", name = "sspp-general-io" },
-    { filter = "ghost_name", name = "sspp-provide-io" },
-    { filter = "ghost_name", name = "sspp-request-io" },
-    { filter = "type", type = "straight-rail" },
-    { filter = "rolling-stock" },
-}
-local filter_ghost_broken = {
-    { filter = "name", name = "sspp-stop" },
-    { filter = "name", name = "sspp-general-io" },
-    { filter = "name", name = "sspp-provide-io" },
-    { filter = "name", name = "sspp-request-io" },
-}
+function main.register_event_handlers()
+    local filter_built = {
+        { filter = "name", name = "sspp-stop" },
+        { filter = "name", name = "sspp-general-io" },
+        { filter = "name", name = "sspp-provide-io" },
+        { filter = "name", name = "sspp-request-io" },
+        { filter = "ghost_name", name = "sspp-stop" },
+        { filter = "ghost_name", name = "sspp-general-io" },
+        { filter = "ghost_name", name = "sspp-provide-io" },
+        { filter = "ghost_name", name = "sspp-request-io" },
+        { filter = "type", type = "straight-rail" },
+    }
+    local filter_broken = {
+        { filter = "name", name = "sspp-stop" },
+        { filter = "name", name = "sspp-general-io" },
+        { filter = "name", name = "sspp-provide-io" },
+        { filter = "name", name = "sspp-request-io" },
+        { filter = "ghost_name", name = "sspp-stop" },
+        { filter = "ghost_name", name = "sspp-general-io" },
+        { filter = "ghost_name", name = "sspp-provide-io" },
+        { filter = "ghost_name", name = "sspp-request-io" },
+        { filter = "type", type = "straight-rail" },
+        { filter = "rolling-stock" },
+    }
+    local filter_ghost_broken = {
+        { filter = "name", name = "sspp-stop" },
+        { filter = "name", name = "sspp-general-io" },
+        { filter = "name", name = "sspp-provide-io" },
+        { filter = "name", name = "sspp-request-io" },
+    }
+
+    script.on_event(defines.events.on_built_entity, on_entity_built, filter_built)
+    script.on_event(defines.events.on_entity_cloned, on_entity_built, filter_built)
+    script.on_event(defines.events.on_robot_built_entity, on_entity_built, filter_built)
+    script.on_event(defines.events.script_raised_built, on_entity_built, filter_built)
+    script.on_event(defines.events.script_raised_revive, on_entity_built, filter_built)
+
+    script.on_event(defines.events.on_entity_died, on_entity_broken, filter_broken)
+    script.on_event(defines.events.on_pre_player_mined_item, on_entity_broken, filter_broken)
+    script.on_event(defines.events.on_robot_pre_mined, on_entity_broken, filter_broken)
+    script.on_event(defines.events.script_raised_destroy, on_entity_broken, filter_broken)
+    script.on_event(defines.events.on_pre_ghost_deconstructed, on_entity_broken, filter_ghost_broken)
+
+    script.on_event(defines.events.on_player_rotated_entity, on_entity_rotated)
+
+    script.on_event(defines.events.on_train_changed_state, on_train_changed_state)
+    script.on_event(defines.events.on_train_created, on_train_created)
+    script.on_event(defines.events.on_train_schedule_changed, on_train_schedule_changed)
+
+    script.on_event(defines.events.on_surface_created, on_surface_created)
+    script.on_event(defines.events.on_surface_imported, on_surface_created)
+    script.on_event(defines.events.on_pre_surface_cleared, on_surface_cleared)
+    script.on_event(defines.events.on_pre_surface_deleted, on_surface_cleared)
+    script.on_event(defines.events.on_surface_renamed, on_surface_renamed)
+
+    script.on_event(defines.events.on_runtime_mod_setting_changed, on_runtime_mod_setting_changed)
+
+    script.on_init(on_init)
+    script.on_load(on_load)
+end
 
 --------------------------------------------------------------------------------
 
-populate_mod_settings()
-
-script.on_event(defines.events.on_built_entity, on_entity_built, filter_built)
-script.on_event(defines.events.on_entity_cloned, on_entity_built, filter_built)
-script.on_event(defines.events.on_robot_built_entity, on_entity_built, filter_built)
-script.on_event(defines.events.script_raised_built, on_entity_built, filter_built)
-script.on_event(defines.events.script_raised_revive, on_entity_built, filter_built)
-
-script.on_event(defines.events.on_entity_died, on_entity_broken, filter_broken)
-script.on_event(defines.events.on_pre_player_mined_item, on_entity_broken, filter_broken)
-script.on_event(defines.events.on_robot_pre_mined, on_entity_broken, filter_broken)
-script.on_event(defines.events.script_raised_destroy, on_entity_broken, filter_broken)
-script.on_event(defines.events.on_pre_ghost_deconstructed, on_entity_broken, filter_ghost_broken)
-
-script.on_event(defines.events.on_player_rotated_entity, on_entity_rotated)
-
-script.on_event(defines.events.on_train_changed_state, on_train_changed_state)
-script.on_event(defines.events.on_train_created, on_train_created)
-script.on_event(defines.events.on_train_schedule_changed, on_train_schedule_changed)
-
-script.on_event(defines.events.on_surface_created, on_surface_created)
-script.on_event(defines.events.on_surface_imported, on_surface_created)
-script.on_event(defines.events.on_pre_surface_cleared, on_surface_cleared)
-script.on_event(defines.events.on_pre_surface_deleted, on_surface_cleared)
-script.on_event(defines.events.on_surface_renamed, on_surface_renamed)
-
-script.on_event(defines.events.on_runtime_mod_setting_changed, on_runtime_mod_setting_changed)
-
-script.on_init(on_init)
-script.on_load(on_load)
-
-gui.register_event_handlers()
+return main

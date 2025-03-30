@@ -14,12 +14,14 @@ local send_train_to_named_stop, assign_job_index = lib.send_train_to_named_stop,
 
 local on_status_changed, on_job_created, on_job_updated = gui.on_status_changed, gui.on_job_created, gui.on_job_updated
 
+local main_hauler = {}
+
 --------------------------------------------------------------------------------
 
 --- This function also takes hauler_id as hauler.train can be invalid.
 ---@param hauler_id HaulerId
 ---@param hauler Hauler
-function main.hauler_disabled_or_destroyed(hauler_id, hauler)
+function main_hauler.on_disabled_or_destroyed(hauler_id, hauler)
     local network = storage.networks[hauler.network]
 
     local job_index = hauler.job
@@ -98,8 +100,8 @@ end
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
-function main.hauler_set_to_manual(hauler)
-    main.hauler_disabled_or_destroyed(hauler.train.id, hauler)
+function main_hauler.on_set_to_manual(hauler)
+    main_hauler.on_disabled_or_destroyed(hauler.train.id, hauler)
 
     hauler.to_depot = nil
     hauler.at_depot = nil
@@ -110,7 +112,7 @@ function main.hauler_set_to_manual(hauler)
 end
 
 ---@param hauler Hauler
-function main.hauler_set_to_automatic(hauler)
+function main_hauler.on_set_to_automatic(hauler)
     local network = storage.networks[hauler.network]
 
     if not network.classes[hauler.class] then
@@ -121,14 +123,14 @@ function main.hauler_set_to_automatic(hauler)
         return
     end
 
-    main.hauler_send_to_fuel_or_depot(hauler, true, true)
+    main_hauler.send_to_fuel_or_depot(hauler, true, true)
 end
 
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
 ---@param job NetworkJob.Pickup|NetworkJob.Combined
-function main.hauler_arrived_at_provide_station(hauler, job)
+function main_hauler.on_arrived_at_provide_station(hauler, job)
     local train = hauler.train
     local stop = job.provide_stop --[[@as LuaEntity]]
 
@@ -181,7 +183,7 @@ end
 
 ---@param hauler Hauler
 ---@param job NetworkJob.Dropoff|NetworkJob.Combined
-function main.hauler_arrived_at_request_station(hauler, job)
+function main_hauler.on_arrived_at_request_station(hauler, job)
     local train = hauler.train
     local stop = job.request_stop --[[@as LuaEntity]]
 
@@ -229,7 +231,7 @@ end
 
 ---@param hauler Hauler
 ---@param job NetworkJob.Pickup|NetworkJob.Combined
-function main.hauler_done_at_provide_station(hauler, job)
+function main_hauler.on_done_at_provide_station(hauler, job)
     local train = hauler.train
     local stop = job.provide_stop --[[@as LuaEntity]]
     local provide = storage.stations[stop.unit_number].provide --[[@as StationProvide]]
@@ -248,7 +250,7 @@ end
 
 ---@param hauler Hauler
 ---@param job NetworkJob.Dropoff|NetworkJob.Combined
-function main.hauler_done_at_request_station(hauler, job)
+function main_hauler.on_done_at_request_station(hauler, job)
     local train = hauler.train
     local stop = job.request_stop --[[@as LuaEntity]]
     local request = storage.stations[stop.unit_number].request --[[@as StationRequest]]
@@ -270,7 +272,7 @@ end
 ---@param hauler Hauler
 ---@param check_fuel boolean
 ---@param check_cargo boolean
-function main.hauler_send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
+function main_hauler.send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
     local network_name = hauler.network
     local class_name = hauler.class
     local train = hauler.train
@@ -342,7 +344,7 @@ end
 
 ---@param hauler Hauler
 ---@param job NetworkJob.Fuel
-function main.hauler_arrived_at_fuel_stop(hauler, job)
+function main_hauler.on_arrived_at_fuel_stop(hauler, job)
     local train = hauler.train
     local stop = train.station --[[@as LuaEntity]]
 
@@ -356,7 +358,7 @@ end
 
 ---@param hauler Hauler
 ---@param job NetworkJob.Fuel
-function main.hauler_done_at_fuel_stop(hauler, job)
+function main_hauler.on_done_at_fuel_stop(hauler, job)
     local network_name = hauler.network
     local network = storage.networks[network_name]
 
@@ -367,13 +369,13 @@ function main.hauler_done_at_fuel_stop(hauler, job)
 
     hauler.job = nil
 
-    main.hauler_send_to_fuel_or_depot(hauler, false, true)
+    main_hauler.send_to_fuel_or_depot(hauler, false, true)
 end
 
 --------------------------------------------------------------------------------
 
 ---@param hauler Hauler
-function main.hauler_arrived_at_depot_stop(hauler)
+function main_hauler.on_arrived_at_depot_stop(hauler)
     local item_key, hauler_id = hauler.to_depot, hauler.train.id
     local network = storage.networks[hauler.network]
 
@@ -399,10 +401,10 @@ end
 
 ---@param old_train_id uint
 ---@param new_train LuaTrain?
-function main.train_broken(old_train_id, new_train)
+function main_hauler.on_broken(old_train_id, new_train)
     local hauler = storage.haulers[old_train_id]
     if hauler then
-        main.hauler_disabled_or_destroyed(old_train_id, hauler)
+        main_hauler.on_disabled_or_destroyed(old_train_id, hauler)
         storage.haulers[old_train_id] = nil
         if new_train then
             storage.haulers[new_train.id] = {
@@ -415,3 +417,7 @@ function main.train_broken(old_train_id, new_train)
     end
     gui.on_train_broken(old_train_id, new_train)
 end
+
+--------------------------------------------------------------------------------
+
+return main_hauler

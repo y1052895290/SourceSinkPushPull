@@ -1,10 +1,13 @@
 -- SSPP by jagoly
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
+local main = require("__SourceSinkPushPull__.scripts.main")
+
+local cmds = {}
 
 --------------------------------------------------------------------------------
 
-function main.reboot()
+function cmds.sspp_reboot()
     for _, network in pairs(storage.networks) do
         network.job_index_counter = 0
         network.jobs = {}
@@ -45,9 +48,9 @@ function main.reboot()
             if name == "entity-ghost" then name = entity.ghost_name end
 
             if name == "sspp-stop" then
-                main.stop_built(entity, nil)
+                main.station.on_stop_built(entity, nil)
             elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-                main.comb_built(entity, nil)
+                main.station.on_comb_built(entity, nil)
             end
         end
     end
@@ -59,4 +62,12 @@ function main.reboot()
     storage.tick_state = "INITIAL"
 end
 
-commands.add_command("sspp-reboot", { "sspp-console.reboot-command-help" }, main.reboot)
+--------------------------------------------------------------------------------
+
+function cmds.register_commands()
+    commands.add_command("sspp-reboot", { "sspp-console.reboot-command-help" }, cmds.sspp_reboot)
+end
+
+--------------------------------------------------------------------------------
+
+return cmds

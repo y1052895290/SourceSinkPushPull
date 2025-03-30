@@ -6,6 +6,8 @@ local enums = require("__SourceSinkPushPull__.scripts.enums")
 
 local e_stop_flags = enums.stop_flags
 
+local main_station = {}
+
 --------------------------------------------------------------------------------
 
 ---@param stop LuaEntity
@@ -151,9 +153,9 @@ end
 
 ---@param stop LuaEntity
 ---@param ghost_unit_number uint?
-function main.stop_built(stop, ghost_unit_number)
+function main_station.on_stop_built(stop, ghost_unit_number)
     if ghost_unit_number then
-        main.stop_broken(ghost_unit_number, nil)
+        main_station.on_stop_broken(ghost_unit_number, nil)
     end
 
     if stop.trains_limit > 10 or stop.trains_limit < 1 then
@@ -186,9 +188,9 @@ end
 
 ---@param comb LuaEntity
 ---@param ghost_unit_number uint?
-function main.comb_built(comb, ghost_unit_number)
+function main_station.on_comb_built(comb, ghost_unit_number)
     if ghost_unit_number then
-        main.comb_broken(ghost_unit_number, nil)
+        main_station.on_comb_broken(ghost_unit_number, nil)
     end
 
     local name = comb.name
@@ -222,7 +224,7 @@ end
 
 ---@param rail LuaEntity
 ---@param direction defines.rail_direction
-function main.rail_built(rail, direction)
+function main_station.on_rail_built(rail, direction)
     local stop = rail.get_rail_segment_stop(direction)
 
     if not stop or stop.name ~= "sspp-stop" then return end -- not connected to the right kind of stop
@@ -247,7 +249,7 @@ end
 
 ---@param stop_id uint
 ---@param stop LuaEntity?
-function main.stop_broken(stop_id, stop)
+function main_station.on_stop_broken(stop_id, stop)
     local comb_ids = storage.stop_comb_ids[stop_id]
 
     gui.on_part_broken(stop_id)
@@ -276,7 +278,7 @@ end
 
 ---@param comb_id uint
 ---@param comb LuaEntity?
-function main.comb_broken(comb_id, comb)
+function main_station.on_comb_broken(comb_id, comb)
     local stop_ids = storage.comb_stop_ids[comb_id]
 
     gui.on_part_broken(comb_id)
@@ -304,7 +306,7 @@ end
 
 ---@param rail LuaEntity
 ---@param direction defines.rail_direction
-function main.rail_broken(rail, direction)
+function main_station.on_rail_broken(rail, direction)
     local stop = rail.get_rail_segment_stop(direction)
 
     if not stop or stop.name ~= "sspp-stop" then return end -- not connected to the right kind of stop
@@ -312,3 +314,7 @@ function main.rail_broken(rail, direction)
 
     try_destroy_station(stop)
 end
+
+--------------------------------------------------------------------------------
+
+return main_station

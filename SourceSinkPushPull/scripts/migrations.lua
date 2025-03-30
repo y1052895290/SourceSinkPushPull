@@ -3,6 +3,7 @@
 local flib_migration = require("__flib__.migration")
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
+local cmds = require("__SourceSinkPushPull__.scripts.cmds")
 
 --------------------------------------------------------------------------------
 
@@ -237,7 +238,7 @@ local function on_configuration_changed(data)
     goto skip_reboot
 
     ::reboot::
-    main.reboot()
+    cmds.sspp_reboot()
     ::skip_reboot::
 
     storage.tick_state = "INITIAL"
