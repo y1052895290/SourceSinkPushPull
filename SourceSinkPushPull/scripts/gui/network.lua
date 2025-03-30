@@ -667,7 +667,7 @@ end
 local function add_job_travel_progress_footer(info_flow, train)
     info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
     info_flow.add({ type = "line" })
-    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.distance-to-travel" }, format_distance(train.path) )
+    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.distance-to-travel" }, format_distance(train.path))
 end
 
 ---@param info_flow LuaGuiElement
@@ -676,8 +676,9 @@ local function add_job_fuel_transfer_progress_footer(info_flow, train)
     info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
     info_flow.add({ type = "line" })
     local min_fullness = 1.0
-    for _, loco_list in pairs(train.locomotives--[=[@as {string: LuaEntity[]}]=]) do
-        for _, loco in pairs(loco_list) do
+    for _, locos in pairs(train.locomotives) do
+        for _, loco in pairs(locos) do
+            ---@cast loco LuaEntity
             local inventory = assert(loco.burner, "TODO: electric trains").inventory
             local total_slots, total_filled_slots = inventory.count_empty_stacks(), 0.0
             for _, item in pairs(inventory.get_contents()) do
@@ -687,7 +688,7 @@ local function add_job_fuel_transfer_progress_footer(info_flow, train)
             min_fullness = math.min(min_fullness, total_filled_slots / total_slots)
         end
     end
-    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.fuel-to-transfer" }, string.format("%.0f%%", (1.0 - min_fullness) * 100.0) )
+    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.fuel-to-transfer" }, string.format("%.0f%%", (1.0 - min_fullness) * 100.0))
 end
 
 ---@param info_flow LuaGuiElement
@@ -701,7 +702,7 @@ local function add_job_cargo_transfer_progress_footer(info_flow, train, item_key
     local format = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
     local count = get_train_item_count(train, name, quality)
     if target_count then count = target_count - count end
-    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.cargo-to-transfer" }, { format, count } )
+    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.cargo-to-transfer" }, { format, count })
 end
 
 --------------------------------------------------------------------------------
@@ -885,7 +886,7 @@ function gui_network.on_poll_finished(player_gui)
                         if liquidate_enabled then item_key, state_icon = depot_key, "[img=virtual-signal/signal-skull]" end
                     end
                 else
-                    local job = jobs[hauler.job--[[@as JobIndex]]]
+                    local job = jobs[hauler.job] --[[@as NetworkJob]]
                     if job.type == "FUEL" then
                         if fuel_enabled then state_icon = "[img=virtual-signal/signal-fuel]" end
                     else
@@ -925,7 +926,7 @@ function gui_network.on_poll_finished(player_gui)
                         if liquidate_enabled then state_icon = "[img=virtual-signal/signal-skull]" end
                     end
                 else
-                    local job = jobs[hauler.job--[[@as JobIndex]]]
+                    local job = jobs[hauler.job] --[[@as NetworkJob]]
                     if job.item == haulers_item_key then
                         if job.request_stop then
                             if request_enabled then state_icon = "[img=virtual-signal/down-arrow]" end
