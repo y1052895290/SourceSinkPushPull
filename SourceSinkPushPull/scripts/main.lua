@@ -29,9 +29,10 @@ local function on_entity_built(event)
     else
         -- this unit number may be incorrect due to https://forums.factorio.com/viewtopic.php?p=666167#p666167
         -- we are just using it here to detect if we built over a ghost at all
-        if event.tags and event.tags.ghost_unit_number then
+        -- UPDATE: we can't even rely on this, because the user can paste a non ghost and wipe the tags completely...
+        -- if event.tags and event.tags.ghost_unit_number then
             main_station.destory_invalid_ghosts()
-        end
+        -- end
         -- ghost_unit_number = event.tags and event.tags.ghost_unit_number
     end
 
