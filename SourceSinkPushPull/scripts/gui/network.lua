@@ -878,15 +878,9 @@ function gui_network.on_poll_finished(player_gui)
         for _, hauler in pairs(storage.haulers) do
             if hauler.network == network_name and hauler.class == haulers_class_name then
                 local state_icon, item_key ---@type string?, ItemKey?
-                local depot_key = hauler.to_depot or hauler.at_depot
-                if depot_key then
-                    if depot_key == "" then
-                        if depot_enabled then state_icon = "[img=virtual-signal/signal-white-flag]" end
-                    else
-                        if liquidate_enabled then item_key, state_icon = depot_key, "[img=virtual-signal/signal-skull]" end
-                    end
-                else
-                    local job = jobs[hauler.job] --[[@as NetworkJob]]
+                local job_index = hauler.job
+                if job_index then
+                    local job = jobs[job_index]
                     if job.type == "FUEL" then
                         if fuel_enabled then state_icon = "[img=virtual-signal/signal-fuel]" end
                     else
@@ -896,6 +890,14 @@ function gui_network.on_poll_finished(player_gui)
                             if provide_enabled then item_key, state_icon = job.item, "[img=virtual-signal/up-arrow]" end
                         end
                     end
+                else
+                    local depot_key = hauler.to_depot or hauler.at_depot
+                    if depot_key == "" then
+                        if depot_enabled then state_icon = "[img=virtual-signal/signal-white-flag]" end
+                    elseif depot_key then
+                        if liquidate_enabled then item_key, state_icon = depot_key, "[img=virtual-signal/signal-skull]" end
+                    end
+                    -- TODO: show disabled haulers
                 end
                 if state_icon then
                     new_length = new_length + 1
@@ -920,19 +922,20 @@ function gui_network.on_poll_finished(player_gui)
         for _, hauler in pairs(storage.haulers) do
             if hauler.network == network_name then
                 local state_icon ---@type string?
-                local depot_key = hauler.to_depot or hauler.at_depot
-                if depot_key then
-                    if depot_key == haulers_item_key then
-                        if liquidate_enabled then state_icon = "[img=virtual-signal/signal-skull]" end
-                    end
-                else
-                    local job = jobs[hauler.job] --[[@as NetworkJob]]
+                local job_index = hauler.job
+                if job_index then
+                    local job = jobs[job_index]
                     if job.item == haulers_item_key then
                         if job.request_stop then
                             if request_enabled then state_icon = "[img=virtual-signal/down-arrow]" end
                         else
                             if provide_enabled then state_icon = "[img=virtual-signal/up-arrow]" end
                         end
+                    end
+                else
+                    local depot_key = hauler.to_depot or hauler.at_depot
+                    if depot_key == haulers_item_key then
+                        if liquidate_enabled then state_icon = "[img=virtual-signal/signal-skull]" end
                     end
                 end
                 if state_icon then
