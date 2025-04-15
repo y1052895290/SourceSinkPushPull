@@ -7,10 +7,9 @@ local enums = require("__SourceSinkPushPull__.scripts.enums")
 local e_train_colors = enums.train_colors
 
 local list_create_or_append, list_destroy_or_remove = lib.list_create_or_append, lib.list_destroy_or_remove
-local compute_load_target, get_train_item_count = lib.compute_load_target, lib.get_train_item_count
 local set_control_behavior, enumerate_spoil_results = lib.set_control_behavior, lib.enumerate_spoil_results
 local clear_control_behavior, clear_hidden_control_behaviors = lib.clear_control_behavior, lib.clear_hidden_control_behaviors
-local send_train_to_named_stop, assign_job_index = lib.send_train_to_named_stop, lib.assign_job_index
+local get_train_item_count, send_train_to_named_stop, assign_job_index = lib.send_train_to_named_stop, lib.assign_job_index, lib.get_train_item_count
 
 local on_status_changed, on_job_created, on_job_updated = gui.on_status_changed, gui.on_job_created, gui.on_job_updated
 
@@ -150,7 +149,7 @@ function main_hauler.on_arrived_at_provide_station(hauler, job)
     local name, quality = network_item.name, network_item.quality
 
     local provide_item = provide.items[item_key]
-    local constant = compute_load_target(network_item, provide_item)
+    local constant = network_item.delivery_size - provide_item.granularity + 1
 
     local signal, wait_conditions ---@type SignalID, WaitCondition[]
     if quality then

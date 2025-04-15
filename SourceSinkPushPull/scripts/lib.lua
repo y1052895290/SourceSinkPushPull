@@ -215,19 +215,6 @@ function lib.compute_buffer(network_item, station_item)
     return buffer
 end
 
----@param network_item NetworkItem
----@param provide_item ProvideItem
----@return integer
-function lib.compute_load_target(network_item, provide_item)
-    local delivery_size, granularity = network_item.delivery_size, provide_item.granularity
-    if network_item.quality then
-        -- for items, granularity is exact, so round down to the nearest multiple of granularity
-        return m_floor(delivery_size / granularity) * granularity
-    end
-    -- for fluids, loading exact amounts is not possible, so just subtract granularity
-    return delivery_size - granularity
-end
-
 --------------------------------------------------------------------------------
 
 --- The entity passed to this function can be invalid.
