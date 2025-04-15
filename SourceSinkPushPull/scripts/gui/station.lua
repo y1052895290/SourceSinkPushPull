@@ -925,6 +925,17 @@ local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
 end }
 
 ---@param event EventData.on_gui_click
+local handle_inactivity_toggled = { [events.on_gui_click] = function(event)
+    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
+    local stop = player_gui.parts.stop --[[@as LuaEntity]]
+
+    local toggled = event.element.toggled
+
+    event.element.tooltip = { toggled and "sspp-gui.station-wait-for-inactivity-tooltip" or "sspp-gui.station-depart-immediately-tooltip" }
+    lib.write_stop_flag(stop, enums.stop_flags.inactivity, toggled)
+end }
+
+---@param event EventData.on_gui_click
 local handle_add_provide_item = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "item-with-quality")
 end }
@@ -967,13 +978,15 @@ end }
 ---@param parts StationParts
 ---@return {[string]: LuaGuiElement} elements, LuaGuiElement window
 local function add_gui_complete(player, parts)
-    local is_disabled = lib.read_stop_flag(parts.stop, enums.stop_flags.disable)
-    local disable_tooltip = { is_disabled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
+    local disable = lib.read_stop_flag(parts.stop, enums.stop_flags.disable)
+    local disable_tooltip = { disable and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
     local name = parts.stop.backer_name
-    local has_custom_name = lib.read_stop_flag(parts.stop, enums.stop_flags.custom_name)
+    local custom_name = lib.read_stop_flag(parts.stop, enums.stop_flags.custom_name)
     local limit = parts.stop.trains_limit
-    local is_bufferless = lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
-    local bufferless_tooltip = { is_bufferless and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
+    local bufferless = lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
+    local bufferless_tooltip = { bufferless and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
+    local inactivity = lib.read_stop_flag(parts.stop, enums.stop_flags.inactivity)
+    local inactivity_tooltip = { inactivity and "sspp-gui.station-wait-for-inactivity-tooltip" or "sspp-gui.station-depart-immediately-tooltip" }
     local no_provide = not parts.provide_io and {}
     local no_request = not parts.request_io and {}
     return flib_gui.add(player.gui.screen, {
@@ -981,7 +994,7 @@ local function add_gui_complete(player, parts)
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
-                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disable_tooltip, mouse_button_filter = { "left" }, auto_toggle = true, toggled = is_disabled, handler = handle_disable_toggled },
+                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disable_tooltip, mouse_button_filter = { "left" }, auto_toggle = true, toggled = disable, handler = handle_disable_toggled },
                 { type = "sprite-button", style = "frame_action_button", sprite = "sspp-map-icon", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = handle_view_on_map },
                 { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = handle_open_network },
                 { type = "empty-widget", style = "empty_widget" },
@@ -994,7 +1007,7 @@ local function add_gui_complete(player, parts)
                         { type = "textfield", name = "stop_name_input", style = "sspp_subheader_caption_textbox", icon_selector = true, text = name, visible = false, handler = handle_name_changed_or_confirmed },
                         { type = "empty-widget", style = "flib_horizontal_pusher" },
                         { type = "sprite-button", name = "stop_name_edit_toggle", style = "control_settings_section_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.edit-custom-name" }, auto_toggle = true, handler = handle_edit_name_toggled },
-                        { type = "sprite-button", name = "stop_name_clear_button", style = "control_settings_section_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.clear-custom-name" }, enabled = has_custom_name, handler = handle_clear_name },
+                        { type = "sprite-button", name = "stop_name_clear_button", style = "control_settings_section_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.clear-custom-name" }, enabled = custom_name, handler = handle_clear_name },
                     } },
                     { type = "tabbed-pane", style = "tabbed_pane", children = {
                         no_provide or {
@@ -1048,7 +1061,8 @@ local function add_gui_complete(player, parts)
                         { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.limit" }), tooltip = { "sspp-gui.station-limit-tooltip" } },
                         { type = "slider", style = "notched_slider", minimum_value = 1, maximum_value = 10, value = limit, handler = handle_limit_changed },
                         { type = "label", name = "limit_value", style = "sspp_station_limit_value", caption = tostring(limit) },
-                        { type = "sprite-button", name = "bufferless_toggle", style = "control_settings_section_button", sprite = "sspp-bufferless-icon", tooltip = bufferless_tooltip, auto_toggle = true, toggled = is_bufferless, handler = handle_bufferless_toggled },
+                        { type = "sprite-button", name = "bufferless_toggle", style = "control_settings_section_button", sprite = "sspp-bufferless-icon", tooltip = bufferless_tooltip, auto_toggle = true, toggled = bufferless, handler = handle_bufferless_toggled },
+                        no_provide or { type = "sprite-button", name = "inactivity_toggle", style = "control_settings_section_button", sprite = "sspp-inactivity-icon", tooltip = inactivity_tooltip, auto_toggle = true, toggled = inactivity, handler = handle_inactivity_toggled },
                     } },
                     { type = "frame", style = "shallow_frame", direction = "horizontal", children = {
                         { type = "scroll-pane", style = "sspp_right_grid_scroll_pane", direction = "vertical", children = {
@@ -1151,6 +1165,7 @@ function gui_station.add_flib_handlers()
         ["station_name_confirmed"] = handle_name_changed_or_confirmed[events.on_gui_confirmed],
         ["station_disable_toggled"] = handle_disable_toggled[events.on_gui_click],
         ["station_bufferless_toggled"] = handle_bufferless_toggled[events.on_gui_click],
+        ["station_inactivity_toggled"] = handle_inactivity_toggled[events.on_gui_click],
         ["station_limit_changed"] = handle_limit_changed[events.on_gui_value_changed],
         ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],
         ["station_add_provide_fluid"] = handle_add_provide_fluid[events.on_gui_click],

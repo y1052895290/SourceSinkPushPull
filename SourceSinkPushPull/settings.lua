@@ -53,11 +53,31 @@ data:extend({
     {
         type = "int-setting",
         name = "sspp-default-train-limit",
-        order = "da",
+        order = "ca",
         setting_type = "runtime-global",
         default_value = 10,
         minimum_value = 1,
         maximum_value = 10,
+    },
+    ---@type data.ModIntSettingPrototype
+    {
+        type = "int-setting",
+        name = "sspp-item-inactivity-ticks",
+        order = "cb",
+        setting_type = "runtime-global",
+        default_value = 60,
+        minimum_value = 30,
+        maximum_value = 120,
+    },
+    ---@type data.ModIntSettingPrototype
+    {
+        type = "int-setting",
+        name = "sspp-fluid-inactivity-ticks",
+        order = "cc",
+        setting_type = "runtime-global",
+        default_value = 60,
+        minimum_value = 30,
+        maximum_value = 120,
     },
     ---@type data.ModIntSettingPrototype
     {

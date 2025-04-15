@@ -36,6 +36,8 @@
 ---@field public auto_paint_trains boolean?
 ---@field public train_colors {[TrainColor]: Color}?
 ---@field public default_train_limit integer?
+---@field public item_inactivity_ticks integer?
+---@field public fluid_inactivity_ticks integer?
 ---@field public stations_per_tick integer?
 
 --------------------------------------------------------------------------------

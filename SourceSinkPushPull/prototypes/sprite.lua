@@ -34,6 +34,7 @@ return {
     generate_icon_sprite("export"),
     generate_icon_sprite("grid"),
     generate_icon_sprite("import"),
+    generate_icon_sprite("inactivity"),
     generate_icon_sprite("map"),
     generate_icon_sprite("move-down"),
     generate_icon_sprite("move-up"),

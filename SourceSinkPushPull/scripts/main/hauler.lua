@@ -4,12 +4,13 @@ local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
 local enums = require("__SourceSinkPushPull__.scripts.enums")
 
-local e_train_colors = enums.train_colors
+local e_stop_flags, e_train_colors = enums.stop_flags, enums.train_colors
 
 local list_create_or_append, list_destroy_or_remove = lib.list_create_or_append, lib.list_destroy_or_remove
 local set_control_behavior, enumerate_spoil_results = lib.set_control_behavior, lib.enumerate_spoil_results
 local clear_control_behavior, clear_hidden_control_behaviors = lib.clear_control_behavior, lib.clear_hidden_control_behaviors
-local get_train_item_count, send_train_to_named_stop, assign_job_index = lib.send_train_to_named_stop, lib.assign_job_index, lib.get_train_item_count
+local read_stop_flag, get_train_item_count = lib.read_stop_flag, lib.get_train_item_count
+local send_train_to_named_stop, assign_job_index = lib.send_train_to_named_stop, lib.assign_job_index
 
 local on_status_changed, on_job_created, on_job_updated = gui.on_status_changed, gui.on_job_created, gui.on_job_updated
 
@@ -151,21 +152,27 @@ function main_hauler.on_arrived_at_provide_station(hauler, job)
     local provide_item = provide.items[item_key]
     local constant = network_item.delivery_size - provide_item.granularity + 1
 
+    local inactivity = read_stop_flag(stop, e_stop_flags.inactivity)
+
     local signal, wait_conditions ---@type SignalID, WaitCondition[]
     if quality then
         signal = { name = name, quality = quality, type = "item" }
         wait_conditions = { { type = "item_count", condition = { first_signal = signal, comparator = ">=", constant = constant } } }
+        if inactivity then
+            wait_conditions[2] = { compare_type = "and", type = "inactivity", ticks = mod_settings.item_inactivity_ticks }
+        end
         for i, result_name in enumerate_spoil_results(name) do
             local spoil_signal = { name = result_name, quality = quality, type = "item" }
-            wait_conditions[i * 2] = { compare_type = "or", type = "item_count", condition = { first_signal = spoil_signal, comparator = ">", constant = 0 } }
-            wait_conditions[i * 2 + 1] = { compare_type = "and", type = "inactivity", ticks = 120 }
+            local length = #wait_conditions
+            wait_conditions[length + 1] = { compare_type = "or", type = "item_count", condition = { first_signal = spoil_signal, comparator = ">", constant = 0 } }
+            wait_conditions[length + 2] = { compare_type = "and", type = "inactivity", ticks = mod_settings.item_inactivity_ticks }
             set_control_behavior(provide.hidden_combs[i], 0, "-", spoil_signal, signal)
         end
     else
         signal = { name = name, type = "fluid" }
         wait_conditions = { { type = "fluid_count", condition = { first_signal = signal, comparator = ">=", constant = constant } } }
-        if provide_item.granularity > 1 then
-            wait_conditions[2] = { compare_type = "and", type = "inactivity", ticks = 60 }
+        if inactivity then
+            wait_conditions[2] = { compare_type = "and", type = "inactivity", ticks = mod_settings.fluid_inactivity_ticks }
         end
     end
     set_control_behavior(provide.comb, constant, "-", signal)

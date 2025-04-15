@@ -2,6 +2,7 @@
 
 local flib_migration = require("__flib__.migration")
 
+local enums = require("__SourceSinkPushPull__.scripts.enums")
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local cmds = require("__SourceSinkPushPull__.scripts.cmds")
 
@@ -190,6 +191,18 @@ local migrations = {
             end
         end
     end,
+    ["0.4.3"] = function()
+        for _, station in pairs(storage.stations) do
+            if station.provide then
+                for item_key, _ in pairs(station.provide.items) do
+                    local _, quality = string.match(item_key, "(.-):(.+)")
+                    if not quality then
+                        lib.write_stop_flag(station.stop, enums.stop_flags.inactivity, true)
+                    end
+                end
+            end
+        end
+    end
 }
 
 --------------------------------------------------------------------------------
