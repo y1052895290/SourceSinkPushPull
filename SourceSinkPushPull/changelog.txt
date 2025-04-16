@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.3
+Date: 2025-04-16
+  Features:
+    - Added Simplified Chinese translation.
+    - Stations now let you choose if pickup orders should have an inactivity condition. Previously, items never had one, and fluids always did.
+    - Changed the way granularity works for items to subtract rather than round down.
+    - These two things mean that multi-item providers using loaders no longer need extra combinators.
+  Bugfixes:
+    - Fix destroying a locomotive with robots could cause issues if the robots needed to remove fuel first.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.2
 Date: 2025-04-6
   Bugfixes:
