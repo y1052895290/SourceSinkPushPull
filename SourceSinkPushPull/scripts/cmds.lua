@@ -48,9 +48,9 @@ function cmds.sspp_reboot()
             if name == "entity-ghost" then name = entity.ghost_name end
 
             if name == "sspp-stop" then
-                main.station.on_stop_built(entity, nil)
+                main.station.on_stop_built(entity)
             elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-                main.station.on_comb_built(entity, nil)
+                main.station.on_comb_built(entity)
             end
         end
     end

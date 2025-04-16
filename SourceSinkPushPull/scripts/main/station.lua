@@ -152,12 +152,7 @@ end
 --------------------------------------------------------------------------------
 
 ---@param stop LuaEntity
----@param ghost_unit_number uint?
-function main_station.on_stop_built(stop, ghost_unit_number)
-    -- if ghost_unit_number then
-    --     main_station.on_stop_broken(ghost_unit_number, nil)
-    -- end
-
+function main_station.on_stop_built(stop)
     if stop.trains_limit > 10 or stop.trains_limit < 1 then
         stop.trains_limit = mod_settings.default_train_limit
     end
@@ -187,12 +182,7 @@ function main_station.on_stop_built(stop, ghost_unit_number)
 end
 
 ---@param comb LuaEntity
----@param ghost_unit_number uint?
-function main_station.on_comb_built(comb, ghost_unit_number)
-    -- if ghost_unit_number then
-    --     main_station.on_comb_broken(ghost_unit_number, nil)
-    -- end
-
+function main_station.on_comb_built(comb)
     local name = comb.name
     if comb.name == "entity-ghost" then name = comb.ghost_name end
 
@@ -223,26 +213,27 @@ function main_station.on_comb_built(comb, ghost_unit_number)
 end
 
 ---@param rail LuaEntity
----@param direction defines.rail_direction
-function main_station.on_rail_built(rail, direction)
-    local stop = rail.get_rail_segment_stop(direction)
+function main_station.on_rail_built(rail)
+    for _, direction in pairs(defines.rail_direction) do
+        local stop = rail.get_rail_segment_stop(direction)
 
-    if not stop or stop.name ~= "sspp-stop" then return end -- not connected to the right kind of stop
-    if stop.connected_rail ~= rail then return end -- rail is not the last in the segment
-    if storage.stations[stop.unit_number] then return end -- another build event already created a station
-    if not storage.entities[stop.unit_number] then return end -- build event for the stop hasn't happened yet
+        if not stop or stop.name ~= "sspp-stop" then return end -- not connected to the right kind of stop
+        if stop.connected_rail ~= rail then return end -- rail is not the last in the segment
+        if storage.stations[stop.unit_number] then return end -- another build event already created a station
+        if not storage.entities[stop.unit_number] then return end -- build event for the stop hasn't happened yet
 
-    local x, y, combs = stop.position.x, stop.position.y, {}
-    for _, entity in pairs(stop.surface.find_entities({ { x - 2.6, y - 2.6 }, { x + 2.6, y + 2.6 } })) do
-        local name = entity.name
-        if name == "entity-ghost" then name = entity.ghost_name end
-        if name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-            if not storage.entities[entity.unit_number] then return end -- build event for this comb hasn't happened yet
-            combs[#combs+1] = entity
+        local x, y, combs = stop.position.x, stop.position.y, {}
+        for _, entity in pairs(stop.surface.find_entities({ { x - 2.6, y - 2.6 }, { x + 2.6, y + 2.6 } })) do
+            local name = entity.name
+            if name == "entity-ghost" then name = entity.ghost_name end
+            if name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
+                if not storage.entities[entity.unit_number] then return end -- build event for this comb hasn't happened yet
+                combs[#combs+1] = entity
+            end
         end
-    end
 
-    try_create_station(stop, combs)
+        try_create_station(stop, combs)
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -305,28 +296,27 @@ function main_station.on_comb_broken(comb_id, comb)
 end
 
 ---@param rail LuaEntity
----@param direction defines.rail_direction
-function main_station.on_rail_broken(rail, direction)
-    local stop = rail.get_rail_segment_stop(direction)
+function main_station.on_rail_broken(rail)
+    for _, direction in pairs(defines.rail_direction) do
+        local stop = rail.get_rail_segment_stop(direction)
 
-    if not stop or stop.name ~= "sspp-stop" then return end -- not connected to the right kind of stop
-    if stop.connected_rail ~= rail then return end -- rail is not the last in the segment
+        if not stop or stop.name ~= "sspp-stop" then return end -- not connected to the right kind of stop
+        if stop.connected_rail ~= rail then return end -- rail is not the last in the segment
 
-    try_destroy_station(stop)
+        try_destroy_station(stop)
+    end
 end
 
 --------------------------------------------------------------------------------
 
-function main_station.destory_invalid_ghosts()
-    -- because tags are buggy and unreliable, there's no good way to identify which ghost entity was
-    -- built over, for now we just check every entity and clean up any that became invalid
+function main_station.destory_invalid_entities()
     local stop_comb_ids, comb_stop_ids = storage.stop_comb_ids, storage.comb_stop_ids
     for unit_number, entity in pairs(storage.entities) do
         if not entity.valid then
             if stop_comb_ids[unit_number] then
-                main_station.on_stop_broken(unit_number, nil)
+                main_station.on_stop_broken(unit_number)
             elseif comb_stop_ids[unit_number] then
-                main_station.on_comb_broken(unit_number, nil)
+                main_station.on_comb_broken(unit_number)
             end
         end
     end

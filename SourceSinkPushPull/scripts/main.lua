@@ -15,31 +15,22 @@ local function on_entity_built(event)
     local entity = event.entity or event.created_entity ---@type LuaEntity
 
     if entity.type == "straight-rail" then
-        main_station.on_rail_built(entity, defines.rail_direction.front)
-        main_station.on_rail_built(entity, defines.rail_direction.back)
+        main_station.on_rail_built(entity)
         return
     end
 
-    local name, ghost_unit_number = entity.name, nil
+    local name = entity.name
     if name == "entity-ghost" then
-        local tags = entity.tags or {}
-        tags.ghost_unit_number = entity.unit_number
-        entity.tags = tags
         name = entity.ghost_name
     else
-        -- this unit number may be incorrect due to https://forums.factorio.com/viewtopic.php?p=666167#p666167
-        -- we are just using it here to detect if we built over a ghost at all
-        -- UPDATE: we can't even rely on this, because the user can paste a non ghost and wipe the tags completely...
-        -- if event.tags and event.tags.ghost_unit_number then
-            main_station.destory_invalid_ghosts()
-        -- end
-        -- ghost_unit_number = event.tags and event.tags.ghost_unit_number
+        -- reliably detecting which ghost was built over is a pain, so check all of them
+        main_station.destory_invalid_entities()
     end
 
     if name == "sspp-stop" then
-        main_station.on_stop_built(entity, ghost_unit_number)
+        main_station.on_stop_built(entity)
     elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-        main_station.on_comb_built(entity, ghost_unit_number)
+        main_station.on_comb_built(entity)
     end
 end
 
@@ -47,8 +38,7 @@ local function on_entity_broken(event)
     local entity = event.entity or event.ghost ---@type LuaEntity
 
     if entity.type == "straight-rail" then
-        main_station.on_rail_broken(entity, defines.rail_direction.front)
-        main_station.on_rail_broken(entity, defines.rail_direction.back)
+        main_station.on_rail_broken(entity)
         return
     end
 
