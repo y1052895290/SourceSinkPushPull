@@ -258,7 +258,7 @@ local function tick_poll()
         end
     end
 
-    --- poll counts and modes, then create supply (provide/request) and demand (push/pull) tickets
+    -- poll counts and modes, then create supply (provide/request) and demand (push/pull) tickets
 
     local provide, request = station.provide, station.request
 
