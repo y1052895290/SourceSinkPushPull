@@ -12,7 +12,7 @@ local main = { station = main_station, hauler = main_hauler }
 --------------------------------------------------------------------------------
 
 local function on_entity_built(event)
-    local entity = event.entity or event.created_entity ---@type LuaEntity
+    local entity = event.entity or event.destination ---@type LuaEntity
 
     if entity.type == "straight-rail" then
         main_station.on_rail_built(entity)
