@@ -1,7 +1,5 @@
 -- SSPP by jagoly
 
-local flib_gui = require("__flib__.gui")
-
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local glib = require("__SourceSinkPushPull__.scripts.glib")
 
@@ -207,40 +205,41 @@ end
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_class_move = { [events.on_gui_click] = function(event)
     local flow = event.element.parent.parent --[[@as LuaGuiElement]]
     glib.move_row(flow.parent, flow.get_index_in_parent(), event.element.get_index_in_parent())
     update_network_after_change(event.player_index)
 end }
 
+---@type GuiHandler
 local handle_class_copy = {} -- defined later
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_class_delete = { [events.on_gui_click] = function(event)
     local flow = event.element.parent --[[@as LuaGuiElement]]
     glib.delete_row(flow.parent, flow.get_index_in_parent())
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_text_changed
+---@type GuiHandler
 local handle_class_name_changed = { [events.on_gui_text_changed] = function(event)
     glib.truncate_input(event.element, 199)
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_class_bypass_depot_changed = { [events.on_gui_click] = function(event)
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_text_changed
+---@type GuiHandler
 local handle_class_depot_name_changed = { [events.on_gui_text_changed] = function(event)
     glib.truncate_input(event.element, 199)
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_text_changed
+---@type GuiHandler
 local handle_class_fueler_name_changed = { [events.on_gui_text_changed] = function(event)
     glib.truncate_input(event.element, 199)
     update_network_after_change(event.player_index)
@@ -248,7 +247,7 @@ end }
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_item_move = { [events.on_gui_click] = function(event)
     local flow = event.element.parent.parent --[[@as LuaGuiElement]]
     glib.move_row(flow.parent, flow.get_index_in_parent(), event.element.get_index_in_parent())
@@ -257,7 +256,7 @@ end }
 
 local handle_item_copy = {} -- defined later
 
----@param event EventData.on_gui_elem_changed
+---@type GuiHandler
 local handle_item_resource_changed = { [events.on_gui_elem_changed] = function(event)
     if not event.element.elem_value then
         local flow = event.element.parent --[[@as LuaGuiElement]]
@@ -267,25 +266,25 @@ local handle_item_resource_changed = { [events.on_gui_elem_changed] = function(e
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_text_changed
+---@type GuiHandler
 local handle_item_class_changed = { [events.on_gui_text_changed] = function(event)
     glib.truncate_input(event.element, 199)
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_text_changed
+---@type GuiHandler
 local handle_item_delivery_size_changed = { [events.on_gui_text_changed] = function(event)
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_text_changed
+---@type GuiHandler
 local handle_item_delivery_time_changed = { [events.on_gui_text_changed] = function(event)
     update_network_after_change(event.player_index)
 end }
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_expand_class_haulers = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
     local elements = player_gui.elements
@@ -312,7 +311,7 @@ local handle_expand_class_haulers = { [events.on_gui_click] = function(event)
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_expand_item_haulers = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
     local elements = player_gui.elements
@@ -340,7 +339,7 @@ local handle_expand_item_haulers = { [events.on_gui_click] = function(event)
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_expand_item_stations = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
     local elements = player_gui.elements
@@ -367,7 +366,7 @@ local handle_expand_item_stations = { [events.on_gui_click] = function(event)
     update_network_after_change(event.player_index)
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_expand_job = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
     local elements = player_gui.elements
@@ -395,7 +394,7 @@ end }
 
 ---@param class_table LuaGuiElement
 local function add_new_class_row(class_table)
-    flib_gui.add(class_table, {
+    glib.add_widgets(class_table, nil, {
         { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
             { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_class_move },
@@ -417,7 +416,7 @@ end
 ---@param item_table LuaGuiElement
 ---@param elem_type string
 local function add_new_item_row(item_table, elem_type)
-    flib_gui.add(item_table, {
+    glib.add_widgets(item_table, nil, {
         { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
             { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
@@ -439,7 +438,6 @@ end
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
 handle_class_copy[events.on_gui_click] = function(event)
     local flow = event.element.parent --[[@as LuaGuiElement]]
     local table = flow.parent --[[@as LuaGuiElement]]
@@ -455,7 +453,6 @@ handle_class_copy[events.on_gui_click] = function(event)
     table_children[j + 5].state = table_children[i + 5].state
 end
 
----@param event EventData.on_gui_click
 handle_item_copy[events.on_gui_click] = function(event)
     local flow = event.element.parent --[[@as LuaGuiElement]]
     local table = flow.parent --[[@as LuaGuiElement]]
@@ -534,7 +531,7 @@ local function insert_history_row(history_table, row_index, job_index, job)
     local actions_flow = history_table.add({ index = row_index * 5 - 3, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
     local durations_flow = history_table.add({ index = row_index * 5 - 2, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
     local summary_flow = history_table.add({ index = row_index * 5 - 1, type = "flow", style = "sspp_history_cell_flow", direction = "vertical" })
-    history_table.add({ index = row_index * 5 - 0, type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-grid-icon", tags = flib_gui.format_handlers(handle_expand_job) })
+    history_table.add({ index = row_index * 5 - 0, type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-grid-icon", tags = glib.format_handler(handle_expand_job) })
 
     if job_type == "FUEL" then
         local fuel_stop = job.fuel_stop or (in_progress and hauler--[[@as Hauler]].train.path_end_stop)
@@ -641,7 +638,7 @@ local function add_job_minimap_widgets(grid_table, subtitle, entity)
     if entity and entity.valid then
         local minimap = minimap_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 })
         minimap.entity = entity
-        minimap.add({ type = "button", style = "sspp_minimap_button", tags = flib_gui.format_handlers(glib.handle_open_minimap_entity) })
+        minimap.add({ type = "button", style = "sspp_minimap_button", tags = glib.format_handler(glib.handle_open_parent_entity) })
         local camera = camera_frame.add({ type = "camera", style = "sspp_camera", zoom = 0.25, position = entity.position })
         camera.entity = entity
     else
@@ -993,25 +990,25 @@ end
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_add_class = { [events.on_gui_click] = function(event)
     local class_table = storage.player_guis[event.player_index].elements.class_table
     add_new_class_row(class_table)
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_add_item = { [events.on_gui_click] = function(event)
     local item_table = storage.player_guis[event.player_index].elements.item_table
     add_new_item_row(item_table, "item-with-quality")
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_add_fluid = { [events.on_gui_click] = function(event)
     local item_table = storage.player_guis[event.player_index].elements.item_table
     add_new_item_row(item_table, "fluid")
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_close_window = { [events.on_gui_click] = function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
     assert(player.opened.name == "sspp-network")
@@ -1021,7 +1018,7 @@ end }
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_import_import = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Network]]
@@ -1108,7 +1105,7 @@ local handle_import_import = { [events.on_gui_click] = function(event)
     player_gui.popup_elements.textbox.select_all()
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_export_export = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Network]]
@@ -1144,7 +1141,7 @@ local function import_or_export_toggled(player_id, toggle, caption, handler)
         if not toggle.toggled then return end
     end
 
-    local elements, window = flib_gui.add(game.get_player(player_id).gui.screen, {
+    local window, elements = glib.add_widget(game.get_player(player_id).gui.screen, {},
         { type = "frame", name = "sspp-popup", style = "frame", direction = "vertical", children = {
             { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                 { type = "textfield", name = "textbox", style = "sspp_json_textbox" },
@@ -1153,8 +1150,8 @@ local function import_or_export_toggled(player_id, toggle, caption, handler)
                 { type = "button", style = "dialog_button", caption = { caption }, mouse_button_filter = { "left" }, handler = handler },
                 { type = "empty-widget", style = "flib_dialog_footer_drag_handle_no_right", drag_target = "sspp-popup" },
             } },
-        } },
-    })
+        } }
+    ) ---@cast elements -nil
 
     window.bring_to_front()
     window.force_auto_center()
@@ -1162,7 +1159,7 @@ local function import_or_export_toggled(player_id, toggle, caption, handler)
     player_gui.popup_elements = elements
 end
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_import_toggled = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Network]]
@@ -1171,7 +1168,7 @@ local handle_import_toggled = { [events.on_gui_click] = function(event)
     if player_gui.popup_elements then player_gui.popup_elements.textbox.focus() end
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_export_toggled = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Network]]
@@ -1197,7 +1194,7 @@ function gui_network.open(player_id, network_name, tab_index)
         localised_name = network.surface.localised_name
     end
 
-    local elements, window = flib_gui.add(player.gui.screen, {
+    local window, elements = glib.add_widget(player.gui.screen, {},
         { type = "frame", name = "sspp-network", style = "frame", direction = "vertical", children = {
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-network", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.network-for-surface", localised_name }, ignored_by_interaction = true },
@@ -1210,10 +1207,8 @@ function gui_network.open(player_id, network_name, tab_index)
             { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                     { type = "tabbed-pane", name = "tabbed_pane", style = "tabbed_pane", children = {
-                        ---@diagnostic disable-next-line: missing-fields
-                        {
-                            tab = { type = "tab", style = "tab", caption = { "sspp-gui.classes" } },
-                            content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
+                        { type = "tab", style = "tab", caption = { "sspp-gui.classes" }, children = {
+                            { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
                                 { type = "table", style = "sspp_network_class_header", column_count = 7, children = {
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.name" }), tooltip = { "sspp-gui.class-name-tooltip" } },
@@ -1230,11 +1225,9 @@ function gui_network.open(player_id, network_name, tab_index)
                                     } },
                                 } },
                             } },
-                        },
-                        ---@diagnostic disable-next-line: missing-fields
-                        {
-                            tab = { type = "tab", style = "tab", caption = { "sspp-gui.items-fluids" } },
-                            content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
+                        } },
+                        { type = "tab", style = "tab", caption = { "sspp-gui.items-fluids" }, children = {
+                            { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
                                 { type = "table", style = "sspp_network_item_header", column_count = 8, children = {
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
@@ -1253,11 +1246,9 @@ function gui_network.open(player_id, network_name, tab_index)
                                     } },
                                 } },
                             } },
-                        },
-                        ---@diagnostic disable-next-line: missing-fields
-                        {
-                            tab = { type = "tab", style = "tab", caption = { "sspp-gui.history" } },
-                            content = { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
+                        } },
+                        { type = "tab", style = "tab", caption = { "sspp-gui.history" }, children = {
+                            { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
                                 { type = "table", style = "sspp_network_history_header", column_count = 5, children = {
                                     { type = "empty-widget" },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.action" } },
@@ -1269,7 +1260,7 @@ function gui_network.open(player_id, network_name, tab_index)
                                     { type = "table", name = "history_table", style = "sspp_network_history_table", column_count = 5 },
                                 } },
                             } },
-                        },
+                        } },
                     } },
                 } },
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
@@ -1291,8 +1282,8 @@ function gui_network.open(player_id, network_name, tab_index)
                     } },
                 } },
             } },
-        } },
-    })
+        } }
+    ) ---@cast elements -nil
 
     elements.tabbed_pane.selected_tab_index = tab_index
     window.force_auto_center()
@@ -1327,8 +1318,8 @@ end
 
 --------------------------------------------------------------------------------
 
-function gui_network.add_flib_handlers()
-    flib_gui.add_handlers({
+function gui_network.initialise()
+    glib.register_functions({
         ["network_class_move"] = handle_class_move[events.on_gui_click],
         ["network_class_copy"] = handle_class_copy[events.on_gui_click],
         ["network_class_delete"] = handle_class_delete[events.on_gui_click],

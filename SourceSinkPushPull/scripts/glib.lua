@@ -1,8 +1,124 @@
 -- SSPP by jagoly
 
-local flib_gui = require("__flib__.gui")
-
 local glib = {}
+
+--------------------------------------------------------------------------------
+
+local handler_name_to_func = {} ---@type {[string]: function}
+local handler_func_to_name = {} ---@type {[function]: string}
+
+local function on_element_event(event)
+    local handler = event.element.tags["__SourceSinkPushPull_handler"]
+    if handler then
+        local name = handler[tostring(event.name)]
+        if name then
+            local func = handler_name_to_func[name]
+            if func then
+                func(event)
+            end
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+
+---@param handler GuiHandler
+---@param tags Tags?
+---@return Tags
+local function format_handler(handler, tags)
+    local formatted = {}
+    for id, func in pairs(handler) do
+        formatted[tostring(id)] = handler_func_to_name[func]
+    end
+
+    tags = tags or {}
+    tags["__SourceSinkPushPull_handler"] = formatted
+
+    return tags
+end
+glib.format_handler = format_handler
+
+---@param parent LuaGuiElement
+---@param elems {[string]: LuaGuiElement}?
+---@param def GuiElemDef
+---@return LuaGuiElement elem, {[string]: LuaGuiElement}? elems
+local function add_widget(parent, elems, def)
+    local elem_mods = def.elem_mods
+    local style_mods = def.style_mods
+    local drag_target = def.drag_target
+    local handler = def.handler
+    local children = def.children
+
+    def.elem_mods = nil
+    def.style_mods = nil
+    def.drag_target = nil
+    def.handler = nil
+    def.children = nil
+
+    local elem = parent.add(def)
+
+    if elems then
+        local name = def.name
+        if name then elems[name] = elem end
+    end
+    if elem_mods then
+        for key, value in pairs(elem_mods) do
+            elem[key] = value
+        end
+    end
+    if style_mods then
+        for key, value in pairs(style_mods) do
+            elem.style[key] = value
+        end
+    end
+    if drag_target then
+        ---@cast elems -nil
+        elem.drag_target = assert(elems[drag_target])
+    end
+    if handler then
+        elem.tags = format_handler(handler, elem.tags)
+    end
+    if children then
+        if def.type == "tab" then
+            local content = add_widget(parent, elems, children[1])
+            parent.add_tab(elem, content)
+        else
+            for _, child in pairs(children) do
+                add_widget(elem, elems, child)
+            end
+        end
+    end
+
+    def.elem_mods = elem_mods
+    def.style_mods = style_mods
+    def.drag_target = drag_target
+    def.handler = handler
+    def.children = children
+
+    return elem, elems
+end
+glib.add_widget = add_widget
+
+---@param parent LuaGuiElement
+---@param elems {[string]: LuaGuiElement}?
+---@param defs GuiElemDef[]
+---@return {[string]: LuaGuiElement}? elems
+function glib.add_widgets(parent, elems, defs)
+    for _, def in pairs(defs) do
+        add_widget(parent, elems, def)
+    end
+
+    return elems
+end
+
+---@param functions {[string]: function}
+function glib.register_functions(functions)
+    for name, func in pairs(functions) do
+        assert(handler_name_to_func[name] == nil)
+        handler_name_to_func[name] = func
+        handler_func_to_name[func] = name
+    end
+end
 
 --------------------------------------------------------------------------------
 
@@ -130,8 +246,8 @@ end
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
-glib.handle_open_minimap_entity = { [defines.events.on_gui_click] = function(event)
+---@type GuiHandler
+glib.handle_open_parent_entity = { [defines.events.on_gui_click] = function(event)
     local entity = event.element.parent.entity
     if entity and entity.valid then
         game.get_player(event.player_index).opened = entity
@@ -149,7 +265,7 @@ function glib.acquire_next_minimap(grid_table, grid_children, old_length, new_le
         local inner_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
         local minimap = inner_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 })
 
-        minimap.add({ type = "button", style = "sspp_minimap_button", tags = flib_gui.format_handlers(glib.handle_open_minimap_entity) })
+        minimap.add({ type = "button", style = "sspp_minimap_button", tags = format_handler(glib.handle_open_parent_entity) })
         local top = minimap.add({ type = "label", style = "sspp_minimap_top_label", ignored_by_interaction = true })
         local bottom = minimap.add({ type = "label", style = "sspp_minimap_bottom_label", ignored_by_interaction = true })
 
@@ -164,9 +280,22 @@ end
 
 --------------------------------------------------------------------------------
 
-function glib.add_flib_handlers()
-    flib_gui.add_handlers({
-        ["lib_open_minimap_entity"] = glib.handle_open_minimap_entity[defines.events.on_gui_click],
+function glib.initialise()
+    script.on_event(defines.events.on_gui_checked_state_changed, on_element_event)
+    script.on_event(defines.events.on_gui_click, on_element_event)
+    script.on_event(defines.events.on_gui_confirmed, on_element_event)
+    script.on_event(defines.events.on_gui_elem_changed, on_element_event)
+    script.on_event(defines.events.on_gui_hover, on_element_event)
+    script.on_event(defines.events.on_gui_leave, on_element_event)
+    script.on_event(defines.events.on_gui_location_changed, on_element_event)
+    script.on_event(defines.events.on_gui_selected_tab_changed, on_element_event)
+    script.on_event(defines.events.on_gui_selection_state_changed, on_element_event)
+    script.on_event(defines.events.on_gui_switch_state_changed, on_element_event)
+    script.on_event(defines.events.on_gui_text_changed, on_element_event)
+    script.on_event(defines.events.on_gui_value_changed, on_element_event)
+
+    glib.register_functions({
+        ["lib_open_parent_entity"] = glib.handle_open_parent_entity[defines.events.on_gui_click],
     })
 end
 

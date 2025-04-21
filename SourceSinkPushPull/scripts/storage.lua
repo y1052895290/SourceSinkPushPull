@@ -203,6 +203,32 @@
 
 --------------------------------------------------------------------------------
 
+---@alias GuiStyleMods LuaStyle|{[string]: nil}
+---@alias GuiElemMods LuaGuiElement|{[string]: nil}
+
+---@class (exact) GuiHandler
+---@field public [defines.events.on_gui_checked_state_changed] fun(event: EventData.on_gui_checked_state_changed)?
+---@field public [defines.events.on_gui_click] fun(event: EventData.on_gui_click)?
+---@field public [defines.events.on_gui_closed] fun(event: EventData.on_gui_closed)?
+---@field public [defines.events.on_gui_confirmed] fun(event: EventData.on_gui_confirmed)?
+---@field public [defines.events.on_gui_elem_changed] fun(event: EventData.on_gui_elem_changed)?
+---@field public [defines.events.on_gui_location_changed] fun(event: EventData.on_gui_location_changed)?
+---@field public [defines.events.on_gui_opened] fun(event: EventData.on_gui_opened)?
+---@field public [defines.events.on_gui_selected_tab_changed] fun(event: EventData.on_gui_selected_tab_changed)?
+---@field public [defines.events.on_gui_selection_state_changed] fun(event: EventData.on_gui_selection_state_changed)?
+---@field public [defines.events.on_gui_switch_state_changed] fun(event: EventData.on_gui_switch_state_changed)?
+---@field public [defines.events.on_gui_text_changed] fun(event: EventData.on_gui_text_changed)?
+---@field public [defines.events.on_gui_value_changed] fun(event: EventData.on_gui_value_changed)?
+
+---@class (exact) GuiElemDef : LuaGuiElement.add_param.button|LuaGuiElement.add_param.camera|LuaGuiElement.add_param.checkbox|LuaGuiElement.add_param.choose_elem_button|LuaGuiElement.add_param.drop_down|LuaGuiElement.add_param.flow|LuaGuiElement.add_param.frame|LuaGuiElement.add_param.line|LuaGuiElement.add_param.list_box|LuaGuiElement.add_param.minimap|LuaGuiElement.add_param.progressbar|LuaGuiElement.add_param.radiobutton|LuaGuiElement.add_param.scroll_pane|LuaGuiElement.add_param.slider|LuaGuiElement.add_param.sprite|LuaGuiElement.add_param.sprite_button|LuaGuiElement.add_param.switch|LuaGuiElement.add_param.tab|LuaGuiElement.add_param.table|LuaGuiElement.add_param.text_box|LuaGuiElement.add_param.textfield
+---@field public elem_mods GuiElemMods?
+---@field public style_mods GuiStyleMods?
+---@field public drag_target string?
+---@field public handler GuiHandler?
+---@field public children GuiElemDef[]?
+
+--------------------------------------------------------------------------------
+
 ---@type SourceSinkPushPull.Storage
 storage = storage
 

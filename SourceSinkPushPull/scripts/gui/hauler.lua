@@ -1,7 +1,5 @@
 -- SSPP by jagoly
 
-local flib_gui = require("__flib__.gui")
-
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local glib = require("__SourceSinkPushPull__.scripts.glib")
 
@@ -40,7 +38,7 @@ end
 
 --------------------------------------------------------------------------------
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_open_network = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local network_name = storage.player_guis[player_id].network
@@ -48,7 +46,7 @@ local handle_open_network = { [events.on_gui_click] = function(event)
     gui_network.open(player_id, network_name, 1)
 end }
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_view_on_map = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Hauler]]
@@ -59,7 +57,7 @@ local handle_view_on_map = { [events.on_gui_click] = function(event)
     end
 end }
 
----@param event EventData.on_gui_text_changed
+---@type GuiHandler
 local handle_class_changed = { [events.on_gui_text_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Hauler]]
     local train_id, train = player_gui.train_id, player_gui.train
@@ -100,7 +98,7 @@ local function map_carriage_name(carriage)
     return carriage.name
 end
 
----@param event EventData.on_gui_click
+---@type GuiHandler
 local handle_class_auto_assign = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Hauler]]
     local network_name = player_gui.network
@@ -185,7 +183,7 @@ function gui_hauler.open(player_id, train)
         gui_hauler.close(player_id)
     end
 
-    local elements, window = flib_gui.add(player.gui.screen, {
+    local window, elements = glib.add_widget(player.gui.screen, {},
         { type = "frame", name = "sspp-hauler", style = "sspp_hauler_frame", direction = "vertical", children = {
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.sspp" } },
@@ -195,7 +193,7 @@ function gui_hauler.open(player_id, train)
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", name = "status_label", style = "label" },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal" },
+                { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal", elem_mods = { locked = true } },
                 { type = "sprite-button", name = "stop_button", style = "sspp_compact_slot_button", sprite = "item/sspp-stop", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = handle_view_on_map },
             } },
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
@@ -204,9 +202,8 @@ function gui_hauler.open(player_id, train)
                 { type = "textfield", name = "class_textbox", style = "sspp_wide_name_textbox", icon_selector = true, enabled = manual_mode, handler = handle_class_changed },
                 { type = "sprite-button", name = "class_auto_assign_button", style = "sspp_compact_slot_button", sprite = "sspp-refresh-icon", tooltip = { "sspp-gui.hauler-auto-assign-tooltip" }, mouse_button_filter = { "left" }, enabled = manual_mode, handler = handle_class_auto_assign },
             } },
-        } },
-    })
-    elements.item_button.locked = true -- https://forums.factorio.com/viewtopic.php?t=127562
+        } }
+    ) ---@cast elements -nil
 
     local resolution, scale = player.display_resolution, player.display_scale
     window.location = { x = resolution.width - (244 + 12) * scale, y = resolution.height - (108 + 12) * scale }
@@ -235,8 +232,8 @@ end
 
 --------------------------------------------------------------------------------
 
-function gui_hauler.add_flib_handlers()
-    flib_gui.add_handlers({
+function gui_hauler.initialise()
+    glib.register_functions({
         ["hauler_open_network"] = handle_open_network[events.on_gui_click],
         ["hauler_view_on_map"] = handle_view_on_map[events.on_gui_click],
         ["hauler_class_changed"] = handle_class_changed[events.on_gui_text_changed],

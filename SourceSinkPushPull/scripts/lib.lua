@@ -159,6 +159,9 @@ lib.is_item_key_invalid = is_item_key_invalid
 ---@return string
 local function make_item_icon(name, quality)
     if quality then
+        if quality == "normal" then
+            return "[item=" .. name .. "]"
+        end
         return "[item=" .. name .. ",quality=" .. quality .. "]"
     end
     return "[fluid=" .. name .. "]"
