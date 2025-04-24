@@ -126,6 +126,7 @@ end
 protos.entity_stop = flib.copy_prototype(data.raw["train-stop"]["train-stop"], "sspp-stop") --[[@as data.TrainStopPrototype]]
 protos.entity_stop.icon = "__SourceSinkPushPull__/graphics/icons/sspp-stop.png"
 protos.entity_stop.allow_copy_paste = false
+protos.entity_stop.fast_replaceable_group = nil
 
 protos.entity_general_io = generate_io_entity("decider-combinator", "general") --[[@as data.DeciderCombinatorPrototype]]
 protos.entity_provide_io = generate_io_entity("arithmetic-combinator", "provide") --[[@as data.ArithmeticCombinatorPrototype]]
