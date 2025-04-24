@@ -55,7 +55,7 @@ end
 local function try_create_station(stop, combs)
     if stop.name == "entity-ghost" or not stop.connected_rail then return end
 
-    local station_id = stop.unit_number ---@type StationId
+    local station_id = stop.unit_number --[[@as StationId]]
     assert(storage.stations[station_id] == nil)
 
     local combs_by_name = {} ---@type {[string]: LuaEntity?}
@@ -184,7 +184,7 @@ end
 ---@param comb LuaEntity
 function main_station.on_comb_built(comb)
     local name = comb.name
-    if comb.name == "entity-ghost" then name = comb.ghost_name end
+    if name == "entity-ghost" then name = comb.ghost_name end
 
     if name == "sspp-general-io" then
         comb.combinator_description = "{}" -- TODO
@@ -215,24 +215,41 @@ end
 ---@param rail LuaEntity
 function main_station.on_rail_built(rail)
     for _, direction in pairs(defines.rail_direction) do
-        local stop = rail.get_rail_segment_stop(direction)
+        do
+            local stop = rail.get_rail_segment_stop(direction)
 
-        if not stop or stop.name ~= "sspp-stop" then return end -- not connected to the right kind of stop
-        if stop.connected_rail ~= rail then return end -- rail is not the last in the segment
-        if storage.stations[stop.unit_number] then return end -- another build event already created a station
-        if not storage.entities[stop.unit_number] then return end -- build event for the stop hasn't happened yet
-
-        local x, y, combs = stop.position.x, stop.position.y, {}
-        for _, entity in pairs(stop.surface.find_entities({ { x - 2.6, y - 2.6 }, { x + 2.6, y + 2.6 } })) do
-            local name = entity.name
-            if name == "entity-ghost" then name = entity.ghost_name end
-            if name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-                if not storage.entities[entity.unit_number] then return end -- build event for this comb hasn't happened yet
-                combs[#combs+1] = entity
+            if not stop or stop.name ~= "sspp-stop" then
+                goto continue -- not connected to the right kind of stop
             end
-        end
+            if stop.connected_rail ~= rail then
+                goto continue -- rail is not the last in the segment
+            end
+            if storage.stations[stop.unit_number] then
+                goto continue -- another build event already created a station
+            end
+            if not storage.entities[stop.unit_number] then
+                goto continue -- build event for the stop hasn't happened yet
+            end
 
-        try_create_station(stop, combs)
+            local x, y, combs = stop.position.x, stop.position.y, {}
+            for _, entity in pairs(stop.surface.find_entities({ { x - 2.6, y - 2.6 }, { x + 2.6, y + 2.6 } })) do
+                local name = entity.name
+                if name == "entity-ghost" then
+                    name = entity.ghost_name
+                    if name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
+                        goto continue -- this comb is a ghost
+                    end
+                elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
+                    if not storage.entities[entity.unit_number] then
+                        goto continue -- build event for this comb hasn't happened yet
+                    end
+                    combs[#combs+1] = entity
+                end
+            end
+
+            try_create_station(stop, combs)
+        end
+        ::continue::
     end
 end
 
@@ -298,12 +315,19 @@ end
 ---@param rail LuaEntity
 function main_station.on_rail_broken(rail)
     for _, direction in pairs(defines.rail_direction) do
-        local stop = rail.get_rail_segment_stop(direction)
+        do
+            local stop = rail.get_rail_segment_stop(direction)
 
-        if not stop or stop.name ~= "sspp-stop" then return end -- not connected to the right kind of stop
-        if stop.connected_rail ~= rail then return end -- rail is not the last in the segment
+            if not stop or stop.name ~= "sspp-stop" then
+                goto continue -- not connected to the right kind of stop
+            end
+            if stop.connected_rail ~= rail then
+                goto continue -- rail is not the last in the segment
+            end
 
-        try_destroy_station(stop)
+            try_destroy_station(stop)
+        end
+        ::continue::
     end
 end
 
