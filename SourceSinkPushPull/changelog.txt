@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.4
+Date: 2025-04-25
+  Changes:
+    - Updated simplified chinese translation.
+    - The network item stations grid now defaults to showing surpluses and deficits instead of train counts.
+  Bugfixes:
+    - Fix misuse of on_entity_cloned event (fixes crashes with mods that clone things).
+    - Fix force building SSPP stops over vanila stops would cause things to break.
+    - Fix placing the connected rail last would sometimes not mark a station as complete.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.3
 Date: 2025-04-16
   Features:
