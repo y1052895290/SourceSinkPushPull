@@ -183,7 +183,7 @@ function gui_hauler.open(player_id, train)
         gui_hauler.close(player_id)
     end
 
-    local window, elements = glib.add_widget(player.gui.screen, {},
+    local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-hauler", style = "sspp_hauler_frame", direction = "vertical", children = {
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.sspp" } },

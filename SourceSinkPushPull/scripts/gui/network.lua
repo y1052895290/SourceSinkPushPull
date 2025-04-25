@@ -394,7 +394,7 @@ end }
 
 ---@param class_table LuaGuiElement
 local function add_new_class_row(class_table)
-    glib.add_widgets(class_table, nil, {
+    glib.add_elements(class_table, nil, nil, {
         { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
             { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_class_move },
@@ -416,7 +416,7 @@ end
 ---@param item_table LuaGuiElement
 ---@param elem_type string
 local function add_new_item_row(item_table, elem_type)
-    glib.add_widgets(item_table, nil, {
+    glib.add_elements(item_table, nil, nil, {
         { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
             { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
@@ -1141,7 +1141,7 @@ local function import_or_export_toggled(player_id, toggle, caption, handler)
         if not toggle.toggled then return end
     end
 
-    local window, elements = glib.add_widget(game.get_player(player_id).gui.screen, {},
+    local window, elements = glib.add_element(game.get_player(player_id).gui.screen, {},
         { type = "frame", name = "sspp-popup", style = "frame", direction = "vertical", children = {
             { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                 { type = "textfield", name = "textbox", style = "sspp_json_textbox" },
@@ -1194,7 +1194,7 @@ function gui_network.open(player_id, network_name, tab_index)
         localised_name = network.surface.localised_name
     end
 
-    local window, elements = glib.add_widget(player.gui.screen, {},
+    local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-network", style = "frame", direction = "vertical", children = {
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-network", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.network-for-surface", localised_name }, ignored_by_interaction = true },

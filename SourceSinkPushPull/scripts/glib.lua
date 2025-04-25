@@ -39,76 +39,90 @@ end
 glib.format_handler = format_handler
 
 ---@param parent LuaGuiElement
----@param elems {[string]: LuaGuiElement}?
----@param def GuiElemDef
----@return LuaGuiElement elem, {[string]: LuaGuiElement}? elems
-local function add_widget(parent, elems, def)
+---@param named_elements {[string]: LuaGuiElement}?
+---@param def GuiElementDef
+---@return LuaGuiElement element, {[string]: LuaGuiElement}? named_elements
+local function add_element(parent, named_elements, def)
+    local drag_target = def.drag_target
     local elem_mods = def.elem_mods
     local style_mods = def.style_mods
-    local drag_target = def.drag_target
     local handler = def.handler
     local children = def.children
 
+    def.drag_target = nil
     def.elem_mods = nil
     def.style_mods = nil
-    def.drag_target = nil
     def.handler = nil
     def.children = nil
 
-    local elem = parent.add(def)
+    ---@cast def -LuaGuiElement.add_param.extra
 
-    if elems then
+    local element = parent.add(def)
+
+    if named_elements then
         local name = def.name
-        if name then elems[name] = elem end
+        if name then
+            named_elements[name] = element
+        end
+        if drag_target then
+            element.drag_target = assert(named_elements[drag_target])
+        end
     end
     if elem_mods then
         for key, value in pairs(elem_mods) do
-            elem[key] = value
+            element[key] = value
         end
     end
     if style_mods then
         for key, value in pairs(style_mods) do
-            elem.style[key] = value
+            element.style[key] = value
         end
     end
-    if drag_target then
-        ---@cast elems -nil
-        elem.drag_target = assert(elems[drag_target])
-    end
     if handler then
-        elem.tags = format_handler(handler, elem.tags)
+        element.tags = format_handler(handler, element.tags)
     end
     if children then
         if def.type == "tab" then
-            local content = add_widget(parent, elems, children[1])
-            parent.add_tab(elem, content)
+            local content = add_element(parent, named_elements, children[1])
+            parent.add_tab(element, content)
         else
             for _, child in pairs(children) do
-                add_widget(elem, elems, child)
+                add_element(element, named_elements, child)
             end
         end
     end
 
+    ---@cast def +LuaGuiElement.add_param.extra
+
+    def.drag_target = drag_target
     def.elem_mods = elem_mods
     def.style_mods = style_mods
-    def.drag_target = drag_target
     def.handler = handler
     def.children = children
 
-    return elem, elems
+    return element, named_elements
 end
-glib.add_widget = add_widget
+glib.add_element = add_element
 
 ---@param parent LuaGuiElement
----@param elems {[string]: LuaGuiElement}?
----@param defs GuiElemDef[]
----@return {[string]: LuaGuiElement}? elems
-function glib.add_widgets(parent, elems, defs)
-    for _, def in pairs(defs) do
-        add_widget(parent, elems, def)
+---@param named_elements {[string]: LuaGuiElement}?
+---@param offset integer?
+---@param defs GuiElementDef[]
+---@return LuaGuiElement[] elements, {[string]: LuaGuiElement}? named_elements
+function glib.add_elements(parent, named_elements, offset, defs)
+    local elements = {}
+
+    for index, def in pairs(defs) do
+        if offset then
+            def.index = offset + index
+        end
+        elements[index] = add_element(parent, named_elements, def)
+        if offset then
+            def.index = nil
+        end
     end
 
-    return elems
+    return elements, named_elements
 end
 
 ---@param functions {[string]: function}

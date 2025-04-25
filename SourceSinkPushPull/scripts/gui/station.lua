@@ -398,7 +398,7 @@ end }
 ---@param provide_table LuaGuiElement
 ---@param elem_type string
 local function add_new_provide_row(provide_table, elem_type)
-    glib.add_widgets(provide_table, nil, {
+    glib.add_elements(provide_table, nil, nil, {
         { type = "flow", style = "vertical_flow", direction = "vertical", children = {
             { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
@@ -473,7 +473,7 @@ end
 ---@param request_table LuaGuiElement
 ---@param elem_type string
 local function add_new_request_row(request_table, elem_type)
-    glib.add_widgets(request_table, nil, {
+    glib.add_elements(request_table, nil, nil, {
         { type = "flow", style = "vertical_flow", direction = "vertical", children = {
             { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
                 { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
@@ -943,22 +943,22 @@ local handle_inactivity_toggled = { [events.on_gui_click] = function(event)
 end }
 
 ---@type GuiHandler
-local handle_add_provide_item = { [events.on_gui_click] = function(event)
+local handle_provide_add_item = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "item-with-quality")
 end }
 
 ---@type GuiHandler
-local handle_add_provide_fluid = { [events.on_gui_click] = function(event)
+local handle_provide_add_fluid = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "fluid")
 end }
 
 ---@type GuiHandler
-local handle_add_request_item = { [events.on_gui_click] = function(event)
+local handle_request_add_item = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, "item-with-quality")
 end }
 
 ---@type GuiHandler
-local handle_add_request_fluid = { [events.on_gui_click] = function(event)
+local handle_request_add_fluid = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, "fluid")
 end }
 
@@ -999,7 +999,7 @@ local function add_gui_complete(player, parts)
     local provide = parts.provide_io ~= nil
     local request = parts.request_io ~= nil
 
-    local window, elements = glib.add_widget(player.gui.screen, {},
+    local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
@@ -1032,8 +1032,8 @@ local function add_gui_complete(player, parts)
                                 { type = "scroll-pane", style = "sspp_station_scroll_pane", direction = "vertical", children = {
                                     { type = "table", name = "provide_table", style = "sspp_station_item_table", column_count = 5 },
                                     { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_add_provide_item },
-                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_add_provide_fluid },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_provide_add_item },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_provide_add_fluid },
                                     } },
                                 } },
                             } },
@@ -1050,8 +1050,8 @@ local function add_gui_complete(player, parts)
                                 { type = "scroll-pane", style = "sspp_station_scroll_pane", direction = "vertical", children = {
                                     { type = "table", name = "request_table", style = "sspp_station_item_table", column_count = 5 },
                                     { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_add_request_item },
-                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_add_request_fluid },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_request_add_item },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_request_add_fluid },
                                     } },
                                 } },
                             } },
@@ -1086,7 +1086,7 @@ end
 ---@param player LuaPlayer
 ---@return LuaGuiElement window, {[string]: LuaGuiElement} elements
 local function add_gui_incomplete(player)
-    local window, elements = glib.add_widget(player.gui.screen, {},
+    local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.incomplete-station" }, ignored_by_interaction = true },
@@ -1105,14 +1105,14 @@ end
 ---@param player_id PlayerId
 ---@param entity LuaEntity
 function gui_station.open(player_id, entity)
-    local player = assert(game.get_player(player_id))
+    local player = game.get_player(player_id) --[[@as LuaPlayer]]
     local unit_number = entity.unit_number --[[@as uint]]
     local parts = get_station_parts(entity)
     local network_name = entity.surface.name
 
     player.opened = nil
 
-    local window, elements ---@type LuaGuiElement, {[string]: LuaGuiElement}
+    local window, elements
     if parts then
         window, elements = add_gui_complete(player, parts)
     else
@@ -1179,10 +1179,10 @@ function gui_station.initialise()
         ["station_bufferless_toggled"] = handle_bufferless_toggled[events.on_gui_click],
         ["station_inactivity_toggled"] = handle_inactivity_toggled[events.on_gui_click],
         ["station_limit_changed"] = handle_limit_changed[events.on_gui_value_changed],
-        ["station_add_provide_item"] = handle_add_provide_item[events.on_gui_click],
-        ["station_add_provide_fluid"] = handle_add_provide_fluid[events.on_gui_click],
-        ["station_add_request_item"] = handle_add_request_item[events.on_gui_click],
-        ["station_add_request_fluid"] = handle_add_request_fluid[events.on_gui_click],
+        ["station_provide_add_item"] = handle_provide_add_item[events.on_gui_click],
+        ["station_provide_add_fluid"] = handle_provide_add_fluid[events.on_gui_click],
+        ["station_request_add_item"] = handle_request_add_item[events.on_gui_click],
+        ["station_request_add_fluid"] = handle_request_add_fluid[events.on_gui_click],
         ["station_view_on_map"] = handle_view_on_map[events.on_gui_click],
         ["station_close_window"] = handle_close_window[events.on_gui_click],
     })
