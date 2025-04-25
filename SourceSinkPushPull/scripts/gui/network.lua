@@ -949,7 +949,7 @@ function gui_network.on_poll_finished(player_gui)
     local stations_item_key = player_gui.stations_item
     if stations_item_key then
         local item_icon ---@type string?
-        if elements.grid_stations_mode_switch.switch_state == "right" then
+        if elements.grid_stations_mode_switch.switch_state == "left" then
             local name, quality = split_item_key(stations_item_key)
             item_icon = make_item_icon(name, quality)
         end
@@ -1267,7 +1267,7 @@ function gui_network.open(player_id, network_name, tab_index)
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
                         { type = "label", name = "grid_title", style = "subheader_caption_label" },
                         { type = "empty-widget", style = "flib_horizontal_pusher" },
-                        { type = "switch", name = "grid_stations_mode_switch", style = "switch", left_label_caption = "[item=locomotive]", right_label_caption = "[item=sspp-stop]", left_label_tooltip = { "sspp-gui.grid-stations-hauler-tooltip" }, right_label_tooltip = { "sspp-gui.grid-stations-station-tooltip" }, visible = false },
+                        { type = "switch", name = "grid_stations_mode_switch", style = "switch", left_label_caption = "[item=sspp-stop]", right_label_caption = "[item=locomotive]", left_label_tooltip = { "sspp-gui.grid-stations-station-tooltip" }, right_label_tooltip = { "sspp-gui.grid-stations-hauler-tooltip" }, visible = false },
                         { type = "sprite-button", name = "grid_provide_toggle", style = "control_settings_section_button", sprite = "virtual-signal/up-arrow", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_request_toggle", style = "control_settings_section_button", sprite = "virtual-signal/down-arrow", enabled = false, auto_toggle = true, toggled = true },
                         { type = "sprite-button", name = "grid_liquidate_toggle", style = "control_settings_section_button", sprite = "virtual-signal/signal-skull", enabled = false, auto_toggle = true, toggled = true },
