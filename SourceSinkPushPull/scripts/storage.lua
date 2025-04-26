@@ -195,11 +195,25 @@
 ---@field public type "STATION"
 ---@field public unit_number uint
 ---@field public parts StationParts?
+---@field public station Station?
+---@field public provide_context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>?
+---@field public request_context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>?
 
 ---@class (exact) PlayerGui.Hauler : PlayerGui.Abstract
 ---@field public type "HAULER"
 ---@field public train_id uint
 ---@field public train LuaTrain
+
+--------------------------------------------------------------------------------
+
+---@class GuiTableContext<Root, Key, Object> : {
+--- root: Root,
+--- table: LuaGuiElement,
+--- row_to_cells: LuaGuiElement[][],
+--- row_to_key: (Key|false)[],
+--- key_to_row: {[Key]: integer},
+--- key_to_object: {[Key]: Object},
+---}
 
 --------------------------------------------------------------------------------
 

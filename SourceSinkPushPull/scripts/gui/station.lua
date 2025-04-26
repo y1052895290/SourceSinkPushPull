@@ -16,7 +16,7 @@ local gui_station = {}
 
 --------------------------------------------------------------------------------
 
---- Find all of the entities that make up a station, works with ghosts.
+--- Find all of the entities that would make up a station, even if they are ghosts.
 ---@param entity LuaEntity
 ---@return StationParts?
 local function get_station_parts(entity)
@@ -66,11 +66,58 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param player_gui PlayerGui.Station
+---@param new_stop_name string?
+local function update_station_name(player_gui, new_stop_name)
+    local stop, station = player_gui.parts.stop, player_gui.station
+    local old_stop_name = stop.backer_name --[[@as string]]
+
+    if not new_stop_name then
+        if station then
+            local provide, request = station.provide, station.request
+            new_stop_name = lib.generate_stop_name(provide and provide.items, request and request.items)
+        else
+            new_stop_name = "[virtual-signal=signal-ghost]"
+        end
+    end
+
+    if old_stop_name ~= new_stop_name then
+        player_gui.parts.stop.backer_name = new_stop_name
+        if station then
+            for _, provide_or_request in pairs({ station.provide, station.request }) do
+                for _, hauler_ids in pairs(provide_or_request.deliveries) do
+                    for _, hauler_id in pairs(hauler_ids) do
+                        local train = storage.haulers[hauler_id].train
+                        local schedule = train.schedule --[[@as TrainSchedule]]
+                        for _, record in pairs(schedule.records) do
+                            if record.station == old_stop_name then record.station = new_stop_name end
+                        end
+                        train.schedule = schedule
+                    end
+                end
+            end
+        end
+        player_gui.elements.stop_name_label.caption = new_stop_name
+    end
+end
+
+--------------------------------------------------------------------------------
+
+---@type GuiTableMethods
+local provide_methods = {} ---@diagnostic disable-line: missing-fields
+
+---@type GuiTableMethods
+local request_methods = {} ---@diagnostic disable-line: missing-fields
+
+--------------------------------------------------------------------------------
+
 ---@param flow LuaGuiElement
 ---@return ItemMode mode
 local function get_active_mode_button(flow)
     for index, button in pairs(flow.children) do
-        if button.toggled then return index end
+        if button.toggled then
+            return index
+        end
     end
     error()
 end
@@ -83,346 +130,133 @@ local function set_active_mode_button(flow, mode)
     end
 end
 
----@param elements {[string]: LuaGuiElement}
----@return integer rows
-local function get_total_rows(elements)
-    local provide_table, request_table = elements.provide_table, elements.request_table
-    local rows = 0
-    rows = rows + #provide_table.children / provide_table.column_count
-    rows = rows + #request_table.children / request_table.column_count
-    return rows
-end
-
----@param table LuaGuiElement
----@param enabled boolean
-function set_buffer_settings_enabled(table, enabled)
-    local table_children = table.children
-    for i = 0, #table_children - 1, table.column_count do
-        table_children[i + 4].children[2].children[3].enabled = enabled
-        table_children[i + 4].children[3].children[3].enabled = enabled
-        table_children[i + 5].children[1].children[3].enabled = enabled
-        if not enabled then
-            -- these values don't matter for bufferless stations, but they still need to be valid
-            if not tonumber(table_children[i + 4].children[2].children[3].text) then table_children[i + 4].children[2].children[3].text = "0" end
-            if not tonumber(table_children[i + 4].children[3].children[3].text) then table_children[i + 4].children[3].children[3].text = "30" end
-        end
+---@generic Object
+---@param methods GuiTableMethods
+---@param context GuiTableContext<PlayerGui.Station, ItemKey, Object>
+---@param player_id PlayerId
+---@param button LuaGuiElement
+local function try_copy_item_or_fluid_row(methods, context, player_id, button)
+    if not lib.read_stop_flag(context.root.parts.stop, enums.stop_flags.bufferless) and #context.row_to_cells < 10 then
+        glib.table_copy_mutable_row(methods, context, button)
+    else
+        game.get_player(player_id).play_sound({ path = "utility/cannot_build" })
     end
 end
 
----@param deliveries {[ItemKey]: HaulerId[]}
----@param old_stop_name string
----@param new_stop_name string
-local function rename_schedules_stop(deliveries, old_stop_name, new_stop_name)
-    for _, hauler_ids in pairs(deliveries) do
-        for i = #hauler_ids, 1, -1 do
-            local train = storage.haulers[hauler_ids[i]].train
-            local schedule = train.schedule --[[@as TrainSchedule]]
-            for _, record in pairs(schedule.records) do
-                if record.station == old_stop_name then record.station = new_stop_name end
-            end
-            train.schedule = schedule
-        end
+---@type GuiHandler
+local handle_provide_move = { [events.on_gui_click] = function(event)
+    glib.table_move_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
+end }
+
+---@type GuiHandler
+local handle_request_move = { [events.on_gui_click] = function(event)
+    glib.table_move_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
+end }
+
+---@type GuiHandler
+local handle_provide_copy = { [events.on_gui_click] = function(event)
+    try_copy_item_or_fluid_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.player_index, event.element)
+end }
+
+---@type GuiHandler
+local handle_request_copy = { [events.on_gui_click] = function(event)
+    try_copy_item_or_fluid_row(request_methods, storage.player_guis[event.player_index].request_context, event.player_index, event.element)
+end }
+
+---@type GuiHandler
+local handle_provide_elem_changed = { [events.on_gui_elem_changed] = function(event)
+    if event.element.elem_value then
+        glib.table_modify_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
+    else
+        glib.table_remove_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
     end
-end
+end }
+
+---@type GuiHandler
+local handle_request_elem_changed = { [events.on_gui_elem_changed] = function(event)
+    if event.element.elem_value then
+        glib.table_modify_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
+    else
+        glib.table_remove_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
+    end
+end }
+
+---@type GuiHandler
+local handle_provide_text_changed = { [events.on_gui_text_changed] = function(event)
+    glib.table_modify_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
+end }
+
+---@type GuiHandler
+local handle_request_text_changed = { [events.on_gui_text_changed] = function(event)
+    glib.table_modify_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
+end }
+
+---@type GuiHandler
+local handle_provide_mode_click = { [events.on_gui_click] = function(event)
+    set_active_mode_button(event.element.parent, event.element.get_index_in_parent())
+    glib.table_modify_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
+end }
+
+---@type GuiHandler
+local handle_request_mode_click = { [events.on_gui_click] = function(event)
+    set_active_mode_button(event.element.parent, event.element.get_index_in_parent())
+    glib.table_modify_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
+end }
 
 --------------------------------------------------------------------------------
 
----@param table_children LuaGuiElement[]
----@param i integer
----@param network_item NetworkItem
-local function provide_to_row_network(table_children, i, network_item)
-    local quality = network_item.quality
-    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
-
-    table_children[i + 3].children[1].children[3].caption = network_item.class
-    table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
-    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
-end
-
----@param table_children LuaGuiElement[]
----@param i integer
----@param network_item NetworkItem
----@param item ProvideItem
-local function provide_to_row_statistics(table_children, i, network_item, item)
-    local name, quality = network_item.name, network_item.quality
-    local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
-    local stack_size = quality and prototypes.item[name].stack_size or 1
-
-    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, lib.compute_storage_needed(network_item, item) / stack_size }
-end
-
----@param table_children LuaGuiElement[]
----@param i integer
----@return ItemKey?, ProvideItem?
-local function provide_from_row(table_children, i)
-    local elem_value = table_children[i + 2].elem_value --[[@as (table|string)?]]
+function provide_methods.make_object(context, cells)
+    local elem_value = cells[2].elem_value --[[@as (table|string)?]]
     if not elem_value then return end
+
+    local throughput = tonumber(cells[4].children[2].children[3].text)
+    if not throughput then return end
+
+    local latency = tonumber(cells[4].children[3].children[3].text)
+    if not latency then return end
+
+    local granularity = tonumber(cells[4].children[4].children[3].text)
+    if not granularity or granularity < 1 then return end
 
     local _, _, item_key = extract_elem_value_fields(elem_value)
 
-    local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
-    if not throughput then return item_key end
-
-    local latency = tonumber(table_children[i + 4].children[3].children[3].text)
-    if not latency then return item_key end
-
-    local granularity = tonumber(table_children[i + 4].children[4].children[3].text)
-    if not granularity or granularity < 1 then return item_key end
-
     return item_key, {
-        mode = get_active_mode_button(table_children[i + 4].children[1].children[3]),
+        mode = get_active_mode_button(cells[4].children[1].children[3]),
         throughput = throughput,
         latency = latency,
         granularity = granularity,
     } --[[@as ProvideItem]]
 end
 
----@param player_gui PlayerGui.Station
----@param table_children LuaGuiElement[]
----@param i integer
----@param item_key ItemKey?
----@param item ProvideItem?
-local function provide_to_row(player_gui, table_children, i, item_key, item)
-    local network_item = item_key and storage.networks[player_gui.network].items[item_key]
+function provide_methods.insert_row_blank(context, row_offset, elem_type)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast elem_type string
 
-    if network_item then
-        provide_to_row_network(table_children, i, network_item)
-    else
-        table_children[i + 3].children[1].children[3].caption = ""
-        table_children[i + 3].children[2].children[3].caption = ""
-        table_children[i + 3].children[3].children[3].caption = ""
-    end
-
-    if network_item and item then
-        provide_to_row_statistics(table_children, i, network_item, item)
-    else
-        table_children[i + 5].children[1].children[3].caption = ""
-        table_children[i + 5].children[2].children[3].caption = ""
-    end
-
-    if item then
-        table_children[i + 1].children[2].sprite = ""
-        table_children[i + 1].children[2].tooltip = nil
-    else
-        table_children[i + 1].children[2].sprite = "utility/achievement_warning"
-        table_children[i + 1].children[2].tooltip = { "sspp-gui.invalid-values-tooltip" }
-    end
-end
-
----@param player_gui PlayerGui.Station
----@param item_key ItemKey
-local function provide_remove_key(player_gui, item_key)
-    local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
-    local network = storage.networks[player_gui.network]
-
-    lib.set_haulers_to_manual(station.provide.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
-    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
-end
-
---------------------------------------------------------------------------------
-
----@param table_children LuaGuiElement[]
----@param i integer
----@param network_item NetworkItem
-local function request_to_row_network(table_children, i, network_item)
-    local quality = network_item.quality
-    local fmt_items_or_units = quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units"
-
-    table_children[i + 3].children[1].children[3].caption = network_item.class
-    table_children[i + 3].children[2].children[3].caption = { fmt_items_or_units, network_item.delivery_size }
-    table_children[i + 3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
-end
-
----@param table_children LuaGuiElement[]
----@param i integer
----@param network_item NetworkItem
----@param item RequestItem
-local function request_to_row_statistics(table_children, i, network_item, item)
-    local name, quality = network_item.name, network_item.quality
-    local fmt_slots_or_units = quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units"
-    local stack_size = quality and prototypes.item[name].stack_size or 1
-
-    table_children[i + 5].children[1].children[3].caption = { fmt_slots_or_units, lib.compute_storage_needed(network_item, item) / stack_size }
-end
-
----@param table_children LuaGuiElement[]
----@param i integer
----@return ItemKey?, RequestItem?
-local function request_from_row(table_children, i)
-    local elem_value = table_children[i + 2].elem_value --[[@as (table|string)?]]
-    if not elem_value then return end
-
-    local _, _, item_key = extract_elem_value_fields(elem_value)
-
-    local throughput = tonumber(table_children[i + 4].children[2].children[3].text)
-    if not throughput then return item_key end
-
-    local latency = tonumber(table_children[i + 4].children[3].children[3].text)
-    if not latency then return item_key end
-
-    return item_key, {
-        mode = get_active_mode_button(table_children[i + 4].children[1].children[3]),
-        throughput = throughput,
-        latency = latency,
-    } --[[@as RequestItem]]
-end
-
----@param player_gui PlayerGui.Station
----@param table_children LuaGuiElement[]
----@param i integer
----@param item_key ItemKey?
----@param item RequestItem?
-local function request_to_row(player_gui, table_children, i, item_key, item)
-    local network_item = item_key and storage.networks[player_gui.network].items[item_key]
-
-    if network_item then
-        request_to_row_network(table_children, i, network_item)
-    else
-        table_children[i + 3].children[1].children[3].caption = ""
-        table_children[i + 3].children[2].children[3].caption = ""
-        table_children[i + 3].children[3].children[3].caption = ""
-    end
-
-    if network_item and item then
-        request_to_row_statistics(table_children, i, network_item, item)
-    else
-        table_children[i + 5].children[1].children[3].caption = ""
-        table_children[i + 5].children[2].children[3].caption = ""
-    end
-
-    if item then
-        table_children[i + 1].children[2].sprite = ""
-        table_children[i + 1].children[2].tooltip = nil
-    else
-        table_children[i + 1].children[2].sprite = "utility/achievement_warning"
-        table_children[i + 1].children[2].tooltip = { "sspp-gui.invalid-values-tooltip" }
-    end
-end
-
----@param player_gui PlayerGui.Station
----@param item_key ItemKey
-local function request_remove_key(player_gui, item_key)
-    local station = storage.stations[player_gui.parts.stop.unit_number] --[[@as Station]]
-    local network = storage.networks[player_gui.network]
-
-    lib.set_haulers_to_manual(station.request.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
-    storage.disabled_items[network.surface.name .. ":" .. item_key] = true
-end
-
---------------------------------------------------------------------------------
-
----@param player_id PlayerId
-local function update_station_after_change(player_id)
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Station]]
-    local parts = player_gui.parts --[[@as StationParts]]
-    local stop, provide_io, request_io = parts.stop, parts.provide_io, parts.request_io
-    local station = storage.stations[stop.unit_number] --[[@as Station?]]
-
-    if provide_io then
-        local items = glib.refresh_table(
-            player_gui.elements.provide_table,
-            provide_from_row,
-            function(b, c, d, e) return provide_to_row(player_gui, b, c, d, e) end,
-            station and station.provide.items,
-            station and function(b) return provide_remove_key(player_gui, b) end
-        )
-        if station then
-            station.provide.items = items
-            lib.ensure_hidden_combs(station.provide.comb, station.provide.hidden_combs, items)
-        end
-        provide_io.combinator_description = lib.provide_items_to_combinator_description(items)
-    end
-
-    if request_io then
-        local items = glib.refresh_table(
-            player_gui.elements.request_table,
-            request_from_row,
-            function(b, c, d, e) return request_to_row(player_gui, b, c, d, e) end,
-            station and station.request.items,
-            station and function(b) return request_remove_key(player_gui, b) end
-        )
-        if station then
-            station.request.items = items
-            lib.ensure_hidden_combs(station.request.comb, station.request.hidden_combs, items)
-        end
-        request_io.combinator_description = lib.request_items_to_combinator_description(items)
-    end
-
-    if station and not lib.read_stop_flag(stop, enums.stop_flags.custom_name) then
-        local provide, request = station.provide, station.request
-        local old_stop_name = stop.backer_name --[[@as string]]
-        local new_stop_name = lib.generate_stop_name(provide and provide.items, request and request.items)
-        if old_stop_name ~= new_stop_name then
-            if provide then rename_schedules_stop(provide.deliveries, old_stop_name, new_stop_name) end
-            if request then rename_schedules_stop(request.deliveries, old_stop_name, new_stop_name) end
-            stop.backer_name = new_stop_name
-            player_gui.elements.stop_name_label.caption = new_stop_name
-        end
-    end
-end
-
----@type GuiHandler
-local handle_item_move = { [events.on_gui_click] = function(event)
-    local flow = event.element.parent.parent --[[@as LuaGuiElement]]
-    glib.move_row(flow.parent, flow.get_index_in_parent(), event.element.get_index_in_parent())
-    update_station_after_change(event.player_index)
-end }
-
----@type GuiHandler
-local handle_provide_copy = {} -- defined later
-
----@type GuiHandler
-local handle_request_copy = {} -- defined later
-
----@type GuiHandler
-local handle_item_elem_changed = { [events.on_gui_elem_changed] = function(event)
-    if not event.element.elem_value then
-        glib.delete_row(event.element.parent, event.element.get_index_in_parent() - 1)
-    end
-    update_station_after_change(event.player_index)
-end }
-
----@type GuiHandler
-local handle_item_text_changed = { [events.on_gui_text_changed] = function(event)
-    update_station_after_change(event.player_index)
-end }
-
----@type GuiHandler
-local handle_item_mode_click = { [events.on_gui_click] = function(event)
-    set_active_mode_button(event.element.parent, event.element.get_index_in_parent())
-    update_station_after_change(event.player_index)
-end }
-
---------------------------------------------------------------------------------
-
----@param provide_table LuaGuiElement
----@param elem_type string
-local function add_new_provide_row(provide_table, elem_type)
-    glib.add_elements(provide_table, nil, nil, {
+    return glib.add_elements(context.table, nil, row_offset, {
         { type = "flow", style = "vertical_flow", direction = "vertical", children = {
             { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
-                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
-                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_item_move },
+                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_provide_move },
+                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_provide_move },
             } },
             { type = "sprite", style = "sspp_vertical_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
             { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = handle_provide_copy },
         } },
-        { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_item_elem_changed },
+        { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_provide_elem_changed },
         { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-time" }), tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
         } },
         { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
@@ -430,74 +264,209 @@ local function add_new_provide_row(provide_table, elem_type)
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.mode" }), tooltip = { "sspp-gui.provide-mode-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
                 { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-1", tooltip = { "sspp-gui.provide-mode-tooltip-1" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-2", tooltip = { "sspp-gui.provide-mode-tooltip-2" }, toggled = true, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-3", tooltip = { "sspp-gui.provide-mode-tooltip-3" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-4", tooltip = { "sspp-gui.provide-mode-tooltip-4" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-5", tooltip = { "sspp-gui.provide-mode-tooltip-5" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-6", tooltip = { "sspp-gui.provide-mode-tooltip-6" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.provide-mode-tooltip-dynamic" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-1", tooltip = { "sspp-gui.provide-mode-tooltip-1" }, handler = handle_provide_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-2", tooltip = { "sspp-gui.provide-mode-tooltip-2" }, toggled = true, handler = handle_provide_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-3", tooltip = { "sspp-gui.provide-mode-tooltip-3" }, handler = handle_provide_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-4", tooltip = { "sspp-gui.provide-mode-tooltip-4" }, handler = handle_provide_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-5", tooltip = { "sspp-gui.provide-mode-tooltip-5" }, handler = handle_provide_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-6", tooltip = { "sspp-gui.provide-mode-tooltip-6" }, handler = handle_provide_mode_click },
+                    { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.provide-mode-tooltip-dynamic" }, handler = handle_provide_mode_click },
                 } },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.throughput" }), tooltip = { "sspp-gui.provide-throughput-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "", handler = handle_item_text_changed },
+                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "", handler = handle_provide_text_changed },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.latency" }), tooltip = { "sspp-gui.provide-latency-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "30", handler = handle_item_text_changed },
+                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "30", handler = handle_provide_text_changed },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.granularity" }), tooltip = { "sspp-gui.provide-granularity-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, text = "1", handler = handle_item_text_changed },
+                { type = "textfield", style = "sspp_number_textbox", numeric = true, text = "1", handler = handle_provide_text_changed },
             } },
         } },
         { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.storage-needed" }), tooltip = { "sspp-gui.provide-storage-needed-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-surplus" }), tooltip = { "sspp-gui.provide-current-surplus-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
         } },
     })
 end
 
----@param request_table LuaGuiElement
----@param elem_type string
-local function add_new_request_row(request_table, elem_type)
-    glib.add_elements(request_table, nil, nil, {
+function provide_methods.insert_row_complete(context, row_offset, item_key, provide_item)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast item_key ItemKey
+    ---@cast provide_item ProvideItem
+
+    local name, quality = split_item_key(item_key)
+    local cells = provide_methods.insert_row_blank(context, row_offset, quality and "item-with-quality" or "fluid")
+
+    cells[2].elem_value = quality and { name = name, quality = quality } or name
+
+    set_active_mode_button(cells[4].children[1].children[3], provide_item.mode)
+    cells[4].children[2].children[3].text = tostring(provide_item.throughput)
+    cells[4].children[3].children[3].text = tostring(provide_item.latency)
+    cells[4].children[4].children[3].text = tostring(provide_item.granularity)
+
+    cells[1].children[2].sprite = ""
+    cells[1].children[2].tooltip = nil
+
+    local network_item = storage.networks[context.root.network].items[item_key]
+    if network_item then
+        cells[3].children[1].children[3].caption = network_item.class
+        cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
+        cells[3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
+
+        cells[5].children[1].children[3].caption = { quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units", lib.compute_storage_needed(network_item, provide_item) / (quality and prototypes.item[name].stack_size or 1) }
+    end
+
+    return cells
+end
+
+function provide_methods.insert_row_copy(context, row_offset, src_cells)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+
+    local cells = provide_methods.insert_row_blank(context, row_offset, src_cells[2].elem_type)
+
+    set_active_mode_button(cells[4].children[1].children[3], get_active_mode_button(src_cells[4].children[1].children[3]))
+    cells[4].children[2].children[3].text = src_cells[4].children[2].children[3].text
+    cells[4].children[3].children[3].text = src_cells[4].children[3].children[3].text
+    cells[4].children[4].children[3].text = src_cells[4].children[4].children[3].text
+
+    return cells
+end
+
+function provide_methods.on_row_changed(context, cells, item_key, provide_item)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast item_key ItemKey?
+    ---@cast provide_item ProvideItem?
+
+    local name, quality = nil, nil
+    if item_key then
+        name, quality = split_item_key(item_key)
+    else
+        local elem_value = cells[2].elem_value
+        if elem_value then
+            name, quality, item_key = extract_elem_value_fields(elem_value)
+        end
+    end
+
+    local network_item = item_key and storage.networks[context.root.network].items[item_key]
+
+    if network_item then
+        cells[3].children[1].children[3].caption = network_item.class
+        cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
+        cells[3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
+    else
+        cells[3].children[1].children[3].caption = ""
+        cells[3].children[2].children[3].caption = ""
+        cells[3].children[3].children[3].caption = ""
+    end
+
+    if provide_item then
+        cells[1].children[2].sprite = ""
+        cells[1].children[2].tooltip = nil
+    else
+        cells[1].children[2].sprite = "utility/achievement_warning"
+        cells[1].children[2].tooltip = { "sspp-gui.invalid-values-tooltip" }
+    end
+
+    if network_item and provide_item then
+        cells[5].children[1].children[3].caption = { quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units", lib.compute_storage_needed(network_item, provide_item) / (quality and prototypes.item[name].stack_size or 1) }
+    else
+        cells[5].children[1].children[3].caption = ""
+        cells[5].children[2].children[3].caption = ""
+    end
+end
+
+function provide_methods.on_object_changed(context, item_key, provide_item)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast item_key ItemKey
+    ---@cast provide_item ProvideItem?
+
+    if not provide_item then
+        local station = context.root.station
+        if station then
+            lib.set_haulers_to_manual(station.provide.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+            storage.disabled_items[context.root.network .. ":" .. item_key] = true
+        end
+    end
+end
+
+function provide_methods.on_mutation_finished(context)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+
+    local station, provide_items = context.root.station, context.key_to_object
+    if station then
+        station.provide.items = provide_items
+        lib.ensure_hidden_combs(station.provide.comb, station.provide.hidden_combs, provide_items)
+        if not lib.read_stop_flag(station.stop, enums.stop_flags.custom_name) then update_station_name(context.root, nil) end
+    end
+
+    context.root.parts.provide_io.combinator_description = lib.provide_items_to_combinator_description(provide_items)
+end
+
+--------------------------------------------------------------------------------
+
+function request_methods.make_object(context, cells)
+    local elem_value = cells[2].elem_value --[[@as (table|string)?]]
+    if not elem_value then return end
+
+    local throughput = tonumber(cells[4].children[2].children[3].text)
+    if not throughput then return end
+
+    local latency = tonumber(cells[4].children[3].children[3].text)
+    if not latency then return end
+
+    local _, _, item_key = extract_elem_value_fields(elem_value)
+
+    return item_key, {
+        mode = get_active_mode_button(cells[4].children[1].children[3]),
+        throughput = throughput,
+        latency = latency,
+    } --[[@as RequestItem]]
+end
+
+function request_methods.insert_row_blank(context, row_offset, elem_type)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast elem_type string
+
+    return glib.add_elements(context.table, nil, row_offset, {
         { type = "flow", style = "vertical_flow", direction = "vertical", children = {
             { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
-                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_item_move },
-                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_item_move },
+                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_request_move },
+                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_request_move },
             } },
             { type = "sprite", style = "sspp_vertical_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
             { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = handle_request_copy },
         } },
-        { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_item_elem_changed },
+        { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_request_elem_changed },
         { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-time" }), tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
         } },
         { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
@@ -505,168 +474,221 @@ local function add_new_request_row(request_table, elem_type)
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.mode" }), tooltip = { "sspp-gui.request-mode-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
                 { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-1", tooltip = { "sspp-gui.request-mode-tooltip-1" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-2", tooltip = { "sspp-gui.request-mode-tooltip-2" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-3", tooltip = { "sspp-gui.request-mode-tooltip-3" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-4", tooltip = { "sspp-gui.request-mode-tooltip-4" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-5", tooltip = { "sspp-gui.request-mode-tooltip-5" }, toggled = true, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-6", tooltip = { "sspp-gui.request-mode-tooltip-6" }, handler = handle_item_mode_click },
-                    { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.request-mode-tooltip-dynamic" }, handler = handle_item_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-1", tooltip = { "sspp-gui.request-mode-tooltip-1" }, handler = handle_request_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-2", tooltip = { "sspp-gui.request-mode-tooltip-2" }, handler = handle_request_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-3", tooltip = { "sspp-gui.request-mode-tooltip-3" }, handler = handle_request_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-4", tooltip = { "sspp-gui.request-mode-tooltip-4" }, handler = handle_request_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-5", tooltip = { "sspp-gui.request-mode-tooltip-5" }, toggled = true, handler = handle_request_mode_click },
+                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-6", tooltip = { "sspp-gui.request-mode-tooltip-6" }, handler = handle_request_mode_click },
+                    { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.request-mode-tooltip-dynamic" }, handler = handle_request_mode_click },
                 } },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.throughput" }), tooltip = { "sspp-gui.request-throughput-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "", handler = handle_item_text_changed },
+                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "", handler = handle_request_text_changed },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.latency" }), tooltip = { "sspp-gui.request-latency-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "30", handler = handle_item_text_changed },
+                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "30", handler = handle_request_text_changed },
             } },
         } },
         { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.storage-needed" }), tooltip = { "sspp-gui.request-storage-needed-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
             { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-deficit" }), tooltip = { "sspp-gui.request-current-surplus-tooltip" } },
+                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-deficit" }), tooltip = { "sspp-gui.request-current-deficit-tooltip" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" }
+                { type = "label", style = "label" },
             } },
         } },
     })
 end
 
----@param player_id PlayerId
----@param table_name string
----@param inner function
----@param elem_type string
----@return boolean success
-local function try_add_item_or_fluid(player_id, table_name, inner, elem_type)
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
-    local table = player_gui.elements[table_name]
+function request_methods.insert_row_complete(context, row_offset, item_key, request_item)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast item_key ItemKey
+    ---@cast request_item RequestItem
 
-    if lib.read_stop_flag(stop, enums.stop_flags.bufferless) then
-        if get_total_rows(player_gui.elements) == 0 then
-            inner(table, elem_type)
-            set_buffer_settings_enabled(table, false)
-            update_station_after_change(player_id)
-            return true
+    local name, quality = split_item_key(item_key)
+    local cells = request_methods.insert_row_blank(context, row_offset, quality and "item-with-quality" or "fluid")
+
+    cells[2].elem_value = quality and { name = name, quality = quality } or name
+
+    set_active_mode_button(cells[4].children[1].children[3], request_item.mode)
+    cells[4].children[2].children[3].text = tostring(request_item.throughput)
+    cells[4].children[3].children[3].text = tostring(request_item.latency)
+
+    cells[1].children[2].sprite = ""
+    cells[1].children[2].tooltip = nil
+
+    local network_item = storage.networks[context.root.network].items[item_key]
+    if network_item then
+        cells[3].children[1].children[3].caption = network_item.class
+        cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
+        cells[3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
+
+        cells[5].children[1].children[3].caption = { quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units", lib.compute_storage_needed(network_item, request_item) / (quality and prototypes.item[name].stack_size or 1) }
+    end
+
+    return cells
+end
+
+function request_methods.insert_row_copy(context, row_offset, src_cells)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+
+    local cells = request_methods.insert_row_blank(context, row_offset, src_cells[2].elem_type)
+
+    set_active_mode_button(cells[4].children[1].children[3], get_active_mode_button(src_cells[4].children[1].children[3]))
+    cells[4].children[2].children[3].text = src_cells[4].children[2].children[3].text
+    cells[4].children[3].children[3].text = src_cells[4].children[3].children[3].text
+
+    return cells
+end
+
+function request_methods.on_row_changed(context, cells, item_key, request_item)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast item_key ItemKey?
+    ---@cast request_item RequestItem?
+
+    local name, quality = nil, nil
+    if item_key then
+        name, quality = split_item_key(item_key)
+    else
+        local elem_value = cells[2].elem_value
+        if elem_value then
+            name, quality, item_key = extract_elem_value_fields(elem_value)
         end
-    elseif #table.children < table.column_count * 10 then
-        inner(table, elem_type)
-        return true
     end
 
+    local network_item = item_key and storage.networks[context.root.network].items[item_key]
+
+    if network_item then
+        cells[3].children[1].children[3].caption = network_item.class
+        cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
+        cells[3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
+    else
+        cells[3].children[1].children[3].caption = ""
+        cells[3].children[2].children[3].caption = ""
+        cells[3].children[3].children[3].caption = ""
+    end
+
+    if request_item then
+        cells[1].children[2].sprite = ""
+        cells[1].children[2].tooltip = nil
+    else
+        cells[1].children[2].sprite = "utility/achievement_warning"
+        cells[1].children[2].tooltip = { "sspp-gui.invalid-values-tooltip" }
+    end
+
+    if network_item and request_item then
+        cells[5].children[1].children[3].caption = { quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units", lib.compute_storage_needed(network_item, request_item) / (quality and prototypes.item[name].stack_size or 1) }
+    else
+        cells[5].children[1].children[3].caption = ""
+        cells[5].children[2].children[3].caption = ""
+    end
+end
+
+function request_methods.on_object_changed(context, item_key, request_item)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast item_key ItemKey
+    ---@cast request_item RequestItem?
+
+    if not request_item then
+        local station = context.root.station
+        if station then
+            lib.set_haulers_to_manual(station.request.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
+            storage.disabled_items[context.root.network .. ":" .. item_key] = true
+        end
+    end
+end
+
+function request_methods.on_mutation_finished(context)
+    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+
+    local station, request_items = context.root.station, context.key_to_object
+    if station then
+        station.request.items = request_items
+        lib.ensure_hidden_combs(station.request.comb, station.request.hidden_combs, request_items)
+        if not lib.read_stop_flag(station.stop, enums.stop_flags.custom_name) then update_station_name(context.root, nil) end
+    end
+
+    context.root.parts.request_io.combinator_description = lib.request_items_to_combinator_description(request_items)
+end
+
+--------------------------------------------------------------------------------
+
+---@generic Object
+---@param methods GuiTableMethods
+---@param context GuiTableContext<PlayerGui.Station, ItemKey, Object>
+---@param enabled boolean
+local function set_buffer_settings_enabled(methods, context, enabled)
+    for _, cells in pairs(context.row_to_cells) do
+        if not enabled then
+            -- these values don't matter for bufferless stations, but they still need to be valid
+            if not tonumber(cells[4].children[2].children[3].text) then cells[4].children[2].children[3].text = "0" end
+            if not tonumber(cells[4].children[3].children[3].text) then cells[4].children[3].children[3].text = "30" end
+        end
+
+        cells[4].children[2].children[3].enabled = enabled
+        cells[4].children[3].children[3].enabled = enabled
+        cells[5].children[1].children[3].enabled = enabled
+
+        glib.table_modify_mutable_row(methods, context, cells[1])
+    end
+end
+
+---@generic Object
+---@param methods GuiTableMethods
+---@param context GuiTableContext<PlayerGui.Station, ItemKey, Object>
+---@param player_id PlayerId
+---@param elem_type string
+local function try_add_item_or_fluid_row(methods, context, player_id, elem_type)
+    local player_gui = context.root
+    if lib.read_stop_flag(player_gui.parts.stop, enums.stop_flags.bufferless) then
+        if not player_gui.provide_context or #player_gui.provide_context.row_to_cells == 0 then
+            if not player_gui.request_context or #player_gui.request_context.row_to_cells == 0 then
+                glib.table_insert_blank_mutable_row(methods, context, nil, elem_type)
+                set_buffer_settings_enabled(methods, context, false)
+                return
+            end
+        end
+    elseif #context.row_to_cells < 10 then
+        glib.table_insert_blank_mutable_row(methods, context, nil, elem_type)
+        return
+    end
     game.get_player(player_id).play_sound({ path = "utility/cannot_build" })
-    return false
 end
 
---------------------------------------------------------------------------------
+---@type GuiHandler
+local handle_provide_add_item = { [events.on_gui_click] = function(event)
+    try_add_item_or_fluid_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.player_index, "item-with-quality")
+end }
 
-handle_provide_copy[events.on_gui_click] = function(event)
-    local flow = event.element.parent --[[@as LuaGuiElement]]
-    local table = flow.parent --[[@as LuaGuiElement]]
+---@type GuiHandler
+local handle_provide_add_fluid = { [events.on_gui_click] = function(event)
+    try_add_item_or_fluid_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.player_index, "fluid")
+end }
 
-    local i = flow.get_index_in_parent() - 1
-    local elem_type = table.children[i + 2].elem_type
-    if not try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, elem_type) then return end
+---@type GuiHandler
+local handle_request_add_item = { [events.on_gui_click] = function(event)
+    try_add_item_or_fluid_row(request_methods, storage.player_guis[event.player_index].request_context, event.player_index, "item-with-quality")
+end }
 
-    local j = i + table.column_count
-    glib.insert_newly_added_row(table, j)
-
-    local table_children = table.children
-    set_active_mode_button(table_children[j + 4].children[1].children[3], get_active_mode_button(table_children[i + 4].children[1].children[3]))
-    table_children[j + 4].children[2].children[3].text = table_children[i + 4].children[2].children[3].text
-    table_children[j + 4].children[3].children[3].text = table_children[i + 4].children[3].children[3].text
-    table_children[j + 4].children[4].children[3].text = table_children[i + 4].children[4].children[3].text
-end
-
-handle_request_copy[events.on_gui_click] = function(event)
-    local flow = event.element.parent --[[@as LuaGuiElement]]
-    local table = flow.parent --[[@as LuaGuiElement]]
-
-    local i = flow.get_index_in_parent() - 1
-    local elem_type = table.children[i + 2].elem_type
-    if not try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, elem_type) then return end
-
-    local j = i + table.column_count
-    glib.insert_newly_added_row(table, j)
-
-    local table_children = table.children
-    set_active_mode_button(table_children[j + 4].children[1].children[3], get_active_mode_button(table_children[i + 4].children[1].children[3]))
-    table_children[j + 4].children[2].children[3].text = table_children[i + 4].children[2].children[3].text
-    table_children[j + 4].children[3].children[3].text = table_children[i + 4].children[3].children[3].text
-end
-
---------------------------------------------------------------------------------
-
----@param network_items {[ItemKey]: NetworkItem}
----@param provide_table LuaGuiElement
----@param item_key ItemKey
----@param item ProvideItem
-local function provide_init_row(network_items, provide_table, item_key, item)
-    local name, quality = split_item_key(item_key)
-    add_new_provide_row(provide_table, quality and "item-with-quality" or "fluid")
-
-    local table_children = provide_table.children
-    local i = #table_children - provide_table.column_count
-
-    table_children[i + 2].elem_value = quality and { name = name, quality = quality } or name
-
-    local network_item = network_items[item_key]
-    if network_item then
-        provide_to_row_network(table_children, i, network_item)
-        provide_to_row_statistics(table_children, i, network_item, item)
-    end
-
-    set_active_mode_button(table_children[i + 4].children[1].children[3], item.mode)
-    table_children[i + 4].children[2].children[3].text = tostring(item.throughput)
-    table_children[i + 4].children[3].children[3].text = tostring(item.latency)
-    table_children[i + 4].children[4].children[3].text = tostring(item.granularity)
-
-    table_children[i + 1].children[2].sprite = ""
-    table_children[i + 1].children[2].tooltip = nil
-end
-
----@param network_items {[ItemKey]: NetworkItem}
----@param request_table LuaGuiElement
----@param item_key ItemKey
----@param item RequestItem
-local function request_init_row(network_items, request_table, item_key, item)
-    local name, quality = split_item_key(item_key)
-    add_new_request_row(request_table, quality and "item-with-quality" or "fluid")
-
-    local table_children = request_table.children
-    local i = #table_children - request_table.column_count
-
-    table_children[i + 2].elem_value = quality and { name = name, quality = quality } or name
-
-    local network_item = network_items[item_key]
-    if network_item then
-        request_to_row_network(table_children, i, network_item)
-        request_to_row_statistics(table_children, i, network_item, item)
-    end
-
-    set_active_mode_button(table_children[i + 4].children[1].children[3], item.mode)
-    table_children[i + 4].children[2].children[3].text = tostring(item.throughput)
-    table_children[i + 4].children[3].children[3].text = tostring(item.latency)
-
-    table_children[i + 1].children[2].sprite = ""
-    table_children[i + 1].children[2].tooltip = nil
-end
+---@type GuiHandler
+local handle_request_add_fluid = { [events.on_gui_click] = function(event)
+    try_add_item_or_fluid_row(request_methods, storage.player_guis[event.player_index].request_context, event.player_index, "fluid")
+end }
 
 --------------------------------------------------------------------------------
 
 ---@param player_gui PlayerGui.Station
 function gui_station.on_poll_finished(player_gui)
-    local parts = player_gui.parts
-    if not parts then return end
-    local station = storage.stations[parts.stop.unit_number] --[[@as Station?]]
+    local station = player_gui.station
     if not station then return end
     local provide, request = station.provide, station.request
 
@@ -679,29 +701,28 @@ function gui_station.on_poll_finished(player_gui)
     local old_length, new_length = #grid_children, 0
 
     if provide then
-        local table_children = elements.provide_table.children
+        local context = player_gui.provide_context ---@cast context -nil
         local dynamic_index = -1 -- zero based
 
-        for i = 0, #table_children - 1, elements.provide_table.column_count do
-            if table_children[i + 1].children[2].sprite == "" then
-                local _, quality, item_key = extract_elem_value_fields(table_children[i + 2].elem_value)
-                local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
+        for item_key, row_index in pairs(context.key_to_row) do
+            local cells = context.row_to_cells[row_index]
+            local dynamic_button = cells[4].children[1].children[3].children[7]
 
-                local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.provide-mode-tooltip-dynamic" }
-                if dynamic_button.toggled then
-                    dynamic_index = dynamic_index + 1
-                    dynamic_sprite = "virtual-signal/sspp-signal-" .. tostring(dynamic_index)
-                    local provide_mode = provide.modes[item_key]
-                    if provide_mode then
-                        dynamic_tooltip = { "sspp-gui.fmt-dynamic-mode-active-tooltip", dynamic_tooltip, provide_mode }
-                    end
+            local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.provide-mode-tooltip-dynamic" }
+            if dynamic_button.toggled then
+                dynamic_index = dynamic_index + 1
+                dynamic_sprite = "virtual-signal/sspp-signal-" .. tostring(dynamic_index)
+                local provide_mode = provide.modes[item_key]
+                if provide_mode then
+                    dynamic_tooltip = { "sspp-gui.fmt-dynamic-mode-active-tooltip", dynamic_tooltip, provide_mode }
                 end
-                dynamic_button.sprite, dynamic_button.tooltip = dynamic_sprite, dynamic_tooltip
+            end
+            dynamic_button.sprite, dynamic_button.tooltip = dynamic_sprite, dynamic_tooltip
 
-                local provide_count = provide.counts[item_key]
-                if provide_count then
-                    table_children[i + 5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", provide_count }
-                end
+            local provide_count = provide.counts[item_key]
+            if provide_count then
+                local _, quality = split_item_key(item_key)
+                cells[5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", provide_count }
             end
         end
 
@@ -721,29 +742,28 @@ function gui_station.on_poll_finished(player_gui)
     end
 
     if request then
-        local table_children = elements.request_table.children
+        local context = player_gui.request_context ---@cast context -nil
         local dynamic_index = -1 -- zero based
 
-        for i = 0, #table_children - 1, elements.request_table.column_count do
-            if table_children[i + 1].children[2].sprite == "" then
-                local _, quality, item_key = extract_elem_value_fields(table_children[i + 2].elem_value)
-                local dynamic_button = table_children[i + 4].children[1].children[3].children[7]
+        for item_key, row_index in pairs(context.key_to_row) do
+            local cells = context.row_to_cells[row_index]
+            local dynamic_button = cells[4].children[1].children[3].children[7]
 
-                local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.request-mode-tooltip-dynamic" }
-                if dynamic_button.toggled then
-                    dynamic_index = dynamic_index + 1
-                    dynamic_sprite = "virtual-signal/sspp-signal-" .. tostring(dynamic_index)
-                    local request_mode = request.modes[item_key]
-                    if request_mode then
-                        dynamic_tooltip = { "sspp-gui.fmt-dynamic-mode-active-tooltip", dynamic_tooltip, request_mode }
-                    end
+            local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.request-mode-tooltip-dynamic" }
+            if dynamic_button.toggled then
+                dynamic_index = dynamic_index + 1
+                dynamic_sprite = "virtual-signal/sspp-signal-" .. tostring(dynamic_index)
+                local request_mode = request.modes[item_key]
+                if request_mode then
+                    dynamic_tooltip = { "sspp-gui.fmt-dynamic-mode-active-tooltip", dynamic_tooltip, request_mode }
                 end
-                dynamic_button.sprite, dynamic_button.tooltip = dynamic_sprite, dynamic_tooltip
+            end
+            dynamic_button.sprite, dynamic_button.tooltip = dynamic_sprite, dynamic_tooltip
 
-                local request_count = request.counts[item_key]
-                if request_count then
-                    table_children[i + 5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", request_count }
-                end
+            local request_count = request.counts[item_key]
+            if request_count then
+                local _, quality = split_item_key(item_key)
+                cells[5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", request_count }
             end
         end
 
@@ -780,48 +800,32 @@ end }
 ---@type GuiHandler
 local handle_edit_name_toggled = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
     if event.element.toggled then
-        if not player_gui.elements.stop_name_clear_button.enabled then
-            player_gui.elements.stop_name_input.text = stop.backer_name
-        end
         player_gui.elements.stop_name_label.visible = false
+        player_gui.elements.stop_name_input.text = player_gui.parts.stop.backer_name
         player_gui.elements.stop_name_input.visible = true
         player_gui.elements.stop_name_input.focus()
     else
-        player_gui.elements.stop_name_label.caption = stop.backer_name
-        player_gui.elements.stop_name_input.visible = false
+        player_gui.elements.stop_name_label.caption = player_gui.parts.stop.backer_name
         player_gui.elements.stop_name_label.visible = true
+        player_gui.elements.stop_name_input.visible = false
     end
 end }
 
 ---@type GuiHandler
 local handle_clear_name = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
-    lib.write_stop_flag(stop, enums.stop_flags.custom_name, false)
+    lib.write_stop_flag(player_gui.parts.stop, enums.stop_flags.custom_name, false)
 
-    local station = storage.stations[stop.unit_number] --[[@as Station?]]
-    local new_stop_name ---@type string
-    if station then
-        local provide, request = station.provide, station.request
-        local old_stop_name = stop.backer_name --[[@as string]]
-        new_stop_name = lib.generate_stop_name(provide and provide.items, request and request.items)
-        if provide then rename_schedules_stop(provide.deliveries, old_stop_name, new_stop_name) end
-        if request then rename_schedules_stop(request.deliveries, old_stop_name, new_stop_name) end
-    else
-        new_stop_name = "[virtual-signal=signal-ghost]"
-    end
-    stop.backer_name = new_stop_name
-    player_gui.elements.stop_name_label.caption = new_stop_name
-
-    player_gui.elements.stop_name_input.visible = false
     player_gui.elements.stop_name_label.visible = true
+    player_gui.elements.stop_name_input.visible = false
 
     player_gui.elements.stop_name_edit_toggle.toggled = false
     player_gui.elements.stop_name_clear_button.enabled = false
+
+    update_station_name(player_gui, nil)
 end }
 
 ---@type GuiHandler
@@ -829,35 +833,22 @@ local handle_name_changed_or_confirmed = {}
 
 handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
     local new_stop_name = glib.truncate_input(event.element, 199)
     local has_custom_name = new_stop_name ~= ""
-    player_gui.elements.stop_name_clear_button.enabled = has_custom_name
-    lib.write_stop_flag(stop, enums.stop_flags.custom_name, has_custom_name)
 
-    local station = storage.stations[stop.unit_number] --[[@as Station?]]
-    if station then
-        local provide, request = station.provide, station.request
-        local old_stop_name = stop.backer_name --[[@as string]]
-        if not has_custom_name then
-            new_stop_name = lib.generate_stop_name(provide and provide.items, request and request.items)
-        end
-        if provide then rename_schedules_stop(provide.deliveries, old_stop_name, new_stop_name) end
-        if request then rename_schedules_stop(request.deliveries, old_stop_name, new_stop_name) end
-    elseif not has_custom_name then
-        new_stop_name = "[virtual-signal=signal-ghost]"
-    end
-    stop.backer_name = new_stop_name
+    lib.write_stop_flag(player_gui.parts.stop, enums.stop_flags.custom_name, has_custom_name)
+
+    player_gui.elements.stop_name_clear_button.enabled = has_custom_name
+
+    update_station_name(player_gui, has_custom_name and new_stop_name or nil)
 end
 
 handle_name_changed_or_confirmed[events.on_gui_confirmed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
-    player_gui.elements.stop_name_label.caption = stop.backer_name
-    player_gui.elements.stop_name_input.visible = false
     player_gui.elements.stop_name_label.visible = true
+    player_gui.elements.stop_name_input.visible = false
 
     player_gui.elements.stop_name_edit_toggle.toggled = false
 end
@@ -884,30 +875,30 @@ end }
 ---@type GuiHandler
 local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
     local toggled = event.element.toggled
-    local total_rows = get_total_rows(player_gui.elements)
 
-    if toggled and total_rows > 1 then
+    local provide_context, request_context = player_gui.provide_context, player_gui.request_context
+    local provide_row_count = provide_context and #provide_context.row_to_cells or 0
+    local request_row_count = request_context and #request_context.row_to_cells or 0
+
+    if toggled and provide_row_count + request_row_count > 1 then
         event.element.toggled = false
         game.get_player(event.player_index).play_sound({ path = "utility/cannot_build" })
         return
     end
 
     event.element.tooltip = { toggled and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
-    lib.write_stop_flag(stop, enums.stop_flags.bufferless, toggled)
+    lib.write_stop_flag(player_gui.parts.stop, enums.stop_flags.bufferless, toggled)
 
-    if total_rows > 0 then
-        local provide_table, request_table = player_gui.elements.provide_table, player_gui.elements.request_table
-        if provide_table then set_buffer_settings_enabled(provide_table, not toggled) end
-        if request_table then set_buffer_settings_enabled(request_table, not toggled) end
+    local station = player_gui.station
 
-        local station = storage.stations[stop.unit_number] --[[@as Station?]]
-        if station and station.provide then
+    if provide_row_count > 0 then ---@cast provide_context -nil
+        if station then
             for item_key, hauler_ids in pairs(station.provide.deliveries) do
                 for _, hauler_id in pairs(hauler_ids) do
-                    local network, hauler = storage.networks[station.network], storage.haulers[hauler_id]
+                    local network = storage.networks[station.network]
+                    local hauler = storage.haulers[hauler_id]
                     local job = network.jobs[hauler.job] --[[@as NetworkJob]]
                     if toggled then
                         lib.list_destroy_or_remove(network.provide_haulers, item_key, hauler_id)
@@ -926,8 +917,11 @@ local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
                 end
             end
         end
+        set_buffer_settings_enabled(provide_methods, provide_context, not toggled)
+    end
 
-        update_station_after_change(event.player_index)
+    if request_row_count > 0 then ---@cast request_context -nil
+        set_buffer_settings_enabled(request_methods, request_context, not toggled)
     end
 end }
 
@@ -940,26 +934,6 @@ local handle_inactivity_toggled = { [events.on_gui_click] = function(event)
 
     event.element.tooltip = { toggled and "sspp-gui.station-wait-for-inactivity-tooltip" or "sspp-gui.station-depart-immediately-tooltip" }
     lib.write_stop_flag(stop, enums.stop_flags.inactivity, toggled)
-end }
-
----@type GuiHandler
-local handle_provide_add_item = { [events.on_gui_click] = function(event)
-    try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "item-with-quality")
-end }
-
----@type GuiHandler
-local handle_provide_add_fluid = { [events.on_gui_click] = function(event)
-    try_add_item_or_fluid(event.player_index, "provide_table", add_new_provide_row, "fluid")
-end }
-
----@type GuiHandler
-local handle_request_add_item = { [events.on_gui_click] = function(event)
-    try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, "item-with-quality")
-end }
-
----@type GuiHandler
-local handle_request_add_fluid = { [events.on_gui_click] = function(event)
-    try_add_item_or_fluid(event.player_index, "request_table", add_new_request_row, "fluid")
 end }
 
 ---@type GuiHandler
@@ -1106,9 +1080,7 @@ end
 ---@param entity LuaEntity
 function gui_station.open(player_id, entity)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
-    local unit_number = entity.unit_number --[[@as uint]]
     local parts = get_station_parts(entity)
-    local network_name = entity.surface.name
 
     player.opened = nil
 
@@ -1120,25 +1092,32 @@ function gui_station.open(player_id, entity)
     end
 
     window.force_auto_center()
-    storage.player_guis[player_id] = { type = "STATION", network = network_name, elements = elements, unit_number = unit_number, parts = parts }
+
+    local station = parts and storage.stations[parts.stop.unit_number] --[[@as Station?]]
+
+    ---@type PlayerGui.Station
+    local player_gui = { type = "STATION", network = entity.surface.name, elements = elements, unit_number = entity.unit_number, parts = parts, station = station }
+    storage.player_guis[player_id] = player_gui
 
     if parts then
-        local provide_io, request_io = parts.provide_io, parts.request_io
-        local network_items = storage.networks[network_name].items
-        local buffered = not lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
-        if provide_io then
-            local provide_table = elements.provide_table
-            for item_key, item in pairs(lib.combinator_description_to_provide_items(provide_io)) do
-                provide_init_row(network_items, provide_table, item_key, item)
-            end
-            set_buffer_settings_enabled(provide_table, buffered)
+        local bufferless = lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
+
+        if parts.provide_io then
+            player_gui.provide_context = {
+                root = player_gui, table = elements.provide_table, row_to_cells = {}, row_to_key = {}, key_to_row = {},
+                key_to_object = station and station.provide.items or lib.combinator_description_to_provide_items(parts.provide_io),
+            }
+            glib.table_populate_from_objects(provide_methods, player_gui.provide_context)
+            if bufferless then set_buffer_settings_enabled(provide_methods, player_gui.provide_context, false) end
         end
-        if request_io then
-            local request_table = elements.request_table
-            for item_key, item in pairs(lib.combinator_description_to_request_items(request_io)) do
-                request_init_row(network_items, request_table, item_key, item)
-            end
-            set_buffer_settings_enabled(request_table, buffered)
+
+        if parts.request_io then
+            player_gui.request_context = {
+                root = player_gui, table = elements.request_table, row_to_cells = {}, row_to_key = {}, key_to_row = {},
+                key_to_object = station and station.request.items or lib.combinator_description_to_request_items(parts.request_io),
+            }
+            glib.table_populate_from_objects(request_methods, player_gui.request_context)
+            if bufferless then set_buffer_settings_enabled(request_methods, player_gui.request_context, false) end
         end
     end
 
@@ -1164,12 +1143,20 @@ end
 
 function gui_station.initialise()
     glib.register_functions({
-        ["station_item_move"] = handle_item_move[events.on_gui_click],
+        ["station_provide_move"] = handle_provide_move[events.on_gui_click],
+        ["station_request_move"] = handle_request_move[events.on_gui_click],
         ["station_provide_copy"] = handle_provide_copy[events.on_gui_click],
         ["station_request_copy"] = handle_request_copy[events.on_gui_click],
-        ["station_item_elem_changed"] = handle_item_elem_changed[events.on_gui_elem_changed],
-        ["station_item_text_changed"] = handle_item_text_changed[events.on_gui_text_changed],
-        ["station_item_mode_click"] = handle_item_mode_click[events.on_gui_click],
+        ["station_provide_elem_changed"] = handle_provide_elem_changed[events.on_gui_elem_changed],
+        ["station_request_elem_changed"] = handle_request_elem_changed[events.on_gui_elem_changed],
+        ["station_provide_text_changed"] = handle_provide_text_changed[events.on_gui_text_changed],
+        ["station_request_text_changed"] = handle_request_text_changed[events.on_gui_text_changed],
+        ["station_provide_mode_click"] = handle_provide_mode_click[events.on_gui_click],
+        ["station_request_mode_click"] = handle_request_mode_click[events.on_gui_click],
+        ["station_provide_add_item"] = handle_provide_add_item[events.on_gui_click],
+        ["station_provide_add_fluid"] = handle_provide_add_fluid[events.on_gui_click],
+        ["station_request_add_item"] = handle_request_add_item[events.on_gui_click],
+        ["station_request_add_fluid"] = handle_request_add_fluid[events.on_gui_click],
         ["station_open_network"] = handle_open_network[events.on_gui_click],
         ["station_edit_name_toggled"] = handle_edit_name_toggled[events.on_gui_click],
         ["station_clear_name"] = handle_clear_name[events.on_gui_click],
@@ -1179,10 +1166,6 @@ function gui_station.initialise()
         ["station_bufferless_toggled"] = handle_bufferless_toggled[events.on_gui_click],
         ["station_inactivity_toggled"] = handle_inactivity_toggled[events.on_gui_click],
         ["station_limit_changed"] = handle_limit_changed[events.on_gui_value_changed],
-        ["station_provide_add_item"] = handle_provide_add_item[events.on_gui_click],
-        ["station_provide_add_fluid"] = handle_provide_add_fluid[events.on_gui_click],
-        ["station_request_add_item"] = handle_request_add_item[events.on_gui_click],
-        ["station_request_add_fluid"] = handle_request_add_fluid[events.on_gui_click],
         ["station_view_on_map"] = handle_view_on_map[events.on_gui_click],
         ["station_close_window"] = handle_close_window[events.on_gui_click],
     })
