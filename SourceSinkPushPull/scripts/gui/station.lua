@@ -10,7 +10,7 @@ local events = defines.events
 
 local split_item_key, make_item_icon, get_train_item_count = lib.split_item_key, lib.make_item_icon, lib.get_train_item_count
 
-local cwi, extract_elem_value_fields, acquire_next_minimap = glib.caption_with_info, glib.extract_elem_value_fields, glib.acquire_next_minimap
+local cwi, acquire_next_minimap = glib.caption_with_info, glib.acquire_next_minimap
 
 local gui_station = {}
 
@@ -143,28 +143,23 @@ local function try_copy_item_or_fluid_row(methods, context, player_id, button)
     end
 end
 
----@type GuiHandler
-local handle_provide_move = { [events.on_gui_click] = function(event)
+glib.handlers["station_provide_move"] = { [events.on_gui_click] = function(event)
     glib.table_move_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
 end }
 
----@type GuiHandler
-local handle_request_move = { [events.on_gui_click] = function(event)
+glib.handlers["station_request_move"] = { [events.on_gui_click] = function(event)
     glib.table_move_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
 end }
 
----@type GuiHandler
-local handle_provide_copy = { [events.on_gui_click] = function(event)
+glib.handlers["station_provide_copy"] = { [events.on_gui_click] = function(event)
     try_copy_item_or_fluid_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.player_index, event.element)
 end }
 
----@type GuiHandler
-local handle_request_copy = { [events.on_gui_click] = function(event)
+glib.handlers["station_request_copy"] = { [events.on_gui_click] = function(event)
     try_copy_item_or_fluid_row(request_methods, storage.player_guis[event.player_index].request_context, event.player_index, event.element)
 end }
 
----@type GuiHandler
-local handle_provide_elem_changed = { [events.on_gui_elem_changed] = function(event)
+glib.handlers["station_provide_elem_changed"] = { [events.on_gui_elem_changed] = function(event)
     if event.element.elem_value then
         glib.table_modify_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
     else
@@ -172,8 +167,7 @@ local handle_provide_elem_changed = { [events.on_gui_elem_changed] = function(ev
     end
 end }
 
----@type GuiHandler
-local handle_request_elem_changed = { [events.on_gui_elem_changed] = function(event)
+glib.handlers["station_request_elem_changed"] = { [events.on_gui_elem_changed] = function(event)
     if event.element.elem_value then
         glib.table_modify_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
     else
@@ -181,127 +175,105 @@ local handle_request_elem_changed = { [events.on_gui_elem_changed] = function(ev
     end
 end }
 
----@type GuiHandler
-local handle_provide_text_changed = { [events.on_gui_text_changed] = function(event)
+glib.handlers["station_provide_text_changed"] = { [events.on_gui_text_changed] = function(event)
     glib.table_modify_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
 end }
 
----@type GuiHandler
-local handle_request_text_changed = { [events.on_gui_text_changed] = function(event)
+glib.handlers["station_request_text_changed"] = { [events.on_gui_text_changed] = function(event)
     glib.table_modify_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
 end }
 
----@type GuiHandler
-local handle_provide_mode_click = { [events.on_gui_click] = function(event)
+glib.handlers["station_provide_mode_click"] = { [events.on_gui_click] = function(event)
     set_active_mode_button(event.element.parent, event.element.get_index_in_parent())
     glib.table_modify_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
 end }
 
----@type GuiHandler
-local handle_request_mode_click = { [events.on_gui_click] = function(event)
+glib.handlers["station_request_mode_click"] = { [events.on_gui_click] = function(event)
     set_active_mode_button(event.element.parent, event.element.get_index_in_parent())
     glib.table_modify_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
 end }
 
 --------------------------------------------------------------------------------
 
-function provide_methods.make_object(context, cells)
-    local elem_value = cells[2].elem_value --[[@as (table|string)?]]
-    if not elem_value then return end
-
-    local throughput = tonumber(cells[4].children[2].children[3].text)
-    if not throughput then return end
-
-    local latency = tonumber(cells[4].children[3].children[3].text)
-    if not latency then return end
-
-    local granularity = tonumber(cells[4].children[4].children[3].text)
-    if not granularity or granularity < 1 then return end
-
-    local _, _, item_key = extract_elem_value_fields(elem_value)
-
-    return item_key, {
-        mode = get_active_mode_button(cells[4].children[1].children[3]),
-        throughput = throughput,
-        latency = latency,
-        granularity = granularity,
-    } --[[@as ProvideItem]]
-end
+---@type GuiElementDef[]
+local provide_blank_row_defs = {
+    { type = "flow", style = "vertical_flow", direction = "vertical", children = {
+        { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
+            { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = "station_provide_move" },
+            { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = "station_provide_move" },
+        } },
+        { type = "sprite", style = "sspp_vertical_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
+        { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = "station_provide_copy" },
+    } },
+    { type = "choose-elem-button", style = "big_slot_button", handler = "station_provide_elem_changed" }, -- [2].elem_type
+    { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-time" }), tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+    } },
+    { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.mode" }), tooltip = { "sspp-gui.provide-mode-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-1", tooltip = { "sspp-gui.provide-mode-tooltip-1" }, handler = "station_provide_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-2", tooltip = { "sspp-gui.provide-mode-tooltip-2" }, toggled = true, handler = "station_provide_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-3", tooltip = { "sspp-gui.provide-mode-tooltip-3" }, handler = "station_provide_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-4", tooltip = { "sspp-gui.provide-mode-tooltip-4" }, handler = "station_provide_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-5", tooltip = { "sspp-gui.provide-mode-tooltip-5" }, handler = "station_provide_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-6", tooltip = { "sspp-gui.provide-mode-tooltip-6" }, handler = "station_provide_mode_click" },
+                { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.provide-mode-tooltip-dynamic" }, handler = "station_provide_mode_click" },
+            } },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.throughput" }), tooltip = { "sspp-gui.provide-throughput-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "", handler = "station_provide_text_changed" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.latency" }), tooltip = { "sspp-gui.provide-latency-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "30", handler = "station_provide_text_changed" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.granularity" }), tooltip = { "sspp-gui.provide-granularity-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "textfield", style = "sspp_number_textbox", numeric = true, text = "1", handler = "station_provide_text_changed" },
+        } },
+    } },
+    { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.storage-needed" }), tooltip = { "sspp-gui.provide-storage-needed-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-surplus" }), tooltip = { "sspp-gui.provide-current-surplus-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+    } },
+}
 
 function provide_methods.insert_row_blank(context, row_offset, elem_type)
     ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
     ---@cast elem_type string
 
-    return glib.add_elements(context.table, nil, row_offset, {
-        { type = "flow", style = "vertical_flow", direction = "vertical", children = {
-            { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
-                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_provide_move },
-                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_provide_move },
-            } },
-            { type = "sprite", style = "sspp_vertical_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
-            { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = handle_provide_copy },
-        } },
-        { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_provide_elem_changed },
-        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-time" }), tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-        } },
-        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.mode" }), tooltip = { "sspp-gui.provide-mode-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-1", tooltip = { "sspp-gui.provide-mode-tooltip-1" }, handler = handle_provide_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-2", tooltip = { "sspp-gui.provide-mode-tooltip-2" }, toggled = true, handler = handle_provide_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-3", tooltip = { "sspp-gui.provide-mode-tooltip-3" }, handler = handle_provide_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-4", tooltip = { "sspp-gui.provide-mode-tooltip-4" }, handler = handle_provide_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-5", tooltip = { "sspp-gui.provide-mode-tooltip-5" }, handler = handle_provide_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-provide-mode-6", tooltip = { "sspp-gui.provide-mode-tooltip-6" }, handler = handle_provide_mode_click },
-                    { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.provide-mode-tooltip-dynamic" }, handler = handle_provide_mode_click },
-                } },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.throughput" }), tooltip = { "sspp-gui.provide-throughput-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "", handler = handle_provide_text_changed },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.latency" }), tooltip = { "sspp-gui.provide-latency-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "30", handler = handle_provide_text_changed },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.granularity" }), tooltip = { "sspp-gui.provide-granularity-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, text = "1", handler = handle_provide_text_changed },
-            } },
-        } },
-        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.storage-needed" }), tooltip = { "sspp-gui.provide-storage-needed-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-surplus" }), tooltip = { "sspp-gui.provide-current-surplus-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-        } },
-    })
+    provide_blank_row_defs[2].elem_type = elem_type
+
+    return glib.add_elements(context.table, nil, row_offset, provide_blank_row_defs)
 end
 
 function provide_methods.insert_row_complete(context, row_offset, item_key, provide_item)
@@ -347,6 +319,29 @@ function provide_methods.insert_row_copy(context, row_offset, src_cells)
     return cells
 end
 
+function provide_methods.make_object(context, cells)
+    local elem_value = cells[2].elem_value --[[@as (table|string)?]]
+    if not elem_value then return end
+
+    local throughput = tonumber(cells[4].children[2].children[3].text)
+    if not throughput then return end
+
+    local latency = tonumber(cells[4].children[3].children[3].text)
+    if not latency then return end
+
+    local granularity = tonumber(cells[4].children[4].children[3].text)
+    if not granularity or granularity < 1 then return end
+
+    local _, _, item_key = glib.extract_elem_value_fields(elem_value)
+
+    return item_key, {
+        mode = get_active_mode_button(cells[4].children[1].children[3]),
+        throughput = throughput,
+        latency = latency,
+        granularity = granularity,
+    } --[[@as ProvideItem]]
+end
+
 function provide_methods.on_row_changed(context, cells, item_key, provide_item)
     ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
     ---@cast item_key ItemKey?
@@ -358,7 +353,7 @@ function provide_methods.on_row_changed(context, cells, item_key, provide_item)
     else
         local elem_value = cells[2].elem_value
         if elem_value then
-            name, quality, item_key = extract_elem_value_fields(elem_value)
+            name, quality, item_key = glib.extract_elem_value_fields(elem_value)
         end
     end
 
@@ -419,94 +414,80 @@ end
 
 --------------------------------------------------------------------------------
 
-function request_methods.make_object(context, cells)
-    local elem_value = cells[2].elem_value --[[@as (table|string)?]]
-    if not elem_value then return end
-
-    local throughput = tonumber(cells[4].children[2].children[3].text)
-    if not throughput then return end
-
-    local latency = tonumber(cells[4].children[3].children[3].text)
-    if not latency then return end
-
-    local _, _, item_key = extract_elem_value_fields(elem_value)
-
-    return item_key, {
-        mode = get_active_mode_button(cells[4].children[1].children[3]),
-        throughput = throughput,
-        latency = latency,
-    } --[[@as RequestItem]]
-end
+---@type GuiElementDef[]
+local request_blank_row_defs = {
+    { type = "flow", style = "vertical_flow", direction = "vertical", children = {
+        { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
+            { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = "station_request_move" },
+            { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = "station_request_move" },
+        } },
+        { type = "sprite", style = "sspp_vertical_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
+        { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = "station_request_copy" },
+    } },
+    { type = "choose-elem-button", style = "big_slot_button", handler = "station_request_elem_changed" }, -- [2].elem_type
+    { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-time" }), tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+    } },
+    { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.mode" }), tooltip = { "sspp-gui.request-mode-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-1", tooltip = { "sspp-gui.request-mode-tooltip-1" }, handler = "station_request_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-2", tooltip = { "sspp-gui.request-mode-tooltip-2" }, handler = "station_request_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-3", tooltip = { "sspp-gui.request-mode-tooltip-3" }, handler = "station_request_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-4", tooltip = { "sspp-gui.request-mode-tooltip-4" }, handler = "station_request_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-5", tooltip = { "sspp-gui.request-mode-tooltip-5" }, toggled = true, handler = "station_request_mode_click" },
+                { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-6", tooltip = { "sspp-gui.request-mode-tooltip-6" }, handler = "station_request_mode_click" },
+                { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.request-mode-tooltip-dynamic" }, handler = "station_request_mode_click" },
+            } },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.throughput" }), tooltip = { "sspp-gui.request-throughput-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "", handler = "station_request_text_changed" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.latency" }), tooltip = { "sspp-gui.request-latency-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "30", handler = "station_request_text_changed" },
+        } },
+    } },
+    { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.storage-needed" }), tooltip = { "sspp-gui.request-storage-needed-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-deficit" }), tooltip = { "sspp-gui.request-current-deficit-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+    } },
+}
 
 function request_methods.insert_row_blank(context, row_offset, elem_type)
     ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
     ---@cast elem_type string
 
-    return glib.add_elements(context.table, nil, row_offset, {
-        { type = "flow", style = "vertical_flow", direction = "vertical", children = {
-            { type = "flow", style = "packed_vertical_flow", direction = "vertical", children = {
-                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-up-icon", handler = handle_request_move },
-                { type = "sprite-button", style = "sspp_move_sprite_button", sprite = "sspp-move-down-icon", handler = handle_request_move },
-            } },
-            { type = "sprite", style = "sspp_vertical_warning_image", sprite = "utility/achievement_warning", tooltip = { "sspp-gui.invalid-values-tooltip" } },
-            { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-copy-icon", handler = handle_request_copy },
-        } },
-        { type = "choose-elem-button", style = "big_slot_button", elem_type = elem_type, handler = handle_request_elem_changed },
-        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-time" }), tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-        } },
-        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.mode" }), tooltip = { "sspp-gui.request-mode-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-1", tooltip = { "sspp-gui.request-mode-tooltip-1" }, handler = handle_request_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-2", tooltip = { "sspp-gui.request-mode-tooltip-2" }, handler = handle_request_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-3", tooltip = { "sspp-gui.request-mode-tooltip-3" }, handler = handle_request_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-4", tooltip = { "sspp-gui.request-mode-tooltip-4" }, handler = handle_request_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-5", tooltip = { "sspp-gui.request-mode-tooltip-5" }, toggled = true, handler = handle_request_mode_click },
-                    { type = "sprite-button", style = "sspp_item_mode_sprite_button", sprite = "sspp-request-mode-6", tooltip = { "sspp-gui.request-mode-tooltip-6" }, handler = handle_request_mode_click },
-                    { type = "sprite-button", style = "sspp_compact_slot_button", sprite = "sspp-signal-icon", tooltip = { "sspp-gui.request-mode-tooltip-dynamic" }, handler = handle_request_mode_click },
-                } },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.throughput" }), tooltip = { "sspp-gui.request-throughput-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "", handler = handle_request_text_changed },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.latency" }), tooltip = { "sspp-gui.request-latency-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", style = "sspp_number_textbox", numeric = true, allow_decimal = true, text = "30", handler = handle_request_text_changed },
-            } },
-        } },
-        { type = "flow", style = "sspp_station_cell_flow", direction = "vertical", children = {
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.storage-needed" }), tooltip = { "sspp-gui.request-storage-needed-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-            { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
-                { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-deficit" }), tooltip = { "sspp-gui.request-current-deficit-tooltip" } },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "label", style = "label" },
-            } },
-        } },
-    })
+    request_blank_row_defs[2].elem_type = elem_type
+
+    return glib.add_elements(context.table, nil, row_offset, request_blank_row_defs)
 end
 
 function request_methods.insert_row_complete(context, row_offset, item_key, request_item)
@@ -550,6 +531,25 @@ function request_methods.insert_row_copy(context, row_offset, src_cells)
     return cells
 end
 
+function request_methods.make_object(context, cells)
+    local elem_value = cells[2].elem_value --[[@as (table|string)?]]
+    if not elem_value then return end
+
+    local throughput = tonumber(cells[4].children[2].children[3].text)
+    if not throughput then return end
+
+    local latency = tonumber(cells[4].children[3].children[3].text)
+    if not latency then return end
+
+    local _, _, item_key = glib.extract_elem_value_fields(elem_value)
+
+    return item_key, {
+        mode = get_active_mode_button(cells[4].children[1].children[3]),
+        throughput = throughput,
+        latency = latency,
+    } --[[@as RequestItem]]
+end
+
 function request_methods.on_row_changed(context, cells, item_key, request_item)
     ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
     ---@cast item_key ItemKey?
@@ -561,7 +561,7 @@ function request_methods.on_row_changed(context, cells, item_key, request_item)
     else
         local elem_value = cells[2].elem_value
         if elem_value then
-            name, quality, item_key = extract_elem_value_fields(elem_value)
+            name, quality, item_key = glib.extract_elem_value_fields(elem_value)
         end
     end
 
@@ -664,23 +664,19 @@ local function try_add_item_or_fluid_row(methods, context, player_id, elem_type)
     game.get_player(player_id).play_sound({ path = "utility/cannot_build" })
 end
 
----@type GuiHandler
-local handle_provide_add_item = { [events.on_gui_click] = function(event)
+glib.handlers["station_provide_add_item"] = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.player_index, "item-with-quality")
 end }
 
----@type GuiHandler
-local handle_provide_add_fluid = { [events.on_gui_click] = function(event)
+glib.handlers["station_provide_add_fluid"] = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.player_index, "fluid")
 end }
 
----@type GuiHandler
-local handle_request_add_item = { [events.on_gui_click] = function(event)
+glib.handlers["station_request_add_item"] = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid_row(request_methods, storage.player_guis[event.player_index].request_context, event.player_index, "item-with-quality")
 end }
 
----@type GuiHandler
-local handle_request_add_fluid = { [events.on_gui_click] = function(event)
+glib.handlers["station_request_add_fluid"] = { [events.on_gui_click] = function(event)
     try_add_item_or_fluid_row(request_methods, storage.player_guis[event.player_index].request_context, event.player_index, "fluid")
 end }
 
@@ -789,16 +785,14 @@ end
 
 --------------------------------------------------------------------------------
 
----@type GuiHandler
-local handle_open_network = { [events.on_gui_click] = function(event)
+glib.handlers["station_open_network"] = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local network_name = storage.player_guis[player_id].network
 
     gui_network.open(player_id, network_name, 2)
 end }
 
----@type GuiHandler
-local handle_edit_name_toggled = { [events.on_gui_click] = function(event)
+glib.handlers["station_edit_name_toggled"] = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
 
     if event.element.toggled then
@@ -813,8 +807,7 @@ local handle_edit_name_toggled = { [events.on_gui_click] = function(event)
     end
 end }
 
----@type GuiHandler
-local handle_clear_name = { [events.on_gui_click] = function(event)
+glib.handlers["station_clear_name"] = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
 
     lib.write_stop_flag(player_gui.parts.stop, enums.stop_flags.custom_name, false)
@@ -828,10 +821,9 @@ local handle_clear_name = { [events.on_gui_click] = function(event)
     update_station_name(player_gui, nil)
 end }
 
----@type GuiHandler
-local handle_name_changed_or_confirmed = {}
+glib.handlers["station_name_changed_or_confirmed"] = {}
 
-handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
+glib.handlers["station_name_changed_or_confirmed"][events.on_gui_text_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
 
     local new_stop_name = glib.truncate_input(event.element, 199)
@@ -844,7 +836,7 @@ handle_name_changed_or_confirmed[events.on_gui_text_changed] = function(event)
     update_station_name(player_gui, has_custom_name and new_stop_name or nil)
 end
 
-handle_name_changed_or_confirmed[events.on_gui_confirmed] = function(event)
+glib.handlers["station_name_changed_or_confirmed"][events.on_gui_confirmed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
 
     player_gui.elements.stop_name_label.visible = true
@@ -853,8 +845,7 @@ handle_name_changed_or_confirmed[events.on_gui_confirmed] = function(event)
     player_gui.elements.stop_name_edit_toggle.toggled = false
 end
 
----@type GuiHandler
-local handle_disable_toggled = { [events.on_gui_click] = function(event)
+glib.handlers["station_disable_toggled"] = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
@@ -863,8 +854,7 @@ local handle_disable_toggled = { [events.on_gui_click] = function(event)
     lib.write_stop_flag(stop, enums.stop_flags.disable, toggled)
 end }
 
----@type GuiHandler
-local handle_limit_changed = { [events.on_gui_value_changed] = function(event)
+glib.handlers["station_limit_changed"] = { [events.on_gui_value_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
@@ -872,8 +862,7 @@ local handle_limit_changed = { [events.on_gui_value_changed] = function(event)
     player_gui.elements.limit_value.caption = tostring(event.element.slider_value)
 end }
 
----@type GuiHandler
-local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
+glib.handlers["station_bufferless_toggled"] = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
 
     local toggled = event.element.toggled
@@ -925,8 +914,7 @@ local handle_bufferless_toggled = { [events.on_gui_click] = function(event)
     end
 end }
 
----@type GuiHandler
-local handle_inactivity_toggled = { [events.on_gui_click] = function(event)
+glib.handlers["station_inactivity_toggled"] = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
     local stop = player_gui.parts.stop --[[@as LuaEntity]]
 
@@ -936,8 +924,7 @@ local handle_inactivity_toggled = { [events.on_gui_click] = function(event)
     lib.write_stop_flag(stop, enums.stop_flags.inactivity, toggled)
 end }
 
----@type GuiHandler
-local handle_view_on_map = { [events.on_gui_click] = function(event)
+glib.handlers["station_view_on_map"] = { [events.on_gui_click] = function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
     local stop = storage.player_guis[event.player_index].parts.stop --[[@as LuaEntity]]
 
@@ -945,8 +932,7 @@ local handle_view_on_map = { [events.on_gui_click] = function(event)
     player.centered_on = stop
 end }
 
----@type GuiHandler
-local handle_close_window = { [events.on_gui_click] = function(event)
+glib.handlers["station_close_window"] = { [events.on_gui_click] = function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
     assert(player.opened.name == "sspp-station")
 
@@ -978,20 +964,20 @@ local function add_gui_complete(player, parts)
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
-                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disable_tooltip, mouse_button_filter = { "left" }, auto_toggle = true, toggled = disable, handler = handle_disable_toggled },
-                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-map-icon", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = handle_view_on_map },
-                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = handle_open_network },
+                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disable_tooltip, mouse_button_filter = { "left" }, auto_toggle = true, toggled = disable, handler = "station_disable_toggled" },
+                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-map-icon", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = "station_view_on_map" },
+                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = "station_open_network" },
                 { type = "empty-widget", style = "empty_widget" },
-                { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = handle_close_window },
+                { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = "station_close_window" },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
                 { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                     { type = "frame", style = "sspp_stretchable_subheader_frame", direction = "horizontal", children = {
                         { type = "label", name = "stop_name_label", style = "subheader_caption_label", caption = name },
-                        { type = "textfield", name = "stop_name_input", style = "sspp_subheader_caption_textbox", icon_selector = true, text = name, visible = false, handler = handle_name_changed_or_confirmed },
+                        { type = "textfield", name = "stop_name_input", style = "sspp_subheader_caption_textbox", icon_selector = true, text = name, visible = false, handler = "station_name_changed_or_confirmed" },
                         { type = "empty-widget", style = "flib_horizontal_pusher" },
-                        { type = "sprite-button", name = "stop_name_edit_toggle", style = "control_settings_section_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.edit-custom-name" }, auto_toggle = true, handler = handle_edit_name_toggled },
-                        { type = "sprite-button", name = "stop_name_clear_button", style = "control_settings_section_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.clear-custom-name" }, enabled = custom_name, handler = handle_clear_name },
+                        { type = "sprite-button", name = "stop_name_edit_toggle", style = "control_settings_section_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.edit-custom-name" }, auto_toggle = true, handler = "station_edit_name_toggled" },
+                        { type = "sprite-button", name = "stop_name_clear_button", style = "control_settings_section_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.clear-custom-name" }, enabled = custom_name, handler = "station_clear_name" },
                     } },
                     { type = "tabbed-pane", name = "tabbed_pane", style = "tabbed_pane", children = {
                         { type = "tab", style = "tab", caption = { "sspp-gui.provide" }, visible = provide, children = {
@@ -1006,8 +992,8 @@ local function add_gui_complete(player, parts)
                                 { type = "scroll-pane", style = "sspp_station_scroll_pane", direction = "vertical", children = {
                                     { type = "table", name = "provide_table", style = "sspp_station_item_table", column_count = 5 },
                                     { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = handle_provide_add_item },
-                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = handle_provide_add_fluid },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, handler = "station_provide_add_item" },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, handler = "station_provide_add_fluid" },
                                     } },
                                 } },
                             } },
@@ -1024,8 +1010,8 @@ local function add_gui_complete(player, parts)
                                 { type = "scroll-pane", style = "sspp_station_scroll_pane", direction = "vertical", children = {
                                     { type = "table", name = "request_table", style = "sspp_station_item_table", column_count = 5 },
                                     { type = "flow", style = "horizontal_flow", direction = "horizontal", children = {
-                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = handle_request_add_item },
-                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = handle_request_add_fluid },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-item" }, mouse_button_filter = { "left" }, handler = "station_request_add_item" },
+                                        { type = "button", style = "train_schedule_add_station_button", caption = { "sspp-gui.add-fluid" }, mouse_button_filter = { "left" }, handler = "station_request_add_fluid" },
                                     } },
                                 } },
                             } },
@@ -1037,10 +1023,10 @@ local function add_gui_complete(player, parts)
                         { type = "label", style = "subheader_caption_label", caption = { "sspp-gui.deliveries" } },
                         { type = "empty-widget", style = "flib_horizontal_pusher" },
                         { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.limit" }), tooltip = { "sspp-gui.station-limit-tooltip" } },
-                        { type = "slider", style = "notched_slider", minimum_value = 1, maximum_value = 10, value = limit, handler = handle_limit_changed },
+                        { type = "slider", style = "notched_slider", minimum_value = 1, maximum_value = 10, value = limit, handler = "station_limit_changed" },
                         { type = "label", name = "limit_value", style = "sspp_station_limit_value", caption = tostring(limit) },
-                        { type = "sprite-button", name = "bufferless_toggle", style = "control_settings_section_button", sprite = "sspp-bufferless-icon", tooltip = bufferless_tooltip, auto_toggle = true, toggled = bufferless, handler = handle_bufferless_toggled },
-                        { type = "sprite-button", name = "inactivity_toggle", style = "control_settings_section_button", sprite = "sspp-inactivity-icon", tooltip = inactivity_tooltip, auto_toggle = true, toggled = inactivity, visible = provide, handler = handle_inactivity_toggled },
+                        { type = "sprite-button", name = "bufferless_toggle", style = "control_settings_section_button", sprite = "sspp-bufferless-icon", tooltip = bufferless_tooltip, auto_toggle = true, toggled = bufferless, handler = "station_bufferless_toggled" },
+                        { type = "sprite-button", name = "inactivity_toggle", style = "control_settings_section_button", sprite = "sspp-inactivity-icon", tooltip = inactivity_tooltip, auto_toggle = true, toggled = inactivity, visible = provide, handler = "station_inactivity_toggled" },
                     } },
                     { type = "frame", style = "shallow_frame", direction = "horizontal", children = {
                         { type = "scroll-pane", style = "sspp_right_grid_scroll_pane", direction = "vertical", children = {
@@ -1065,7 +1051,7 @@ local function add_gui_incomplete(player)
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.incomplete-station" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
-                { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = handle_close_window },
+                { type = "sprite-button", style = "close_button", sprite = "utility/close", hovered_sprite = "utility/close_black", mouse_button_filter = { "left" }, handler = "station_close_window" },
             } },
             { type = "label", style = "info_label", caption = { "sspp-gui.incomplete-station-message" } },
         } }
@@ -1107,7 +1093,7 @@ function gui_station.open(player_id, entity)
                 root = player_gui, table = elements.provide_table, row_to_cells = {}, row_to_key = {}, key_to_row = {},
                 key_to_object = station and station.provide.items or lib.combinator_description_to_provide_items(parts.provide_io),
             }
-            glib.table_populate_from_objects(provide_methods, player_gui.provide_context)
+            glib.table_populate_from_objects(provide_methods, player_gui.provide_context, false)
             if bufferless then set_buffer_settings_enabled(provide_methods, player_gui.provide_context, false) end
         end
 
@@ -1116,7 +1102,7 @@ function gui_station.open(player_id, entity)
                 root = player_gui, table = elements.request_table, row_to_cells = {}, row_to_key = {}, key_to_row = {},
                 key_to_object = station and station.request.items or lib.combinator_description_to_request_items(parts.request_io),
             }
-            glib.table_populate_from_objects(request_methods, player_gui.request_context)
+            glib.table_populate_from_objects(request_methods, player_gui.request_context, false)
             if bufferless then set_buffer_settings_enabled(request_methods, player_gui.request_context, false) end
         end
     end
@@ -1137,38 +1123,6 @@ function gui_station.close(player_id)
     end
 
     storage.player_guis[player_id] = nil
-end
-
---------------------------------------------------------------------------------
-
-function gui_station.initialise()
-    glib.register_functions({
-        ["station_provide_move"] = handle_provide_move[events.on_gui_click],
-        ["station_request_move"] = handle_request_move[events.on_gui_click],
-        ["station_provide_copy"] = handle_provide_copy[events.on_gui_click],
-        ["station_request_copy"] = handle_request_copy[events.on_gui_click],
-        ["station_provide_elem_changed"] = handle_provide_elem_changed[events.on_gui_elem_changed],
-        ["station_request_elem_changed"] = handle_request_elem_changed[events.on_gui_elem_changed],
-        ["station_provide_text_changed"] = handle_provide_text_changed[events.on_gui_text_changed],
-        ["station_request_text_changed"] = handle_request_text_changed[events.on_gui_text_changed],
-        ["station_provide_mode_click"] = handle_provide_mode_click[events.on_gui_click],
-        ["station_request_mode_click"] = handle_request_mode_click[events.on_gui_click],
-        ["station_provide_add_item"] = handle_provide_add_item[events.on_gui_click],
-        ["station_provide_add_fluid"] = handle_provide_add_fluid[events.on_gui_click],
-        ["station_request_add_item"] = handle_request_add_item[events.on_gui_click],
-        ["station_request_add_fluid"] = handle_request_add_fluid[events.on_gui_click],
-        ["station_open_network"] = handle_open_network[events.on_gui_click],
-        ["station_edit_name_toggled"] = handle_edit_name_toggled[events.on_gui_click],
-        ["station_clear_name"] = handle_clear_name[events.on_gui_click],
-        ["station_name_changed"] = handle_name_changed_or_confirmed[events.on_gui_text_changed],
-        ["station_name_confirmed"] = handle_name_changed_or_confirmed[events.on_gui_confirmed],
-        ["station_disable_toggled"] = handle_disable_toggled[events.on_gui_click],
-        ["station_bufferless_toggled"] = handle_bufferless_toggled[events.on_gui_click],
-        ["station_inactivity_toggled"] = handle_inactivity_toggled[events.on_gui_click],
-        ["station_limit_changed"] = handle_limit_changed[events.on_gui_value_changed],
-        ["station_view_on_map"] = handle_view_on_map[events.on_gui_click],
-        ["station_close_window"] = handle_close_window[events.on_gui_click],
-    })
 end
 
 --------------------------------------------------------------------------------

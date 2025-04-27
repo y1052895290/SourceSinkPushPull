@@ -38,16 +38,14 @@ end
 
 --------------------------------------------------------------------------------
 
----@type GuiHandler
-local handle_open_network = { [events.on_gui_click] = function(event)
+glib.handlers["hauler_open_network"] = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local network_name = storage.player_guis[player_id].network
 
     gui_network.open(player_id, network_name, 1)
 end }
 
----@type GuiHandler
-local handle_view_on_map = { [events.on_gui_click] = function(event)
+glib.handlers["hauler_view_on_map"] = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Hauler]]
 
@@ -57,8 +55,7 @@ local handle_view_on_map = { [events.on_gui_click] = function(event)
     end
 end }
 
----@type GuiHandler
-local handle_class_changed = { [events.on_gui_text_changed] = function(event)
+glib.handlers["hauler_class_changed"] = { [events.on_gui_text_changed] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Hauler]]
     local train_id, train = player_gui.train_id, player_gui.train
 
@@ -98,8 +95,7 @@ local function map_carriage_name(carriage)
     return carriage.name
 end
 
----@type GuiHandler
-local handle_class_auto_assign = { [events.on_gui_click] = function(event)
+glib.handlers["hauler_class_auto_assign"] = { [events.on_gui_click] = function(event)
     local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Hauler]]
     local network_name = player_gui.network
     local train_id, train = player_gui.train_id, player_gui.train
@@ -188,19 +184,19 @@ function gui_hauler.open(player_id, train)
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "frame_title", caption = { "sspp-gui.sspp" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = handle_open_network },
+                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = "hauler_open_network" },
             } },
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", name = "status_label", style = "label" },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
                 { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal", elem_mods = { locked = true } },
-                { type = "sprite-button", name = "stop_button", style = "sspp_compact_slot_button", sprite = "item/sspp-stop", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = handle_view_on_map },
+                { type = "sprite-button", name = "stop_button", style = "sspp_compact_slot_button", sprite = "item/sspp-stop", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = "hauler_view_on_map" },
             } },
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = { "sspp-gui.class" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", name = "class_textbox", style = "sspp_wide_name_textbox", icon_selector = true, enabled = manual_mode, handler = handle_class_changed },
-                { type = "sprite-button", name = "class_auto_assign_button", style = "sspp_compact_slot_button", sprite = "sspp-refresh-icon", tooltip = { "sspp-gui.hauler-auto-assign-tooltip" }, mouse_button_filter = { "left" }, enabled = manual_mode, handler = handle_class_auto_assign },
+                { type = "textfield", name = "class_textbox", style = "sspp_wide_name_textbox", icon_selector = true, enabled = manual_mode, handler = "hauler_class_changed" },
+                { type = "sprite-button", name = "class_auto_assign_button", style = "sspp_compact_slot_button", sprite = "sspp-refresh-icon", tooltip = { "sspp-gui.hauler-auto-assign-tooltip" }, mouse_button_filter = { "left" }, enabled = manual_mode, handler = "hauler_class_auto_assign" },
             } },
         } }
     ) ---@cast elements -nil
@@ -228,17 +224,6 @@ function gui_hauler.close(player_id)
     player.gui.screen["sspp-hauler"].destroy()
 
     storage.player_guis[player_id] = nil
-end
-
---------------------------------------------------------------------------------
-
-function gui_hauler.initialise()
-    glib.register_functions({
-        ["hauler_open_network"] = handle_open_network[events.on_gui_click],
-        ["hauler_view_on_map"] = handle_view_on_map[events.on_gui_click],
-        ["hauler_class_changed"] = handle_class_changed[events.on_gui_text_changed],
-        ["hauler_class_auto_assign"] = handle_class_auto_assign[events.on_gui_click],
-    })
 end
 
 --------------------------------------------------------------------------------

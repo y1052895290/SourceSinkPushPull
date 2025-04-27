@@ -159,11 +159,7 @@ function gui.register_event_handlers()
     script.on_event(defines.events.on_gui_closed, on_gui_closed)
     script.on_event(defines.events.on_lua_shortcut, on_lua_shortcut)
 
-    glib.initialise()
-
-    gui_network.initialise()
-    gui_station.initialise()
-    gui_hauler.initialise()
+    glib.register_event_handlers()
 end
 
 --------------------------------------------------------------------------------

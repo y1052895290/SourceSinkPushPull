@@ -26,7 +26,7 @@
 ---@field public drag_target string?
 ---@field public elem_mods GuiElemMods?
 ---@field public style_mods GuiStyleMods?
----@field public handler GuiHandler?
+---@field public handler string?
 ---@field public children GuiElementDef[]?
 
 --------------------------------------------------------------------------------
@@ -34,19 +34,11 @@
 ---@class GuiTableMethods
 GuiTableMethods = {}
 
---- Called whenever a row needs to be converted to a key and an object.
----@generic Base, Key, Object
----@param context GuiTableContext<Base, Key, Object>
----@param cells LuaGuiElement[]
----@return Key? key
----@return Object? object
-function GuiTableMethods.make_object(context, cells) end
-
 --- Called whenever a new row needs to be inserted, then initialised with default values.
 ---@generic Base, Key, Object
 ---@param context GuiTableContext<Base, Key, Object>
 ---@param row_offset integer?
----@param args AnyBasic
+---@param args AnyBasic?
 ---@return LuaGuiElement[] cells
 function GuiTableMethods.insert_row_blank(context, row_offset, args) end
 
@@ -66,6 +58,13 @@ function GuiTableMethods.insert_row_complete(context, row_offset, key, object) e
 ---@param src_cells LuaGuiElement[]
 ---@return LuaGuiElement[] cells
 function GuiTableMethods.insert_row_copy(context, row_offset, src_cells) end
+
+--- Called whenever a row needs to be converted to a key and an object.
+---@generic Base, Key, Object
+---@param context GuiTableContext<Base, Key, Object>
+---@param cells LuaGuiElement[]
+---@return Key? key, Object? object
+function GuiTableMethods.make_object(context, cells) end
 
 --- Called whenever some part of the row has been or should be updated.
 ---@generic Base, Key, Object

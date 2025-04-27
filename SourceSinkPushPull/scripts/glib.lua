@@ -6,15 +6,17 @@ local t_insert, t_remove = table.insert, table.remove
 
 --------------------------------------------------------------------------------
 
-local handler_name_to_func = {} ---@type {[string]: function}
-local handler_func_to_name = {} ---@type {[function]: string}
+---@type {[string]: GuiHandler}
+local handlers = {}
+
+glib.handlers = handlers
 
 local function on_element_event(event)
-    local handler = event.element.tags["__SourceSinkPushPull_handler"]
-    if handler then
-        local name = handler[tostring(event.name)]
-        if name then
-            local func = handler_name_to_func[name]
+    local name = event.element.tags["__SourceSinkPushPull_handler"]
+    if name then
+        local handler = handlers[name]
+        if handler then
+            local func = handler[event.name]
             if func then
                 func(event)
             end
@@ -24,17 +26,14 @@ end
 
 --------------------------------------------------------------------------------
 
----@param handler GuiHandler
+---@param handler string
 ---@param tags Tags?
 ---@return Tags
 local function format_handler(handler, tags)
-    local formatted = {}
-    for id, func in pairs(handler) do
-        formatted[tostring(id)] = handler_func_to_name[func]
-    end
+    assert(handlers[handler])
 
     tags = tags or {}
-    tags["__SourceSinkPushPull_handler"] = formatted
+    tags["__SourceSinkPushPull_handler"] = handler
 
     return tags
 end
@@ -127,15 +126,6 @@ function glib.add_elements(parent, named_elements, offset, defs)
     return elements, named_elements
 end
 
----@param functions {[string]: function}
-function glib.register_functions(functions)
-    for name, func in pairs(functions) do
-        assert(handler_name_to_func[name] == nil)
-        handler_name_to_func[name] = func
-        handler_func_to_name[func] = name
-    end
-end
-
 --------------------------------------------------------------------------------
 
 ---@param caption LocalisedString
@@ -191,8 +181,6 @@ function glib.extract_elem_value_fields(elem_value)
     return name, quality, item_key
 end
 
---------------------------------------------------------------------------------
-
 ---@param table LuaGuiElement
 ---@param child LuaGuiElement
 ---@return integer row
@@ -205,6 +193,9 @@ local function get_row_for_child(table, child)
 
     return math.ceil((child.get_index_in_parent()) / table.column_count)
 end
+glib.get_row_for_child = get_row_for_child
+
+--------------------------------------------------------------------------------
 
 ---@generic Key
 ---@param row_to_key (Key|false)[]
@@ -220,35 +211,38 @@ local function find_row_for_key(row_to_key, key)
 end
 
 ---@generic Key
----@param row_to_key (Key|false)[]
 ---@param key_to_row {[Key]: integer}
 ---@param row integer
 ---@param key Key|false
 ---@param insert true?
 ---@return {[Key]: integer} key_to_row
-local function assign_key_to_row(row_to_key, key_to_row, row, key, insert)
+local function assign_key_to_row(key_to_row, row, key, insert)
     local key_to_row_new = {}
 
-    for r, k in pairs(row_to_key) do
-        if k then
-            if k == key then
-                if r == row then
-                    key_to_row_new[k] = r
+    for k1, r1 in next, key_to_row do
+        if r1 < row then
+            key_to_row_new[k1] = r1
+        else
+            if key then
+                key_to_row_new[key] = row
+            end
+            if insert then
+                key_to_row_new[k1] = r1 + 1
+                for k2, r2 in next, key_to_row, k1 do
+                    key_to_row_new[k2] = r2 + 1
                 end
             else
-                local row_new = key_to_row[k]
-                if row_new then
-                    if insert then
-                        if row_new >= row then
-                            row_new = row_new + 1
-                        end
-                    end
-                    if r == row_new then
-                        key_to_row_new[k] = r
-                    end
+                key_to_row_new[k1] = r1
+                for k2, r2 in next, key_to_row, k1 do
+                    key_to_row_new[k2] = r2
                 end
             end
+            return key_to_row_new
         end
+    end
+
+    if key then
+        key_to_row_new[key] = row
     end
 
     return key_to_row_new
@@ -287,7 +281,7 @@ local function insert_row(row_to_cells, row_to_key, key_to_row, row, key, cells)
         t_insert(row_to_cells, row, cells)
         t_insert(row_to_key, row, key)
 
-        return assign_key_to_row(row_to_key, key_to_row, row, key, true)
+        return assign_key_to_row(key_to_row, row, key, true)
     else
         row = #row_to_cells + 1
 
@@ -328,7 +322,7 @@ end
 ---@param methods GuiTableMethods
 ---@param context GuiTableContext<Base, Key, Object>
 ---@param row integer?
----@param args AnyBasic
+---@param args AnyBasic?
 function glib.table_insert_blank_mutable_row(methods, context, row, args)
     local row_to_cells, row_to_key = context.row_to_cells, context.row_to_key
 
@@ -373,16 +367,14 @@ end
 ---@generic Base, Key, Object
 ---@param methods GuiTableMethods
 ---@param context GuiTableContext<Base, Key, Object>
----@param child LuaGuiElement
-function glib.table_remove_immutable_row(methods, context, child)
-    local row_to_key, key_to_row = context.row_to_key, context.key_to_row
+---@param key Key
+function glib.table_remove_immutable_row(methods, context, key)
+    local key_to_row = context.key_to_row
+    local row = key_to_row[key]
 
-    local row = get_row_for_child(context.table, child)
-    local old_key = row_to_key[row] ---@cast old_key -false
+    key_to_row[key] = nil
 
-    key_to_row[old_key] = nil
-
-    remove_row(context.row_to_cells, row_to_key, key_to_row, row)
+    remove_row(context.row_to_cells, context.row_to_key, key_to_row, row)
 end
 
 ---@generic Base, Key, Object
@@ -405,7 +397,7 @@ function glib.table_remove_mutable_row(methods, context, child)
             assert(other_key == old_key)
 
             methods.on_row_changed(context, other_cells, other_key, other_object)
-            context.key_to_row = assign_key_to_row(row_to_key, context.key_to_row, other_row, other_key)
+            context.key_to_row = assign_key_to_row(context.key_to_row, other_row, other_key)
             methods.on_object_changed(context, other_key, other_object)
             context.key_to_object = assign_key_to_object(context.key_to_row, context.key_to_object, other_key, other_object)
         else
@@ -423,12 +415,11 @@ end
 ---@generic Base, Key, Object
 ---@param methods GuiTableMethods
 ---@param context GuiTableContext<Base, Key, Object>
----@param child LuaGuiElement
-function glib.table_modify_immutable_row(methods, context, child)
-    local row = get_row_for_child(context.table, child)
-    local old_key = context.row_to_key[row] ---@cast old_key -false
+---@param key Key
+function glib.table_modify_immutable_row(methods, context, key)
+    local row = context.key_to_row[key]
 
-    methods.on_row_changed(context, context.row_to_cells[row], old_key, context.key_to_object[old_key])
+    methods.on_row_changed(context, context.row_to_cells[row], key, context.key_to_object[key])
 end
 
 ---@generic Base, Key, Object
@@ -456,7 +447,7 @@ function glib.table_modify_mutable_row(methods, context, child)
             assert(other_key == old_key)
 
             methods.on_row_changed(context, other_cells, other_key, other_object)
-            context.key_to_row = assign_key_to_row(row_to_key, context.key_to_row, other_row, other_key)
+            context.key_to_row = assign_key_to_row(context.key_to_row, other_row, other_key)
             methods.on_object_changed(context, other_key, other_object)
             context.key_to_object = assign_key_to_object(context.key_to_row, context.key_to_object, other_key, other_object)
         else
@@ -469,7 +460,7 @@ function glib.table_modify_mutable_row(methods, context, child)
     if new_key then
         if old_key ~= new_key then
             methods.on_row_changed(context, cells, new_key, new_object)
-            context.key_to_row = assign_key_to_row(row_to_key, context.key_to_row, row, new_key)
+            context.key_to_row = assign_key_to_row(context.key_to_row, row, new_key)
             methods.on_object_changed(context, new_key, new_object)
             context.key_to_object = assign_key_to_object(context.key_to_row, context.key_to_object, new_key, new_object)
         else
@@ -549,100 +540,41 @@ end
 ---@generic Base, Key, Object
 ---@param methods GuiTableMethods
 ---@param context GuiTableContext<Base, Key, Object>
-function glib.table_populate_from_objects(methods, context)
-    local row_to_cells, row_to_key, key_to_row = context.row_to_cells, context.row_to_key, context.key_to_row
-    local column_count = context.table.column_count
+---@param reversed boolean
+function glib.table_populate_from_objects(methods, context, reversed)
+    local row_to_cells, row_to_key, key_to_row, key_to_object = context.row_to_cells, context.row_to_key, context.key_to_row, context.key_to_object
 
     local insert_row_complete = methods.insert_row_complete
 
-    local row, row_offset = 0, 0
-    for key, object in pairs(context.key_to_object) do
-        row = row + 1
+    if reversed then
+        local length, key_list = 0, {}
 
-        local cells = insert_row_complete(context, row_offset, key, object)
+        for key, _ in pairs(key_to_object) do
+            length = length + 1
+            key_list[length] = key
+        end
 
-        row_to_cells[row] = cells
-        row_to_key[row] = key
+        for i = length, 1, -1 do
+            local key, row = key_list[i], length - i + 1
+            row_to_cells[row] = insert_row_complete(context, nil, key, key_to_object[key])
+            row_to_key[row] = key
+            key_to_row[key] = row
+        end
+    else
+        local row = 0
 
-        key_to_row[key] = row
-
-        row_offset = row_offset + column_count
+        for key, object in pairs(context.key_to_object) do
+            row = row + 1
+            row_to_cells[row] = insert_row_complete(context, nil, key, object)
+            row_to_key[row] = key
+            key_to_row[key] = row
+        end
     end
 end
 
 --------------------------------------------------------------------------------
 
----@param table LuaGuiElement
----@param flow_index integer
----@param button_index integer
-function glib.move_row(table, flow_index, button_index)
-    local columns = table.column_count
-    local i = flow_index - 1
-    local j = i + (button_index * 2 - 3) * columns
-    if j >= 0 and j + columns <= #table.children then
-        for c = 1, columns do
-            table.swap_children(i + c, j + c)
-        end
-    end
-end
-
----@param table LuaGuiElement
----@param flow_index integer
-function glib.delete_row(table, flow_index)
-    local children = table.children
-    for i = flow_index - 1 + table.column_count, flow_index, -1 do
-        children[i].destroy()
-    end
-end
-
----@param table LuaGuiElement
----@param destination_i integer
-function glib.insert_newly_added_row(table, destination_i)
-    local columns = table.column_count
-    for i = #table.children - columns, destination_i + columns, -columns do
-        for c = 1, columns do
-            table.swap_children(i + c, i + c - columns)
-        end
-    end
-end
-
----@param table LuaGuiElement
----@param from_row fun(table_children: LuaGuiElement[], i: integer): key: string?, value: any
----@param to_row fun(table_children: LuaGuiElement[], i: integer, key: string?, value: any)
----@param old_dict {[string]: any}?
----@param key_remove fun(key: string)?
----@return {[string]: any}
-function glib.refresh_table(table, from_row, to_row, old_dict, key_remove)
-    local table_children = table.children
-
-    local new_dict = {}
-
-    for i = 0, #table_children - 1, table.column_count do
-        local key, value = from_row(table_children, i)
-        if key then
-            if new_dict[key] then
-                key, value = nil, nil
-            else
-                new_dict[key] = value
-            end
-        end
-        to_row(table_children, i, key, value)
-    end
-
-    if old_dict then
-        ---@cast key_remove -nil
-        for key, _ in pairs(old_dict) do
-            if not new_dict[key] then key_remove(key) end
-        end
-    end
-
-    return new_dict
-end
-
---------------------------------------------------------------------------------
-
----@type GuiHandler
-glib.handle_open_parent_entity = { [defines.events.on_gui_click] = function(event)
+glib.handlers["lib_open_parent_entity"] = { [defines.events.on_gui_click] = function(event)
     local entity = event.element.parent.entity
     if entity and entity.valid then
         game.get_player(event.player_index).opened = entity
@@ -660,7 +592,7 @@ function glib.acquire_next_minimap(grid_table, grid_children, old_length, new_le
         local inner_frame = outer_frame.add({ type = "frame", style = "deep_frame_in_shallow_frame" })
         local minimap = inner_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 })
 
-        minimap.add({ type = "button", style = "sspp_minimap_button", tags = format_handler(glib.handle_open_parent_entity) })
+        minimap.add({ type = "button", style = "sspp_minimap_button", tags = format_handler("lib_open_parent_entity") })
         local top = minimap.add({ type = "label", style = "sspp_minimap_top_label", ignored_by_interaction = true })
         local bottom = minimap.add({ type = "label", style = "sspp_minimap_bottom_label", ignored_by_interaction = true })
 
@@ -675,7 +607,7 @@ end
 
 --------------------------------------------------------------------------------
 
-function glib.initialise()
+function glib.register_event_handlers()
     script.on_event(defines.events.on_gui_checked_state_changed, on_element_event)
     script.on_event(defines.events.on_gui_click, on_element_event)
     script.on_event(defines.events.on_gui_confirmed, on_element_event)
@@ -688,10 +620,6 @@ function glib.initialise()
     script.on_event(defines.events.on_gui_switch_state_changed, on_element_event)
     script.on_event(defines.events.on_gui_text_changed, on_element_event)
     script.on_event(defines.events.on_gui_value_changed, on_element_event)
-
-    glib.register_functions({
-        ["lib_open_parent_entity"] = glib.handle_open_parent_entity[defines.events.on_gui_click],
-    })
 end
 
 --------------------------------------------------------------------------------

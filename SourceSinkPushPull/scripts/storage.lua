@@ -184,10 +184,12 @@
 
 ---@class (exact) PlayerGui.Network : PlayerGui.Abstract
 ---@field public type "NETWORK"
----@field public history_indices JobIndex[]
----@field public haulers_class ClassName?
----@field public haulers_item ItemKey?
----@field public stations_item ItemKey?
+---@field public class_context GuiTableContext<PlayerGui.Network, ClassName, NetworkClass>
+---@field public item_context GuiTableContext<PlayerGui.Network, ItemKey, NetworkItem>
+---@field public job_context GuiTableContext<PlayerGui.Network, JobIndex, NetworkJob>
+---@field public expanded_class ClassName?
+---@field public expanded_stations_item ItemKey?
+---@field public expanded_haulers_item ItemKey?
 ---@field public expanded_job JobIndex?
 ---@field public popup_elements {[string]: LuaGuiElement}?
 
