@@ -7,6 +7,7 @@ local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
 
 local events = defines.events
 
+---@class sspp.gui.hauler
 local gui_hauler = {}
 
 --------------------------------------------------------------------------------

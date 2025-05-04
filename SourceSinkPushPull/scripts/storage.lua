@@ -208,14 +208,17 @@
 
 --------------------------------------------------------------------------------
 
----@class GuiTableContext<Root, Key, Object> : {
+-- yes, this really needs to be this ugly
+
+---@class (exact) GuiTableContext<Root, Key, Object> : {
 --- root: Root,
---- table: LuaGuiElement,
---- row_to_cells: LuaGuiElement[][],
---- row_to_key: (Key|false)[],
---- key_to_row: {[Key]: integer},
---- key_to_object: {[Key]: Object},
+--- rows: { key: Key?, match: boolean?, cells: LuaGuiElement[]? }[],
+--- indices: {[Key]: integer},
+--- objects: {[Key]: Object},
 ---}
+---@field table LuaGuiElement
+---@field reverse true?
+---@field row_limit integer?
 
 --------------------------------------------------------------------------------
 

@@ -12,6 +12,7 @@ local split_item_key, make_item_icon, get_train_item_count = lib.split_item_key,
 
 local cwi, acquire_next_minimap = glib.caption_with_info, glib.acquire_next_minimap
 
+---@class sspp.gui.station
 local gui_station = {}
 
 --------------------------------------------------------------------------------
@@ -136,19 +137,19 @@ end
 ---@param player_id PlayerId
 ---@param button LuaGuiElement
 local function try_copy_item_or_fluid_row(methods, context, player_id, button)
-    if not lib.read_stop_flag(context.root.parts.stop, enums.stop_flags.bufferless) and #context.row_to_cells < 10 then
-        glib.table_copy_mutable_row(methods, context, button)
+    if not lib.read_stop_flag(context.root.parts.stop, enums.stop_flags.bufferless) and #context.rows < 10 then
+        glib.table_copy_row(methods, context, button)
     else
         game.get_player(player_id).play_sound({ path = "utility/cannot_build" })
     end
 end
 
 glib.handlers["station_provide_move"] = { [events.on_gui_click] = function(event)
-    glib.table_move_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
+    glib.table_move_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
 end }
 
 glib.handlers["station_request_move"] = { [events.on_gui_click] = function(event)
-    glib.table_move_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
+    glib.table_move_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
 end }
 
 glib.handlers["station_provide_copy"] = { [events.on_gui_click] = function(event)
@@ -342,6 +343,10 @@ function provide_methods.make_object(context, cells)
     } --[[@as ProvideItem]]
 end
 
+function provide_methods.filter_object(context, item_key, provide_item)
+    return true
+end
+
 function provide_methods.on_row_changed(context, cells, item_key, provide_item)
     ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
     ---@cast item_key ItemKey?
@@ -402,7 +407,7 @@ end
 function provide_methods.on_mutation_finished(context)
     ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
 
-    local station, provide_items = context.root.station, context.key_to_object
+    local station, provide_items = context.root.station, context.objects
     if station then
         station.provide.items = provide_items
         lib.ensure_hidden_combs(station.provide.comb, station.provide.hidden_combs, provide_items)
@@ -550,6 +555,10 @@ function request_methods.make_object(context, cells)
     } --[[@as RequestItem]]
 end
 
+function request_methods.filter_object(context, item_key, request_item)
+    return true
+end
+
 function request_methods.on_row_changed(context, cells, item_key, request_item)
     ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
     ---@cast item_key ItemKey?
@@ -610,7 +619,7 @@ end
 function request_methods.on_mutation_finished(context)
     ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
 
-    local station, request_items = context.root.station, context.key_to_object
+    local station, request_items = context.root.station, context.objects
     if station then
         station.request.items = request_items
         lib.ensure_hidden_combs(station.request.comb, station.request.hidden_combs, request_items)
@@ -627,7 +636,9 @@ end
 ---@param context GuiTableContext<PlayerGui.Station, ItemKey, Object>
 ---@param enabled boolean
 local function set_buffer_settings_enabled(methods, context, enabled)
-    for _, cells in pairs(context.row_to_cells) do
+    for _, row in pairs(context.rows) do
+        local cells = row.cells ---@cast cells -nil
+
         if not enabled then
             -- these values don't matter for bufferless stations, but they still need to be valid
             if not tonumber(cells[4].children[2].children[3].text) then cells[4].children[2].children[3].text = "0" end
@@ -650,15 +661,15 @@ end
 local function try_add_item_or_fluid_row(methods, context, player_id, elem_type)
     local player_gui = context.root
     if lib.read_stop_flag(player_gui.parts.stop, enums.stop_flags.bufferless) then
-        if not player_gui.provide_context or #player_gui.provide_context.row_to_cells == 0 then
-            if not player_gui.request_context or #player_gui.request_context.row_to_cells == 0 then
-                glib.table_insert_blank_mutable_row(methods, context, nil, elem_type)
+        if not player_gui.provide_context or #player_gui.provide_context.rows == 0 then
+            if not player_gui.request_context or #player_gui.request_context.rows == 0 then
+                glib.table_append_blank_row(methods, context, elem_type)
                 set_buffer_settings_enabled(methods, context, false)
                 return
             end
         end
-    elseif #context.row_to_cells < 10 then
-        glib.table_insert_blank_mutable_row(methods, context, nil, elem_type)
+    elseif #context.rows < 10 then
+        glib.table_append_blank_row(methods, context, elem_type)
         return
     end
     game.get_player(player_id).play_sound({ path = "utility/cannot_build" })
@@ -700,8 +711,8 @@ function gui_station.on_poll_finished(player_gui)
         local context = player_gui.provide_context ---@cast context -nil
         local dynamic_index = -1 -- zero based
 
-        for item_key, row_index in pairs(context.key_to_row) do
-            local cells = context.row_to_cells[row_index]
+        for item_key, index in pairs(context.indices) do
+            local cells = context.rows[index].cells ---@cast cells -nil
             local dynamic_button = cells[4].children[1].children[3].children[7]
 
             local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.provide-mode-tooltip-dynamic" }
@@ -741,8 +752,8 @@ function gui_station.on_poll_finished(player_gui)
         local context = player_gui.request_context ---@cast context -nil
         local dynamic_index = -1 -- zero based
 
-        for item_key, row_index in pairs(context.key_to_row) do
-            local cells = context.row_to_cells[row_index]
+        for item_key, index in pairs(context.indices) do
+            local cells = context.rows[index].cells ---@cast cells -nil
             local dynamic_button = cells[4].children[1].children[3].children[7]
 
             local dynamic_sprite, dynamic_tooltip = "sspp-signal-icon", { "sspp-gui.request-mode-tooltip-dynamic" }
@@ -868,8 +879,8 @@ glib.handlers["station_bufferless_toggled"] = { [events.on_gui_click] = function
     local toggled = event.element.toggled
 
     local provide_context, request_context = player_gui.provide_context, player_gui.request_context
-    local provide_row_count = provide_context and #provide_context.row_to_cells or 0
-    local request_row_count = request_context and #request_context.row_to_cells or 0
+    local provide_row_count = provide_context and #provide_context.rows or 0
+    local request_row_count = request_context and #request_context.rows or 0
 
     if toggled and provide_row_count + request_row_count > 1 then
         event.element.toggled = false
@@ -1089,20 +1100,16 @@ function gui_station.open(player_id, entity)
         local bufferless = lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
 
         if parts.provide_io then
-            player_gui.provide_context = {
-                root = player_gui, table = elements.provide_table, row_to_cells = {}, row_to_key = {}, key_to_row = {},
-                key_to_object = station and station.provide.items or lib.combinator_description_to_provide_items(parts.provide_io),
-            }
-            glib.table_populate_from_objects(provide_methods, player_gui.provide_context, false)
+            local provide_items = station and station.provide.items or lib.combinator_description_to_provide_items(parts.provide_io)
+            player_gui.provide_context = { root = player_gui, table = elements.provide_table }
+            glib.table_initialise(provide_methods, player_gui.provide_context, provide_items, nil, nil)
             if bufferless then set_buffer_settings_enabled(provide_methods, player_gui.provide_context, false) end
         end
 
         if parts.request_io then
-            player_gui.request_context = {
-                root = player_gui, table = elements.request_table, row_to_cells = {}, row_to_key = {}, key_to_row = {},
-                key_to_object = station and station.request.items or lib.combinator_description_to_request_items(parts.request_io),
-            }
-            glib.table_populate_from_objects(request_methods, player_gui.request_context, false)
+            local request_items = station and station.request.items or lib.combinator_description_to_request_items(parts.request_io)
+            player_gui.request_context = { root = player_gui, table = elements.request_table }
+            glib.table_initialise(request_methods, player_gui.request_context, request_items, nil, nil)
             if bufferless then set_buffer_settings_enabled(request_methods, player_gui.request_context, false) end
         end
     end

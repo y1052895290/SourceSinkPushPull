@@ -1,5 +1,7 @@
 -- SSPP by jagoly
 
+local flib_dictionary_on_init = require("__flib__.dictionary").on_init
+
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
 local enums = require("__SourceSinkPushPull__.scripts.enums")
@@ -7,6 +9,7 @@ local enums = require("__SourceSinkPushPull__.scripts.enums")
 local main_station = require("__SourceSinkPushPull__.scripts.main.station")
 local main_hauler = require("__SourceSinkPushPull__.scripts.main.hauler")
 
+---@class sspp.main
 local main = { station = main_station, hauler = main_hauler }
 
 --------------------------------------------------------------------------------
@@ -274,6 +277,8 @@ local function on_init()
     storage.buffer_items = {}
     storage.disabled_items = {}
     for _, surface in pairs(game.surfaces) do init_network_for_surface(surface) end
+
+    flib_dictionary_on_init()
 end
 
 local function on_load()

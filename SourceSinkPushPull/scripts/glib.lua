@@ -1,5 +1,6 @@
 -- SSPP by jagoly
 
+---@class sspp.glib
 local glib = {}
 
 local t_insert, t_remove = table.insert, table.remove
@@ -181,355 +182,451 @@ function glib.extract_elem_value_fields(elem_value)
     return name, quality, item_key
 end
 
+--------------------------------------------------------------------------------
+
 ---@param table LuaGuiElement
 ---@param child LuaGuiElement
----@return integer row
-local function get_row_for_child(table, child)
+---@return integer offset
+local function get_offset_for_child(table, child)
     repeat
         local parent = child.parent
         if parent == table then break end
         child = parent --[[@as LuaGuiElement]]
     until false
 
-    return math.ceil((child.get_index_in_parent()) / table.column_count)
+    local columns = table.column_count
+    local actual_row = math.ceil((child.get_index_in_parent()) / columns)
+
+    return (actual_row - 1) * columns
 end
-glib.get_row_for_child = get_row_for_child
 
---------------------------------------------------------------------------------
+---@param table LuaGuiElement
+---@param rows { cells: any }[]
+---@param offset integer
+---@param reverse boolean
+---@return integer index
+local function get_index_for_offset(table, rows, offset, reverse)
+    local columns = table.column_count
 
----@generic Key
----@param row_to_key (Key|false)[]
----@param key Key
----@return integer? row
-local function find_row_for_key(row_to_key, key)
-    for row, other_key in pairs(row_to_key) do
-        if other_key == key then
-            return row
+    local first, last, increment
+    if reverse then
+        first, last, increment = #rows, 1, -1
+    else
+        first, last, increment = 1, #rows, 1
+    end
+
+    for index = first, last, increment do
+        local row = rows[index]
+        if row.cells then
+            if offset == 0 then return index end
+            offset = offset - columns
         end
     end
-    return nil
+
+    error()
+end
+
+---@param table LuaGuiElement
+---@param rows { cells: any }[]
+---@param child LuaGuiElement
+---@return integer row
+local function get_index_for_child(table, rows, child, reverse)
+    return get_index_for_offset(table, rows, get_offset_for_child(table, child), reverse)
 end
 
 ---@generic Key
----@param key_to_row {[Key]: integer}
----@param row integer
----@param key Key|false
----@param insert true?
----@return {[Key]: integer} key_to_row
-local function assign_key_to_row(key_to_row, row, key, insert)
-    local key_to_row_new = {}
+---@param rows { key: Key? }[]
+---@param key Key
+---@return integer? index
+local function find_index_for_key(rows, key)
+    for index, row in pairs(rows) do
+        if row.key == key then
+            return index
+        end
+    end
+end
 
-    for k1, r1 in next, key_to_row do
-        if r1 < row then
-            key_to_row_new[k1] = r1
+---@generic Root, Key, Object
+---@param context GuiTableContext<Root, Key, Object>
+---@param key Key?
+---@param index integer
+---@param insert true?
+local function assign_index_for_key(context, key, index, insert)
+    local indices, indices_new = context.indices, {}
+
+    for k1, i1 in next, indices do
+        if i1 < index then
+            indices_new[k1] = i1
         else
             if key then
-                key_to_row_new[key] = row
+                indices_new[key] = index
             end
             if insert then
-                key_to_row_new[k1] = r1 + 1
-                for k2, r2 in next, key_to_row, k1 do
-                    key_to_row_new[k2] = r2 + 1
+                indices_new[k1] = i1 + 1
+                for k2, i2 in next, indices, k1 do
+                    indices_new[k2] = i2 + 1
                 end
             else
-                key_to_row_new[k1] = r1
-                for k2, r2 in next, key_to_row, k1 do
-                    key_to_row_new[k2] = r2
+                if k1 ~= key then
+                    indices_new[k1] = i1
+                end
+                for k2, i2 in next, indices, k1 do
+                    if k2 ~= key then
+                        indices_new[k2] = i2
+                    end
                 end
             end
-            return key_to_row_new
+            goto skip_assign
         end
     end
 
     if key then
-        key_to_row_new[key] = row
+        indices_new[key] = index
     end
 
-    return key_to_row_new
+    ::skip_assign::
+    context.indices = indices_new
 end
 
----@generic Key, Object
----@param key_to_row {[Key]: integer}
----@param key_to_object {[Key]: Object}
+---@generic Root, Key, Object
+---@param context GuiTableContext<Root, Key, Object>
 ---@param key Key
 ---@param object Object
----@return {[Key]: Object} key_to_object
-local function assign_key_to_object(key_to_row, key_to_object, key, object)
-    local key_to_object_new = {}
+local function assign_object_for_key(context, key, object)
+    local objects, objects_new = context.objects, {}
 
-    for k, _ in pairs(key_to_row) do
-        if k == key then
-            key_to_object_new[k] = object
+    for k, _ in pairs(context.indices) do
+        if k ~= key then
+            objects_new[k] = objects[k]
         else
-            key_to_object_new[k] = key_to_object[k]
+            objects_new[k] = object
         end
     end
 
-    return key_to_object_new
+    context.objects = objects_new
 end
 
----@generic Key
----@param row_to_cells LuaGuiElement[][]
----@param row_to_key (Key|false)[]
----@param key_to_row {[Key]: integer}
----@param row integer?
----@param key Key|false
----@param cells LuaGuiElement[]
----@return {[Key]: integer} key_to_row
-local function insert_row(row_to_cells, row_to_key, key_to_row, row, key, cells)
-    if row then
-        t_insert(row_to_cells, row, cells)
-        t_insert(row_to_key, row, key)
+---@generic Root, Key, Object
+---@param context GuiTableContext<Root, Key, Object>
+---@param index integer?
+---@param key Key?
+local function insert_row(context, index, key)
+    local rows, row = context.rows, { key = key }
 
-        return assign_key_to_row(key_to_row, row, key, true)
+    if index then
+        t_insert(rows, index, row)
+        assign_index_for_key(context, key, index, true)
     else
-        row = #row_to_cells + 1
-
-        row_to_cells[row] = cells
-        row_to_key[row] = key
+        index = #rows + 1
+        rows[index] = row
 
         if key then
-            key_to_row[key] = row
-        end
-
-        return key_to_row
-    end
-end
-
----@generic Key
----@param row_to_cells LuaGuiElement[][]
----@param row_to_key (Key|false)[]
----@param key_to_row {[Key]: integer}
----@param row integer
-local function remove_row(row_to_cells, row_to_key, key_to_row, row)
-    local cells = row_to_cells[row]
-
-    t_remove(row_to_cells, row)
-    t_remove(row_to_key, row)
-
-    for k, r in pairs(key_to_row) do
-        if r > row then
-            key_to_row[k] = r - 1
+            local indices = context.indices
+            indices[key] = index
+            context.indices = indices
         end
     end
 
-    for _, cell in pairs(cells) do
-        cell.destroy()
-    end
+    return row
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
+---@param context GuiTableContext<Root, Key, Object>
+---@param index integer
+---@return LuaGuiElement[]? cells
+local function remove_row(context, index)
+    local rows, indices = context.rows, context.indices
+    local cells = rows[index].cells
+
+    t_remove(rows, index)
+
+    for k, i in pairs(indices) do
+        if i > index then
+            indices[k] = i - 1
+        end
+    end
+
+    return cells
+end
+
+--------------------------------------------------------------------------------
+
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
----@param row integer?
+---@param context GuiTableContext<Root, Key, Object>
+---@param child LuaGuiElement
+---@return Key? key
+function glib.table_get_key_for_child(methods, context, child)
+    local table, rows = context.table, context.rows
+    local index = get_index_for_offset(table, rows, get_offset_for_child(table, child), context.reverse)
+    local row = rows[index]
+    if row.match then return row.key end
+end
+
+---@generic Root, Key, Object
+---@param methods GuiTableMethods
+---@param context GuiTableContext<Root, Key, Object>
 ---@param args AnyBasic?
-function glib.table_insert_blank_mutable_row(methods, context, row, args)
-    local row_to_cells, row_to_key = context.row_to_cells, context.row_to_key
+function glib.table_append_blank_row(methods, context, args)
+    local row = insert_row(context, nil, nil)
 
-    local row_offset = row and (row - 1) * context.table.column_count
-    local cells = methods.insert_row_blank(context, row_offset, args)
-
-    context.key_to_row = insert_row(row_to_cells, row_to_key, context.key_to_row, row, false, cells)
+    row.cells = methods.insert_row_blank(context, nil, args)
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
----@param row integer?
+---@param context GuiTableContext<Root, Key, Object>
 ---@param key Key
 ---@param object Object
-function glib.table_insert_complete_row(methods, context, row, key, object)
-    local row_to_cells, row_to_key = context.row_to_cells, context.row_to_key
+function glib.table_append_immutable_row(methods, context, key, object)
+    local row = insert_row(context, nil, key)
+    local match = methods.filter_object(context, key, object)
 
-    local row_offset = row and (row - 1) * context.table.column_count
-    local cells = methods.insert_row_complete(context, row_offset, key, object)
+    row.match = match
 
-    context.key_to_row = insert_row(row_to_cells, row_to_key, context.key_to_row, row, key, cells)
+    if match then
+        glib.table_apply_filter(methods, context)
+    end
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
+---@param context GuiTableContext<Root, Key, Object>
 ---@param child LuaGuiElement
-function glib.table_copy_mutable_row(methods, context, child)
-    local row_to_cells, row_to_key = context.row_to_cells, context.row_to_key
+function glib.table_copy_row(methods, context, child)
+    local table, rows = context.table, context.rows
 
-    local src_row = get_row_for_child(context.table, child)
-    local src_cells = row_to_cells[src_row]
+    local src_offset = get_offset_for_child(table, child)
+    local src_index = get_index_for_offset(table, rows, src_offset, false)
+    local src_cells = rows[src_index].cells ---@cast src_cells -nil
 
-    local row = src_row + 1
-    local row_offset = src_row * context.table.column_count
-    local cells = methods.insert_row_copy(context, row_offset, src_cells)
+    local offset, index = src_offset + table.column_count, src_index + 1
+    local row = insert_row(context, index, nil)
 
-    context.key_to_row = insert_row(row_to_cells, row_to_key, context.key_to_row, row, false, cells)
+    row.cells = methods.insert_row_copy(context, offset, src_cells)
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
+---@param context GuiTableContext<Root, Key, Object>
 ---@param key Key
 function glib.table_remove_immutable_row(methods, context, key)
-    local key_to_row = context.key_to_row
-    local row = key_to_row[key]
+    local indices = context.indices
+    local index = indices[key]
 
-    key_to_row[key] = nil
+    indices[key] = nil
 
-    remove_row(context.row_to_cells, context.row_to_key, key_to_row, row)
+    local cells = remove_row(context, index)
+
+    if cells then
+        for _, cell in pairs(cells) do cell.destroy() end
+
+        -- can unhide another row if below the row limit
+        glib.table_apply_filter(methods, context)
+    end
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
+---@param context GuiTableContext<Root, Key, Object>
 ---@param child LuaGuiElement
 function glib.table_remove_mutable_row(methods, context, child)
-    local row_to_cells, row_to_key = context.row_to_cells, context.row_to_key
+    local index = get_index_for_child(context.table, context.rows, child)
+    local row = context.rows[index]
+    local key = row.key
 
-    local row = get_row_for_child(context.table, child)
-    local old_key = row_to_key[row]
+    if key then
+        if context.indices[key] ~= index then key = nil end
+        row.key = nil
+    end
 
-    if old_key and context.key_to_row[old_key] == row then
-        row_to_key[row] = false
+    local need_apply_filter = false
 
-        local other_row = find_row_for_key(row_to_key, old_key)
-        if other_row then
-            local other_cells = row_to_cells[other_row]
+    if key then
+        local other_index = find_index_for_key(context.rows, key)
+        if other_index then
+            -- invalid rows are never hidden
+            local other_row = context.rows[other_index] ---@cast other_row -nil
+            local other_cells = other_row.cells ---@cast other_cells -nil
+
             local other_key, other_object = methods.make_object(context, other_cells)
-            assert(other_key == old_key)
+            assert(other_key == key)
 
             methods.on_row_changed(context, other_cells, other_key, other_object)
-            context.key_to_row = assign_key_to_row(context.key_to_row, other_row, other_key)
+            assign_index_for_key(context, other_key, other_index)
             methods.on_object_changed(context, other_key, other_object)
-            context.key_to_object = assign_key_to_object(context.key_to_row, context.key_to_object, other_key, other_object)
+            assign_object_for_key(context, other_key, other_object)
+
+            local other_match = methods.filter_object(context, other_key, other_object)
+            other_row.match = other_match
+            if not other_match then need_apply_filter = true end
         else
-            context.key_to_row[old_key] = nil
-            methods.on_object_changed(context, old_key, nil)
-            context.key_to_object[old_key] = nil
+            context.indices[key] = nil
+            methods.on_object_changed(context, key, nil)
+            context.objects[key] = nil
         end
     end
 
-    remove_row(row_to_cells, row_to_key, context.key_to_row, row)
+    -- mutable rows must not be hidden to be removed
+    local cells = remove_row(context, index) ---@cast cells -nil
 
-    methods.on_mutation_finished(context)
+    for _, cell in pairs(cells) do cell.destroy() end
+
+    if key then
+        if need_apply_filter then
+            glib.table_apply_filter(methods, context)
+        end
+
+        methods.on_mutation_finished(context)
+    end
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
+---@param context GuiTableContext<Root, Key, Object>
 ---@param key Key
 function glib.table_modify_immutable_row(methods, context, key)
-    local row = context.key_to_row[key]
+    local index = context.indices[key]
+    local object = context.objects[key]
+    local row = context.rows[index]
 
-    methods.on_row_changed(context, context.row_to_cells[row], key, context.key_to_object[key])
+    local match = methods.filter_object(context, key, object)
+
+    if row.match ~= match then
+        row.match = match
+        glib.table_apply_filter(methods, context)
+    else
+        local cells = row.cells
+        if cells then
+            methods.on_row_changed(context, cells, key, object)
+        end
+    end
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
+---@param context GuiTableContext<Root, Key, Object>
 ---@param child LuaGuiElement
 function glib.table_modify_mutable_row(methods, context, child)
-    local row_to_cells, row_to_key = context.row_to_cells, context.row_to_key
+    local index = get_index_for_child(context.table, context.rows, child)
+    local row = context.rows[index]
+    local old_key = row.key
 
-    local row = get_row_for_child(context.table, child)
-    local cells, old_key = row_to_cells[row], row_to_key[row]
+    -- mutable rows must not be hidden to be modified
+    local cells = row.cells ---@cast cells -nil
 
     local new_key, new_object = methods.make_object(context, cells)
 
-    row_to_key[row] = new_key
+    row.key = new_key
 
-    old_key = old_key and context.key_to_row[old_key] == row and old_key or nil
-    new_key = new_key and (context.key_to_row[new_key] or row) == row and new_key or nil
+    if old_key and context.indices[old_key] ~= index then old_key = nil end
+    if new_key and (context.indices[new_key] or index) ~= index then new_key = nil end
+
+    local need_apply_filter = false
 
     if old_key and old_key ~= new_key then
-        local other_row = find_row_for_key(row_to_key, old_key)
-        if other_row then
-            local other_cells = row_to_cells[other_row]
+        local other_index = find_index_for_key(context.rows, old_key)
+        if other_index then
+            -- invalid rows are never hidden
+            local other_row = context.rows[other_index] ---@cast other_row -nil
+            local other_cells = other_row.cells ---@cast other_cells -nil
+
             local other_key, other_object = methods.make_object(context, other_cells)
             assert(other_key == old_key)
 
             methods.on_row_changed(context, other_cells, other_key, other_object)
-            context.key_to_row = assign_key_to_row(context.key_to_row, other_row, other_key)
+            assign_index_for_key(context, other_key, other_index)
             methods.on_object_changed(context, other_key, other_object)
-            context.key_to_object = assign_key_to_object(context.key_to_row, context.key_to_object, other_key, other_object)
+            assign_object_for_key(context, other_key, other_object)
+
+            local other_match = methods.filter_object(context, other_key, other_object)
+            other_row.match = other_match
+            if not other_match then need_apply_filter = true end
         else
-            context.key_to_row[old_key] = nil
+            context.indices[old_key] = nil
             methods.on_object_changed(context, old_key, nil)
-            context.key_to_object[old_key] = nil
+            context.objects[old_key] = nil
         end
     end
 
     if new_key then
+        methods.on_row_changed(context, cells, new_key, new_object)
+
         if old_key ~= new_key then
             methods.on_row_changed(context, cells, new_key, new_object)
-            context.key_to_row = assign_key_to_row(context.key_to_row, row, new_key)
+            assign_index_for_key(context, new_key, index)
             methods.on_object_changed(context, new_key, new_object)
-            context.key_to_object = assign_key_to_object(context.key_to_row, context.key_to_object, new_key, new_object)
+            assign_object_for_key(context, new_key, new_object)
         else
             methods.on_row_changed(context, cells, new_key, new_object)
             methods.on_object_changed(context, new_key, new_object)
-            context.key_to_object[new_key] = new_object
+            context.objects[new_key] = new_object
         end
+
+        local match = methods.filter_object(context, new_key, new_object)
+        row.match = match
+        if not match then need_apply_filter = true end
     else
         methods.on_row_changed(context, cells, nil, nil)
+        row.match = nil
+    end
+
+    if need_apply_filter then
+        glib.table_apply_filter(methods, context)
     end
 
     methods.on_mutation_finished(context)
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
+---@param context GuiTableContext<Root, Key, Object>
 ---@param button LuaGuiElement
-function glib.table_move_mutable_row(methods, context, button)
-    local table = context.table
-    local direction = (button.get_index_in_parent() * 2 - 3)
+function glib.table_move_row(methods, context, button)
+    local table, rows = context.table, context.rows
 
-    local src_row = get_row_for_child(table, button)
-    local dst_row = src_row + direction
+    local src_offset = get_offset_for_child(table, button)
+    local src_index = get_index_for_offset(table, rows, src_offset, false)
+    local direction = button.get_index_in_parent() * 2 - 3
+    local dst_index = src_index + direction
 
-    local dst_cells = context.row_to_cells[dst_row]
-    if dst_cells then
-        local src_cells = context.row_to_cells[src_row]
+    if dst_index >= 1 and dst_index <= #rows then
+        local src_row = rows[src_index]
+        local dst_row = rows[dst_index]
 
-        local column_count = table.column_count
-        for c = 1, column_count do
-            src_cells[c], dst_cells[c] = dst_cells[c], src_cells[c]
-            table.swap_children((src_row - 1) * column_count + c, (dst_row - 1) * column_count + c)
+        local src_key = src_row.match ~= nil and src_row.key
+        local dst_key = dst_row.match ~= nil and dst_row.key
+
+        local dst_cells = dst_row.cells
+
+        rows[src_index] = dst_row
+        rows[dst_index] = src_row
+
+        if dst_cells then
+            local dst_offset = src_offset + direction * table.column_count
+            for c = 1, table.column_count do
+                table.swap_children(src_offset + c, dst_offset + c)
+            end
         end
 
-        local row_to_key, key_to_row = context.row_to_key, context.key_to_row
+        if src_key or dst_key then
+            local indices = context.indices
 
-        local src_key = row_to_key[src_row]
-        local dst_key = row_to_key[dst_row]
+            if src_key then indices[src_key] = dst_index end
+            if dst_key then indices[dst_key] = src_index end
 
-        local src_has_object = src_key and (key_to_row[src_key] == src_row)
-        local dst_has_object = dst_key and (key_to_row[dst_key] == dst_row)
-
-        if src_has_object or dst_has_object then
-            row_to_key[src_row] = dst_key
-            row_to_key[dst_row] = src_key
-
-            if src_has_object then --[[@cast src_key -false]] key_to_row[src_key] = dst_row end
-            if dst_has_object then --[[@cast dst_key -false]] key_to_row[dst_key] = src_row end
-
-            local key_to_row_new = {}
-
-            for r, k in pairs(row_to_key) do
-                if k and r == key_to_row[k] then
-                    key_to_row_new[k] = r
-                end
+            local indices_new = {}
+            for index, row in pairs(rows) do
+                local key = row.key
+                if key and row.match ~= nil then indices_new[key] = index end
             end
+            context.indices = indices_new
 
-            context.key_to_row = key_to_row_new
-
-            if src_has_object and dst_has_object then
-                local key_to_object = context.key_to_object
-                local key_to_object_new = {}
-
-                for k, _ in pairs(key_to_row_new) do
-                    key_to_object_new[k] = key_to_object[k]
-                end
-
-                context.key_to_object = key_to_object_new
+            if src_key and dst_key then
+                local objects = context.objects
+                local objects_new = {}
+                for k, _ in pairs(indices_new) do objects_new[k] = objects[k] end
+                context.objects = objects_new
             end
 
             methods.on_mutation_finished(context)
@@ -537,37 +634,91 @@ function glib.table_move_mutable_row(methods, context, button)
     end
 end
 
----@generic Base, Key, Object
+---@generic Root, Key, Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<Base, Key, Object>
----@param reversed boolean
-function glib.table_populate_from_objects(methods, context, reversed)
-    local row_to_cells, row_to_key, key_to_row, key_to_object = context.row_to_cells, context.row_to_key, context.key_to_row, context.key_to_object
+---@param context GuiTableContext<Root, Key, Object>
+---@param objects {[Key]: Object}
+---@param reverse true?
+---@param row_limit integer?
+function glib.table_initialise(methods, context, objects, reverse, row_limit)
+    local filter_object = methods.filter_object
+
+    local rows, indices = {}, {}
+
+    context.rows = rows
+    context.indices = indices
+    context.objects = objects
+    context.reverse = reverse
+    context.row_limit = row_limit
+
+    local index = 0
+
+    for key, object in pairs(objects) do
+        index = index + 1
+        rows[index] = { key = key, match = filter_object(context, key, object) }
+        indices[key] = index
+    end
+
+    context.table.clear()
+
+    glib.table_apply_filter(methods, context)
+end
+
+---@generic Root, Key, Object
+---@param methods GuiTableMethods
+---@param context GuiTableContext<Root, Key, Object>
+function glib.table_update_matches(methods, context)
+    local indices, objects = context.indices, context.objects
+
+    local filter_object = methods.filter_object
+
+    for index, row in pairs(context.rows) do
+        local key = row.key
+        if key and indices[key] == index then
+            row.match = filter_object(context, key, objects[key])
+        end
+    end
+end
+
+---@generic Root, Key, Object
+---@param methods GuiTableMethods
+---@param context GuiTableContext<Root, Key, Object>
+function glib.table_apply_filter(methods, context)
+    local rows, objects = context.rows, context.objects
+
+    local columns = context.table.column_count
+    local row_count, row_limit = 0, context.row_limit or 10000
 
     local insert_row_complete = methods.insert_row_complete
 
-    if reversed then
-        local length, key_list = 0, {}
-
-        for key, _ in pairs(key_to_object) do
-            length = length + 1
-            key_list[length] = key
-        end
-
-        for i = length, 1, -1 do
-            local key, row = key_list[i], length - i + 1
-            row_to_cells[row] = insert_row_complete(context, nil, key, key_to_object[key])
-            row_to_key[row] = key
-            key_to_row[key] = row
-        end
+    local first, last, increment
+    if context.reverse then
+        first, last, increment = #rows, 1, -1
     else
-        local row = 0
+        first, last, increment = 1, #rows, 1
+    end
 
-        for key, object in pairs(context.key_to_object) do
-            row = row + 1
-            row_to_cells[row] = insert_row_complete(context, nil, key, object)
-            row_to_key[row] = key
-            key_to_row[key] = row
+    for index = first, last, increment do
+        local row = rows[index]
+        local match = row.match
+
+        if match ~= nil then
+            local cells = row.cells
+
+            if match and row_count < row_limit then
+                if not cells then
+                    local key = row.key ---@cast key -nil
+                    row.cells = insert_row_complete(context, row_count * columns, key, objects[key])
+                end
+                row_count = row_count + 1
+            else
+                if cells then
+                    for _, cell in pairs(cells) do cell.destroy() end
+                    row.cells = nil
+                end
+            end
+        else
+            row_count = row_count + 1
         end
     end
 end

@@ -6,6 +6,7 @@ local enums = require("__SourceSinkPushPull__.scripts.enums")
 
 local e_stop_flags = enums.stop_flags
 
+---@class sspp.main.station
 local main_station = {}
 
 --------------------------------------------------------------------------------

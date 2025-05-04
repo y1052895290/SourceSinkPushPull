@@ -1,5 +1,6 @@
 -- SSPP by jagoly
 
+local flib_dictionary = require("__flib__.dictionary")
 local flib_migration = require("__flib__.migration")
 
 local enums = require("__SourceSinkPushPull__.scripts.enums")
@@ -209,6 +210,17 @@ local migrations = {
 
 ---@param data ConfigurationChangedData
 local function on_configuration_changed(data)
+    flib_dictionary.on_init()
+
+    local names_dict = {}
+    for name, proto in pairs(prototypes.item) do
+        names_dict[name] = { "?", proto.localised_name, "item/" .. name }
+    end
+    for name, proto in pairs(prototypes.fluid) do
+        names_dict[name] = { "?", proto.localised_name, "fluid/" .. name }
+    end
+    flib_dictionary.new("names", names_dict)
+
     flib_migration.on_config_changed(data, migrations)
 
     local is_item_key_invalid = lib.is_item_key_invalid

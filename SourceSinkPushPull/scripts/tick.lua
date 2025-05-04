@@ -1,5 +1,7 @@
 -- SSPP by jagoly
 
+local flib_dictionary_on_tick = require("__flib__.dictionary").on_tick
+
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
 local main = require("__SourceSinkPushPull__.scripts.main")
@@ -537,6 +539,7 @@ local function get_provide_mode_and_score(station, item_key)
     local stop = station.stop
     local limit = stop.trains_limit
     local score = (limit - station.total_deliveries) / limit -- emptyness
+    -- TODO: this is a significant bottleneck! stations should cache their flags
     if read_stop_flag(stop, e_stop_flags.bufferless) then score = 1.0 - score end -- fullness
     return station.provide.modes[item_key], score
 end
@@ -937,6 +940,8 @@ local function on_tick()
     elseif tick_state == "INITIAL" then
         prepare_for_tick_poll()
     end
+
+    flib_dictionary_on_tick()
 end
 
 script.on_event(defines.events.on_tick, on_tick)

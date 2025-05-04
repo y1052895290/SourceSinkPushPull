@@ -14,6 +14,7 @@ local send_train_to_named_stop, assign_job_index = lib.send_train_to_named_stop,
 
 local on_status_changed, on_job_created, on_job_updated = gui.on_status_changed, gui.on_job_created, gui.on_job_updated
 
+---@class sspp.main.hauler
 local main_hauler = {}
 
 --------------------------------------------------------------------------------

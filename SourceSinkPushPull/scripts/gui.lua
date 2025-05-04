@@ -6,6 +6,7 @@ local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
 local gui_station = require("__SourceSinkPushPull__.scripts.gui.station")
 local gui_hauler = require("__SourceSinkPushPull__.scripts.gui.hauler")
 
+---@class sspp.gui
 local gui = {}
 
 --------------------------------------------------------------------------------

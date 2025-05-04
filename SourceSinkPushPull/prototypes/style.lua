@@ -95,7 +95,7 @@ styles.sspp_network_class_header = { ---@type data.TableStyleSpecification
     right_padding = 12,
     cell_padding = 4,
     column_widths = {
-        { column = 1, width = 32 + 4 + 32 + 4 + 32 + 4 + 20 },
+        { column = 1, width = 128 },
         { column = 2, width = 120 },
         { column = 3, width = 120 },
         { column = 4, width = 120 },
@@ -123,7 +123,7 @@ styles.sspp_network_item_header = { ---@type data.TableStyleSpecification
     right_padding = 12,
     cell_padding = 4,
     column_widths = {
-        { column = 1, width = 32 + 4 + 32 + 4 + 32 + 4 + 20 },
+        { column = 1, width = 128 },
         { column = 2, width = 120 },
         { column = 3, width = 120 },
         { column = 4, width = 120 },
@@ -145,40 +145,39 @@ styles.sspp_network_item_table = { ---@type data.TableStyleSpecification
     odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
 }
 
-styles.sspp_network_history_header = { ---@type data.TableStyleSpecification
+styles.sspp_network_job_header = { ---@type data.TableStyleSpecification
     type = "table_style",
     parent = "table",
-    left_padding = 18,
-    right_padding = 18,
+    left_padding = 12,
+    right_padding = 12,
     cell_padding = 4,
     column_widths = {
-        { column = 1, width = 40 + 8 },
-        { column = 2, width = 280 },
-        { column = 3, width = 112 },
-        { column = 4, width = 224 + 8 },
-        { column = 5, width = 32 },
+        { column = 1, width = 128 },
+        { column = 2, width = 272 },
+        { column = 3, width = 100 },
+        { column = 4, width = 224 },
     },
     horizontal_spacing = 0,
     vertical_spacing = 0,
 }
 
-styles.sspp_network_history_table = { ---@type data.TableStyleSpecification
+styles.sspp_network_job_table = { ---@type data.TableStyleSpecification
     type = "table_style",
-    parent = "sspp_network_history_header",
+    parent = "sspp_network_job_header",
     width = 764,
-    left_padding = 10,
-    right_padding = 10,
+    left_padding = 4,
+    right_padding = 4,
     top_cell_padding = 5,
     bottom_cell_padding = 5,
     odd_row_graphical_set = { position = { 472, 25 }, size = 1 },
 }
 
-styles.sspp_network_history_inverted_table = { ---@type data.TableStyleSpecification
+styles.sspp_network_job_inverted_table = { ---@type data.TableStyleSpecification
     type = "table_style",
-    parent = "sspp_network_history_header",
+    parent = "sspp_network_job_header",
     width = 764,
-    left_padding = 10,
-    right_padding = 10,
+    left_padding = 4,
+    right_padding = 4,
     top_cell_padding = 5,
     bottom_cell_padding = 5,
     even_row_graphical_set = { position = { 472, 25 }, size = 1 },
@@ -276,14 +275,35 @@ styles.sspp_compact_warning_image = { ---@type data.ImageStyleSpecification
     stretch_image_to_widget_size = true,
 }
 
-styles.sspp_history_cell_flow = { ---@type data.VerticalFlowStyleSpecification
+styles.sspp_job_buttons_flow = { ---@type data.HorizontalFlowStyleSpecification
+    type = "horizontal_flow_style",
+    left_padding = 6,
+    horizontal_spacing = 10,
+    vertical_align = "center",
+}
+
+styles.sspp_job_slot_button = { ---@type data.ButtonStyleSpecification
+    type = "button_style",
+    parent = "slot_button",
+    size = 48,
+}
+
+styles.sspp_job_sprite_button = { ---@type data.ButtonStyleSpecification
+    type = "button_style",
+    parent = "slot_button",
+    size = 32,
+    padding = 4,
+    invert_colors_of_picture_when_hovered_or_toggled = true,
+}
+
+styles.sspp_job_cell_flow = { ---@type data.VerticalFlowStyleSpecification
     type = "vertical_flow_style",
     vertical_spacing = 2,
     height = 20 * 4 + 2 * 3,
     vertical_align = "center",
 }
 
-styles.sspp_history_action_label = { ---@type data.LabelStyleSpecification
+styles.sspp_job_action_label = { ---@type data.LabelStyleSpecification
     type = "label_style",
     parent = "label",
     maximal_width = 274 - 8,
@@ -320,6 +340,14 @@ styles.sspp_station_limit_value = { ---@type data.LabelStyleSpecification
     width = 16,
     right_margin = 4,
     horizontal_align = "right",
+}
+
+styles.sspp_header_filter_textbox = { ---@type data.TextBoxStyleSpecification
+    type = "textbox_style",
+    parent = "textbox",
+    width = 104,
+    top_margin = -4,
+    bottom_margin = -4,
 }
 
 styles.sspp_name_textbox = { ---@type data.TextBoxStyleSpecification

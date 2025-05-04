@@ -4,6 +4,7 @@ local m_max, m_ceil, m_floor = math.max, math.ceil, math.floor
 local b_test, b_or, b_and, b_not = bit32.btest, bit32.bor, bit32.band, bit32.bnot
 local s_match, s_gmatch, s_format = string.match, string.gmatch, string.format
 
+---@class sspp.lib
 local lib = {}
 
 --------------------------------------------------------------------------------
