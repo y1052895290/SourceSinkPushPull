@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.5
+Date: 2025-05-07
+  Features:
+    - The Items/Fluids and History tables in the network GUI are now searchable.
+    - Added a command to update granularity at all stations, for when you research an inserter capacity bonus.
+  Changes:
+    - The history tab in the network GUI now only shows 100 jobs at a time, to reduce lag while the gui is open.
+  Bugfixes:
+    - Fix crash at startup when LTN is installed alongside SSPP.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.4
 Date: 2025-04-25
   Changes:
