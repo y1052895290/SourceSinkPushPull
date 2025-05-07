@@ -1,7 +1,5 @@
 -- SSPP by jagoly
 
-local flib_dictionary_on_init = require("__flib__.dictionary").on_init
-
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
 local enums = require("__SourceSinkPushPull__.scripts.enums")
@@ -278,7 +276,7 @@ local function on_init()
     storage.disabled_items = {}
     for _, surface in pairs(game.surfaces) do init_network_for_surface(surface) end
 
-    flib_dictionary_on_init()
+    lib.refresh_dictionaries()
 end
 
 local function on_load()

@@ -66,7 +66,20 @@ end
 
 --------------------------------------------------------------------------------
 
+local function tick_initial()
+    storage.poll_stations = {}
+    storage.request_done_items = {}
+    storage.liquidate_items = {}
+    storage.provide_done_items = {}
+    storage.dispatch_items = {}
+    storage.buffer_items = {}
+end
+
+--------------------------------------------------------------------------------
+
 local function prepare_for_tick_poll()
+    storage.disabled_items = {}
+
     for _, network in pairs(storage.networks) do
         network.push_tickets = {}
         network.provide_tickets = {}
@@ -77,10 +90,7 @@ local function prepare_for_tick_poll()
         network.buffer_tickets = {}
     end
 
-    storage.disabled_items = {}
-
-    local list, length = {}, 0 ---@type StationId[]
-    storage.poll_stations = list
+    local list, length = storage.poll_stations, 0
 
     for station_id, station in pairs(storage.stations) do
         local provide = station.provide
@@ -556,8 +566,7 @@ end
 --------------------------------------------------------------------------------
 
 local function prepare_for_tick_request_done()
-    local list, length = {}, 0 ---@type NetworkItemKey[]
-    storage.request_done_items = list
+    local list, length = storage.request_done_items, 0
 
     for network_name, network in pairs(storage.networks) do
         for item_key, station_ids in pairs(network.request_done_tickets) do
@@ -599,8 +608,7 @@ end
 --------------------------------------------------------------------------------
 
 local function prepare_for_tick_liquidate()
-    local list, length = {}, 0 ---@type NetworkItemKey[]
-    storage.liquidate_items = list
+    local list, length = storage.liquidate_items, 0
 
     for network_name, network in pairs(storage.networks) do
         local pull_tickets = network.pull_tickets
@@ -674,8 +682,7 @@ end
 --------------------------------------------------------------------------------
 
 local function prepare_for_tick_provide_done()
-    local list, length = {}, 0 ---@type NetworkItemKey[]
-    storage.provide_done_items = list
+    local list, length = storage.provide_done_items, 0
 
     for network_name, network in pairs(storage.networks) do
         local pull_tickets = network.pull_tickets
@@ -749,8 +756,7 @@ end
 --------------------------------------------------------------------------------
 
 local function prepare_for_tick_dispatch()
-    local list, length = {}, 0 ---@type NetworkItemKey[]
-    storage.dispatch_items = list
+    local list, length = storage.dispatch_items, 0
 
     for network_name, network in pairs(storage.networks) do
         local provide_haulers = network.provide_haulers
@@ -831,8 +837,7 @@ end
 --------------------------------------------------------------------------------
 
 local function prepare_for_tick_buffer()
-    local list, length = {}, 0 ---@type NetworkItemKey[]
-    storage.buffer_items = list
+    local list, length = storage.buffer_items, 0
 
     for network_name, network in pairs(storage.networks) do
         for item_key, station_ids in pairs(network.buffer_tickets) do
@@ -938,6 +943,7 @@ local function on_tick()
             prepare_for_tick_poll()
         end
     elseif tick_state == "INITIAL" then
+        tick_initial()
         prepare_for_tick_poll()
     end
 

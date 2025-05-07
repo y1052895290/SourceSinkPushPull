@@ -222,12 +222,10 @@ glib.handlers["network_job_expand"] = { [events.on_gui_click] = function(event)
 
     clear_expanded_object(player_gui)
 
-    local context = player_gui.job_context
-    local job_index = glib.table_get_key_for_child(job_methods, player_gui.job_context, event.element)
-    ---@cast job_index -false
+    local job_index = glib.table_get_key_for_child(job_methods, player_gui.job_context, event.element) ---@cast job_index -nil
 
     local elements = player_gui.elements
-    local job = context.objects[job_index]
+    local job = player_gui.job_context.objects[job_index]
 
     if job.type == "FUEL" then
         elements.grid_title.caption = { "sspp-gui.fmt-job-title", "[virtual-signal=signal-fuel]", job_index }
@@ -245,12 +243,86 @@ end }
 
 glib.handlers["network_item_query_changed"] = { [events.on_gui_text_changed] = function(event)
     local context = storage.player_guis[event.player_index].item_context
+    local query_string, query = event.element.text, nil
+
+    if query_string ~= "" then
+        query = {}
+
+        for query_capture in string.gmatch(query_string, "([^&]+)") do
+            local query_substring = s_lower(string.match(query_capture, " *(.-) *$"))
+            if query_substring ~= "" then
+                if string.sub(query_substring, 1, 1) == "@" then
+                    local dictionary = flib_dictionary_get(event.player_index, "misc")
+                    if dictionary then
+                        if s_lower(dictionary["item"]) == query_substring then
+                            query.hide_fluid = true
+                        elseif s_lower(dictionary["fluid"]) == query_substring then
+                            query.hide_item = true
+                        end
+                    end
+                else
+                    query.partial_name = query_substring
+                end
+            end
+        end
+
+        if query.partial_name then
+            if not query.hide_item then
+                query.item_dictionary = flib_dictionary_get(event.player_index, "item")
+            end
+            if not query.hide_fluid then
+                query.fluid_dictionary = flib_dictionary_get(event.player_index, "fluid")
+            end
+        end
+    end
+
+    context.query = query
     glib.table_update_matches(item_methods, context)
     glib.table_apply_filter(item_methods, context)
 end }
 
 glib.handlers["network_job_query_changed"] = { [events.on_gui_text_changed] = function(event)
     local context = storage.player_guis[event.player_index].job_context
+    local query_string, query = event.element.text, nil
+
+    if query_string ~= "" then
+        query = {}
+
+        for query_capture in string.gmatch(query_string, "([^&]+)") do
+            local query_substring = s_lower(string.match(query_capture, " *(.-) *$"))
+            if query_substring ~= "" then
+                if string.sub(query_substring, 1, 1) == "@" then
+                    local dictionary = flib_dictionary_get(event.player_index, "misc")
+                    if dictionary then
+                        if s_lower(dictionary["fuel"]) == query_substring then
+                            query.hide_item = true
+                            query.hide_fluid = true
+                        elseif s_lower(dictionary["item"]) == query_substring then
+                            query.hide_fluid = true
+                            query.hide_fuel = true
+                        elseif s_lower(dictionary["fluid"]) == query_substring then
+                            query.hide_item = true
+                            query.hide_fuel = true
+                        end
+                    end
+                else
+                    query.partial_name = query_substring
+                    query.hide_fuel = true
+                end
+            end
+        end
+
+        if query.partial_name then
+            if not query.hide_item then
+                query.item_dictionary = flib_dictionary_get(event.player_index, "item")
+            end
+            if not query.hide_fluid then
+                query.fluid_dictionary = flib_dictionary_get(event.player_index, "fluid")
+            end
+        end
+    end
+
+    context.query = query
     glib.table_update_matches(job_methods, context)
     glib.table_apply_filter(job_methods, context)
 end }
@@ -490,16 +562,20 @@ function item_methods.filter_object(context, item_key, item)
     ---@cast item_key ItemKey
     ---@cast item NetworkItem
 
-    local query = context.root.elements.item_filter_query_input.text
-    if query == "" then return true end
+    local query = context.query
+    if query then
+        local dictionary ---@type flib.TranslatedDictionary?
+        if item.quality then
+            if query.hide_item then return false end
+            dictionary = query.item_dictionary
+        else
+            if query.hide_fluid then return false end
+            dictionary = query.fluid_dictionary
+        end
+        if dictionary and not s_find(s_lower(dictionary[item.name]), query.partial_name, nil, true) then return false end
+    end
 
-    local names_dict = flib_dictionary_get(1, "names")
-    if not names_dict then return true end
-
-    local name, quality = split_item_key(item_key)
-
-    local local_name = names_dict[name]
-    return s_find(s_lower(local_name), s_lower(query), 1, true) ~= nil
+    return true
 end
 
 function item_methods.on_row_changed(context, cells, item_key, item)
@@ -680,21 +756,26 @@ function job_methods.filter_object(context, job_index, job)
     ---@cast job_index JobIndex
     ---@cast job NetworkJob
 
-    local query = context.root.elements.job_filter_query_input.text
-    if query == "" then return true end
-
-    local item_key = job.item
-    if item_key then
-        local names_dict = flib_dictionary_get(1, "names")
-        if not names_dict then return true end
-
-        local name, quality = split_item_key(item_key)
-
-        local local_name = names_dict[name]
-        return s_find(s_lower(local_name), s_lower(query), nil, true) ~= nil
-    else
-        return s_find("refuel", s_lower(query), nil, true) ~= nil
+    local query = context.query
+    if query then
+        local item_key = job.item
+        if item_key then
+            local dictionary ---@type flib.TranslatedDictionary?
+            local name, quality = split_item_key(item_key)
+            if quality then
+                if query.hide_item then return false end
+                dictionary = query.item_dictionary
+            else
+                if query.hide_fluid then return false end
+                dictionary = query.fluid_dictionary
+            end
+            if dictionary and not s_find(s_lower(dictionary[name]), query.partial_name, nil, true) then return false end
+        else
+            if query.hide_fuel then return false end
+        end
     end
+
+    return true
 end
 
 function job_methods.on_row_changed(context, cells, job_index, job)
@@ -710,17 +791,18 @@ end
 ---@param player_gui PlayerGui.Network
 function gui_network.on_job_created(player_gui)
     local context = player_gui.job_context
-    local table = context.table
     local network = storage.networks[player_gui.network]
     local job_index = network.job_index_counter
 
-    if table.style.name == "sspp_network_job_inverted_table" then
-        table.style = "sspp_network_job_table"
-    else
-        table.style = "sspp_network_job_inverted_table"
-    end
-
     glib.table_append_immutable_row(job_methods, context, job_index, network.jobs[job_index])
+
+    if context.rows[#context.rows].cells then
+        if context.table.style.name == "sspp_network_job_inverted_table" then
+            context.table.style = "sspp_network_job_table"
+        else
+            context.table.style = "sspp_network_job_inverted_table"
+        end
+    end
 end
 
 ---@param player_gui PlayerGui.Network
@@ -1329,7 +1411,7 @@ function gui_network.open(player_id, network_name, tab_index)
                         { type = "tab", style = "tab", caption = { "sspp-gui.items-fluids" }, children = {
                             { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
                                 { type = "table", style = "sspp_network_item_header", column_count = 8, children = {
-                                    { type = "textfield", name = "item_filter_query_input", style = "sspp_header_filter_textbox", handler = "network_item_query_changed" },
+                                    { type = "textfield", name = "item_filter_query_input", style = "sspp_header_filter_textbox", tooltip = { "sspp-gui.item-query-tooltip" }, handler = "network_item_query_changed" },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.class" }), tooltip = { "sspp-gui.item-class-tooltip" } },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-size" }), tooltip = { "sspp-gui.item-delivery-size-tooltip" } },
                                     { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.delivery-time" }), tooltip = { "sspp-gui.item-delivery-time-tooltip" } },
@@ -1350,7 +1432,7 @@ function gui_network.open(player_id, network_name, tab_index)
                         { type = "tab", style = "tab", caption = { "sspp-gui.history" }, children = {
                             { type = "flow", style = "sspp_tab_content_flow", direction = "vertical", children = {
                                 { type = "table", style = "sspp_network_job_header", column_count = 4, children = {
-                                    { type = "textfield", name = "job_filter_query_input", style = "sspp_header_filter_textbox", handler = "network_job_query_changed" },
+                                    { type = "textfield", name = "job_filter_query_input", style = "sspp_header_filter_textbox", tooltip = { "sspp-gui.job-query-tooltip" }, handler = "network_job_query_changed" },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.action" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.duration" } },
                                     { type = "label", style = "bold_label", caption = { "sspp-gui.summary" } },

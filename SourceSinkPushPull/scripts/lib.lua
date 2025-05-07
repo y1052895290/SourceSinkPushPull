@@ -1,5 +1,7 @@
 -- SSPP by jagoly
 
+local flib_dictionary = require("__flib__.dictionary")
+
 local m_max, m_ceil, m_floor = math.max, math.ceil, math.floor
 local b_test, b_or, b_and, b_not = bit32.btest, bit32.bor, bit32.band, bit32.bnot
 local s_match, s_gmatch, s_format = string.match, string.gmatch, string.format
@@ -651,6 +653,30 @@ function lib.format_time(tick)
     local minutes = m_floor(total_seconds / 60) % 60
     local hours = m_floor(total_seconds / 3600)
     return s_format("%02d:%02d:%02d", hours, minutes, seconds)
+end
+
+--------------------------------------------------------------------------------
+
+function lib.refresh_dictionaries()
+    flib_dictionary.on_init()
+
+    local item_dict = {}
+    for name, proto in pairs(prototypes.item) do
+        item_dict[name] = { "?", proto.localised_name, "item/" .. name }
+    end
+    flib_dictionary.new("item", item_dict)
+
+    local fluid_dict = {}
+    for name, proto in pairs(prototypes.fluid) do
+        fluid_dict[name] = { "?", proto.localised_name, "fluid/" .. name }
+    end
+    flib_dictionary.new("fluid", fluid_dict)
+
+    local misc_dict = {}
+    misc_dict["fuel"] = { "sspp-query.fuel" }
+    misc_dict["item"] = { "sspp-query.item" }
+    misc_dict["fluid"] = { "sspp-query.fluid" }
+    flib_dictionary.new("misc", misc_dict)
 end
 
 --------------------------------------------------------------------------------

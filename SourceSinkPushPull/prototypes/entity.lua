@@ -127,6 +127,7 @@ protos.entity_stop = flib.copy_prototype(data.raw["train-stop"]["train-stop"], "
 protos.entity_stop.icon = "__SourceSinkPushPull__/graphics/icons/sspp-stop.png"
 protos.entity_stop.allow_copy_paste = false
 protos.entity_stop.fast_replaceable_group = nil
+protos.entity_stop.next_upgrade = nil -- LTN sets this on train-stop, but we need to clear it
 
 protos.entity_general_io = generate_io_entity("decider-combinator", "general") --[[@as data.DeciderCombinatorPrototype]]
 protos.entity_provide_io = generate_io_entity("arithmetic-combinator", "provide") --[[@as data.ArithmeticCombinatorPrototype]]

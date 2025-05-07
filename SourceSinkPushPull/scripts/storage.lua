@@ -219,6 +219,7 @@
 ---@field table LuaGuiElement
 ---@field reverse true?
 ---@field row_limit integer?
+---@field query table?
 
 --------------------------------------------------------------------------------
 
