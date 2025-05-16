@@ -57,8 +57,6 @@ local function add_element(parent, named_elements, def)
     def.handler = nil
     def.children = nil
 
-    ---@cast def -LuaGuiElement.add_param.extra
-
     local element = parent.add(def)
 
     if named_elements then
@@ -93,8 +91,6 @@ local function add_element(parent, named_elements, def)
             end
         end
     end
-
-    ---@cast def +LuaGuiElement.add_param.extra
 
     def.drag_target = drag_target
     def.elem_mods = elem_mods

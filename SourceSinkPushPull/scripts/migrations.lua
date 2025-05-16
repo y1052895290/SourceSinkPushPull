@@ -202,6 +202,14 @@ local migrations = {
                 end
             end
         end
+    end,
+    ["0.4.6"] = function()
+        for network_name, network in pairs(storage.networks) do
+            if network.surface and network.surface.name ~= lib.get_network_name_for_surface(network.surface) then
+                storage.networks[network_name] = nil
+                assert(next(network.classes) == nil, "why did you do this ☹️")
+            end
+        end
     end
 }
 

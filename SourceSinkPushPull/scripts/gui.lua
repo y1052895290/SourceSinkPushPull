@@ -1,5 +1,6 @@
 -- SSPP by jagoly
 
+local lib = require("__SourceSinkPushPull__.scripts.lib")
 local glib = require("__SourceSinkPushPull__.scripts.glib")
 
 local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
@@ -50,7 +51,7 @@ local function on_lua_shortcut(event)
             player.opened = nil
         else
             -- TODO: remember some previous state
-            gui_network.open(player_id, player.surface.name, 1)
+            gui_network.open(player_id, lib.get_network_name_for_surface(player.surface) or "nauvis", 1)
         end
     end
 end

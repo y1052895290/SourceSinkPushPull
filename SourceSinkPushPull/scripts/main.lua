@@ -33,6 +33,20 @@ local function on_entity_built(event)
     elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
         main_station.on_comb_built(entity)
     end
+
+    if not lib.get_network_name_for_surface(entity.surface) then
+        local player_id = event.player_index
+        local player = player_id and game.get_player(player_id)
+        if player then
+            player.play_sound({ path = "utility/cannot_build" })
+            player.create_local_flying_text({ create_at_cursor = true, text = { "sspp-gui.unsupported-surface" }})
+        end
+        if player and not (player.cursor_record or player.cursor_stack.name == "blueprint") then
+            player.mine_entity(entity, true)
+        else
+            entity.destroy({ raise_destroy = true })
+        end
+    end
 end
 
 local function on_entity_broken(event)
@@ -173,7 +187,10 @@ end
 
 ---@param surface LuaSurface
 local function init_network_for_surface(surface)
-    storage.networks[surface.name] = {
+    local network_name = lib.get_network_name_for_surface(surface)
+    if not network_name then return end
+
+    storage.networks[network_name] = {
         surface = surface,
         classes = {},
         items = {},
@@ -197,28 +214,46 @@ local function init_network_for_surface(surface)
     }
 end
 
+---@param surface LuaSurface
+local function break_all_surface_entities(surface)
+    for _, entity in pairs(surface.find_entities()) do
+        if entity.valid then
+            local name = entity.name
+            if name == "entity-ghost" then name = entity.ghost_name end
+
+            if name == "sspp-stop" then
+                main_station.on_stop_broken(entity.unit_number, entity)
+            elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
+                main_station.on_comb_broken(entity.unit_number, entity)
+            else
+                local train = entity.train
+                if train then main_hauler.on_broken(train.id, nil) end
+            end
+        end
+    end
+end
+
 ---@param event EventData.on_surface_created|EventData.on_surface_imported
 local function on_surface_created(event)
     local surface = assert(game.get_surface(event.surface_index))
     init_network_for_surface(surface)
 end
 
----@param event EventData.on_pre_surface_cleared|EventData.on_pre_surface_deleted
+---@param event EventData.on_pre_surface_cleared
 local function on_surface_cleared(event)
     local surface = assert(game.get_surface(event.surface_index))
+    break_all_surface_entities(surface)
+end
 
-    for _, entity in pairs(surface.find_entities()) do
-        local name = entity.name
-        if name == "entity-ghost" then name = entity.ghost_name end
+---@param event EventData.on_pre_surface_deleted
+local function on_surface_deleted(event)
+    local surface = assert(game.get_surface(event.surface_index))
+    break_all_surface_entities(surface)
 
-        if name == "sspp-stop" then
-            main_station.on_stop_broken(entity.unit_number, entity)
-        elseif name == "sspp-general-io" or name == "sspp-provide-io" or name == "sspp-request-io" then
-            main_station.on_comb_broken(entity.unit_number, entity)
-        end
+    local network_name = lib.get_network_name_for_surface(surface)
+    if network_name then
+        storage.networks[network_name] = nil
     end
-
-    storage.networks[surface.name] = nil
 end
 
 ---@param event EventData.on_surface_renamed
@@ -337,7 +372,7 @@ function main.register_event_handlers()
     script.on_event(defines.events.on_surface_created, on_surface_created)
     script.on_event(defines.events.on_surface_imported, on_surface_created)
     script.on_event(defines.events.on_pre_surface_cleared, on_surface_cleared)
-    script.on_event(defines.events.on_pre_surface_deleted, on_surface_cleared)
+    script.on_event(defines.events.on_pre_surface_deleted, on_surface_deleted)
     script.on_event(defines.events.on_surface_renamed, on_surface_renamed)
 
     script.on_event(defines.events.on_runtime_mod_setting_changed, on_runtime_mod_setting_changed)

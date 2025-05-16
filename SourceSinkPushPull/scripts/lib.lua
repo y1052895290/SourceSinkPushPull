@@ -623,6 +623,18 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param surface LuaSurface
+---@return NetworkName?
+function lib.get_network_name_for_surface(surface)
+    local name = surface.name
+    if surface.planet then return name end
+    if name == "__sspp_test" then return name end
+    -- TODO: mod surfaces which lack associated planets will have to be allowed individually
+    return nil
+end
+
+--------------------------------------------------------------------------------
+
 ---@param path LuaRailPath?
 ---@return LocalisedString
 function lib.format_distance(path)

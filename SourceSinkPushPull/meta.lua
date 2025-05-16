@@ -6,7 +6,6 @@
 
 ---@alias GuiStyleMods LuaStyle|{[string]: nil}
 ---@alias GuiElemMods LuaGuiElement|{[string]: nil}
----@alias GuiElementDef LuaGuiElement.add_param|LuaGuiElement.add_param.extra
 
 ---@class (exact) GuiHandler
 ---@field public [defines.events.on_gui_checked_state_changed] fun(event: EventData.on_gui_checked_state_changed)?
@@ -22,12 +21,36 @@
 ---@field public [defines.events.on_gui_text_changed] fun(event: EventData.on_gui_text_changed)?
 ---@field public [defines.events.on_gui_value_changed] fun(event: EventData.on_gui_value_changed)?
 
----@class (exact) LuaGuiElement.add_param.extra
+---@class (exact) GuiElementDef.base
 ---@field public drag_target string?
 ---@field public elem_mods GuiElemMods?
 ---@field public style_mods GuiStyleMods?
 ---@field public handler string?
 ---@field public children GuiElementDef[]?
+
+---@class (exact) GuiElementDef.button : GuiElementDef.base, LuaGuiElement.add_param.button
+---@class (exact) GuiElementDef.camera : GuiElementDef.base, LuaGuiElement.add_param.camera
+---@class (exact) GuiElementDef.checkbox : GuiElementDef.base, LuaGuiElement.add_param.checkbox
+---@class (exact) GuiElementDef.choose_elem_button : GuiElementDef.base, LuaGuiElement.add_param.choose_elem_button
+---@class (exact) GuiElementDef.drop_down : GuiElementDef.base, LuaGuiElement.add_param.drop_down
+---@class (exact) GuiElementDef.flow : GuiElementDef.base, LuaGuiElement.add_param.flow
+---@class (exact) GuiElementDef.frame : GuiElementDef.base, LuaGuiElement.add_param.frame
+---@class (exact) GuiElementDef.line : GuiElementDef.base, LuaGuiElement.add_param.line
+---@class (exact) GuiElementDef.list_box : GuiElementDef.base, LuaGuiElement.add_param.list_box
+---@class (exact) GuiElementDef.minimap : GuiElementDef.base, LuaGuiElement.add_param.minimap
+---@class (exact) GuiElementDef.progressbar : GuiElementDef.base, LuaGuiElement.add_param.progressbar
+---@class (exact) GuiElementDef.radiobutton : GuiElementDef.base, LuaGuiElement.add_param.radiobutton
+---@class (exact) GuiElementDef.scroll_pane : GuiElementDef.base, LuaGuiElement.add_param.scroll_pane
+---@class (exact) GuiElementDef.slider : GuiElementDef.base, LuaGuiElement.add_param.slider
+---@class (exact) GuiElementDef.sprite : GuiElementDef.base, LuaGuiElement.add_param.sprite
+---@class (exact) GuiElementDef.sprite_button : GuiElementDef.base, LuaGuiElement.add_param.sprite_button
+---@class (exact) GuiElementDef.switch : GuiElementDef.base, LuaGuiElement.add_param.switch
+---@class (exact) GuiElementDef.tab : GuiElementDef.base, LuaGuiElement.add_param.tab
+---@class (exact) GuiElementDef.table : GuiElementDef.base, LuaGuiElement.add_param.table
+---@class (exact) GuiElementDef.text_box : GuiElementDef.base, LuaGuiElement.add_param.text_box
+---@class (exact) GuiElementDef.textfield : GuiElementDef.base, LuaGuiElement.add_param.textfield
+
+---@alias GuiElementDef GuiElementDef.button|GuiElementDef.camera|GuiElementDef.checkbox|GuiElementDef.choose_elem_button|GuiElementDef.drop_down|GuiElementDef.flow|GuiElementDef.frame|GuiElementDef.line|GuiElementDef.list_box|GuiElementDef.minimap|GuiElementDef.progressbar|GuiElementDef.radiobutton|GuiElementDef.scroll_pane|GuiElementDef.slider|GuiElementDef.sprite|GuiElementDef.sprite_button|GuiElementDef.switch|GuiElementDef.tab|GuiElementDef.table|GuiElementDef.text_box|GuiElementDef.textfield
 
 --------------------------------------------------------------------------------
 
