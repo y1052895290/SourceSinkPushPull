@@ -2,8 +2,12 @@
 
 local flib_dictionary = require("__flib__.dictionary")
 
+local enums = require("__SourceSinkPushPull__.scripts.enums")
+
+local e_stop_flags = enums.stop_flags
+
 local m_max, m_ceil, m_floor = math.max, math.ceil, math.floor
-local b_test, b_or, b_and, b_not = bit32.btest, bit32.bor, bit32.band, bit32.bnot
+local b_test = bit32.btest
 local s_match, s_gmatch, s_format = string.match, string.gmatch, string.format
 
 ---@class sspp.lib
@@ -312,31 +316,6 @@ end
 
 --------------------------------------------------------------------------------
 
----@param stop LuaEntity
----@param flag StopFlag
----@return boolean value
-function lib.read_stop_flag(stop, flag)
-    local cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
-    local condition = cb.logistic_condition --[[@as CircuitCondition]]
-    return b_test(condition.constant or 0, flag)
-end
-
----@param stop LuaEntity
----@param flag StopFlag
----@param value boolean
-function lib.write_stop_flag(stop, flag, value)
-    local cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
-    local condition = cb.logistic_condition --[[@as CircuitCondition]]
-    if value then
-        condition.constant = b_or(condition.constant or 0, flag)
-    else
-        condition.constant = b_and(condition.constant or 0, b_not(flag))
-    end
-    cb.logistic_condition = condition --[[@as CircuitConditionDefinition]]
-end
-
---------------------------------------------------------------------------------
-
 ---@param comb LuaEntity
 ---@param constant integer
 ---@param operation "-"|"+"
@@ -363,10 +342,48 @@ end
 
 --------------------------------------------------------------------------------
 
----@param provide_io LuaEntity
----@return {[ItemKey]: ProvideItem}
-function lib.combinator_description_to_provide_items(provide_io)
-    local description = provide_io.combinator_description
+---@param entity LuaEntity
+---@return GhostStationStop
+function lib.read_station_stop_settings(entity)
+    local cb = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    local constant = cb.logistic_condition.constant or 0
+
+    ---@type GhostStationStop
+    return {
+        entity = entity,
+        custom_name = b_test(constant, e_stop_flags.custom_name),
+        disabled = b_test(constant, e_stop_flags.disabled),
+        bufferless = b_test(constant, e_stop_flags.bufferless),
+        inactivity = b_test(constant, e_stop_flags.inactivity),
+    }
+end
+
+---@param comb LuaEntity
+---@return GhostStationGeneral
+function lib.read_station_general_settings(comb)
+    local description = comb.combinator_description
+
+    local version, lines = s_match(description, "G([%d]+)(.*)")
+    local custom_network_name = nil
+
+    if version == "1" then
+        local network_name = s_match(lines, "\n([^\n]*)")
+
+        local network = storage.networks[network_name]
+        if network and not network.surface then custom_network_name = network_name end
+    end
+
+    ---@type GhostStationGeneral
+    return {
+        comb = comb,
+        network = custom_network_name or comb.surface.name, -- may be an unsupported surface
+    }
+end
+
+---@param comb LuaEntity
+---@return GhostStationProvide
+function lib.read_station_provide_settings(comb)
+    local description = comb.combinator_description
 
     local version, lines = s_match(description, "P([%d]+)(.*)")
     local items = {} ---@type {[ItemKey]: ProvideItem}
@@ -380,55 +397,16 @@ function lib.combinator_description_to_provide_items(provide_io)
                 end
             end
         end
-        return items
     end
 
-    local json = helpers.json_to_table(description) --[[@as table?]]
-    if json then
-        for item_key, json_item in pairs(json) do
-            if is_item_key_invalid(item_key) then goto continue end
-
-            local mode = json_item[1]
-            if type(mode) ~= "number" then
-                -- changed from boolean to integer in 0.3.12
-                mode = (mode == true) and 5 or 2
-            end
-
-            local throughput = json_item[2]
-            if type(throughput) ~= "number" then throughput = 0.0 end
-
-            local latency = json_item[3]
-            if type(latency) ~= "number" then latency = 30.0 end
-
-            local granularity = json_item[4]
-            if type(granularity) ~= "number" then granularity = 1 end
-
-            items[item_key] = { mode = mode, throughput = throughput, latency = latency, granularity = granularity }
-
-            ::continue::
-        end
-    end
-
-    return items
+    ---@type GhostStationProvide
+    return { comb = comb, items = items }
 end
 
----@param provide_items {[ItemKey]: ProvideItem}
----@return string
-function lib.provide_items_to_combinator_description(provide_items)
-    local result = "P1"
-    for item_key, item in pairs(provide_items) do
-        result = result .. s_format(
-            "\n%s %u %s %s %u",
-            item_key, item.mode, tostring(item.throughput), tostring(item.latency), item.granularity
-        )
-    end
-    return result
-end
-
----@param request_io LuaEntity
----@return {[ItemKey]: RequestItem}
-function lib.combinator_description_to_request_items(request_io)
-    local description = request_io.combinator_description
+---@param comb LuaEntity
+---@return GhostStationRequest
+function lib.read_station_request_settings(comb)
+    local description = comb.combinator_description
 
     local version, lines = s_match(description, "R([%d]+)(.*)")
     local items = {} ---@type {[ItemKey]: RequestItem}
@@ -442,46 +420,52 @@ function lib.combinator_description_to_request_items(request_io)
                 end
             end
         end
-        return items
     end
 
-    local json = helpers.json_to_table(description) --[[@as table?]]
-    if json then
-        for item_key, json_item in pairs(json) do
-            if is_item_key_invalid(item_key) then goto continue end
-
-            local mode = json_item[1]
-            if type(mode) ~= "number" then
-                -- changed from boolean to integer in 0.3.12
-                mode = (mode == true) and 5 or 2
-            end
-
-            local throughput = json_item[2]
-            if type(throughput) ~= "number" then throughput = 0.0 end
-
-            local latency = json_item[3]
-            if type(latency) ~= "number" then latency = 30.0 end
-
-            items[item_key] = { mode = mode, throughput = throughput, latency = latency }
-
-            ::continue::
-        end
-    end
-
-    return items
+    ---@type GhostStationRequest
+    return { comb = comb, items = items }
 end
 
----@param request_items {[ItemKey]: RequestItem}
----@return string
-function lib.request_items_to_combinator_description(request_items)
-    local result = "R1"
-    for item_key, item in pairs(request_items) do
-        result = result .. s_format(
+--------------------------------------------------------------------------------
+
+---@param stop GhostStationStop
+function lib.write_station_stop_settings(stop)
+    local constant = 0
+    if stop.custom_name then constant = constant + e_stop_flags.custom_name end
+    if stop.disabled then constant = constant + e_stop_flags.disabled end
+    if stop.bufferless then constant = constant + e_stop_flags.bufferless end
+    if stop.inactivity then constant = constant + e_stop_flags.inactivity end
+    local cb = stop.entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    cb.logistic_condition = { constant = constant } ---@diagnostic disable-line: missing-fields
+end
+
+---@param general GhostStationGeneral
+function lib.write_station_general_settings(general)
+    general.comb.combinator_description = s_format("G1\n%s", general.network)
+end
+
+---@param provide GhostStationProvide
+function lib.write_station_provide_settings(provide)
+    local description = "P1"
+    for item_key, item in pairs(provide.items) do
+        description = description .. s_format(
+            "\n%s %u %s %s %u",
+            item_key, item.mode, tostring(item.throughput), tostring(item.latency), item.granularity
+        )
+    end
+    provide.comb.combinator_description = description
+end
+
+---@param request GhostStationRequest
+function lib.write_station_request_settings(request)
+    local description = "R1"
+    for item_key, item in pairs(request.items) do
+        description = description .. s_format(
             "\n%s %u %s %s",
             item_key, item.mode, tostring(item.throughput), tostring(item.latency)
         )
     end
-    return result
+    request.comb.combinator_description = description
 end
 
 --------------------------------------------------------------------------------
@@ -502,11 +486,10 @@ end
 local function set_train_color(train, color_id)
     if mod_settings.auto_paint_trains then
         local color = mod_settings.train_colors[color_id]
-        for _, locos in pairs(train.locomotives) do
-            for _, loco in pairs(locos) do
-                ---@cast loco LuaEntity
-                loco.copy_color_from_train_stop = false
-                loco.color = color
+        for _, carriage in pairs(train.carriages) do
+            if carriage.type == "locomotive" then
+                carriage.copy_color_from_train_stop = false
+                carriage.color = color
             end
         end
     end

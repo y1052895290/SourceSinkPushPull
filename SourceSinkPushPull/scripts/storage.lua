@@ -13,7 +13,7 @@
 ---@alias JobIndex integer
 ---@alias TickState "INITIAL"|"POLL"|"REQUEST_DONE"|"LIQUIDATE"|"PROVIDE_DONE"|"DISPATCH"|"BUFFER"
 ---@alias NetworkJob NetworkJob.Fuel|NetworkJob.Pickup|NetworkJob.Dropoff|NetworkJob.Combined
----@alias PlayerGui PlayerGui.Network|PlayerGui.Station|PlayerGui.Hauler
+---@alias GuiRoot GuiRoot.Network|GuiRoot.Station|GuiRoot.Hauler
 
 ---@class (exact) SourceSinkPushPull.Storage
 ---@field public tick_state TickState
@@ -23,7 +23,7 @@
 ---@field public networks {[NetworkName]: Network}
 ---@field public stations {[StationId]: Station}
 ---@field public haulers {[HaulerId]: Hauler}
----@field public player_guis {[PlayerId]: PlayerGui}
+---@field public player_guis {[PlayerId]: GuiRoot}
 ---@field public poll_stations StationId[]
 ---@field public request_done_items NetworkItemKey[]
 ---@field public liquidate_items NetworkItemKey[]
@@ -43,7 +43,7 @@
 --------------------------------------------------------------------------------
 
 ---@class (exact) Network
----@field public surface LuaSurface
+---@field public surface LuaSurface?
 ---@field public classes {[ClassName]: NetworkClass}
 ---@field public items {[ItemKey]: NetworkItem}
 ---@field public job_index_counter JobIndex
@@ -116,28 +116,47 @@
 
 --------------------------------------------------------------------------------
 
----@class (exact) Station
+---@class (exact) GhostStation
+---@field public stop GhostStationStop
+---@field public general GhostStationGeneral
+---@field public provide GhostStationProvide?
+---@field public request GhostStationRequest?
+---@field public unit_numbers {[uint]: true?}
+
+---@class (exact) GhostStationStop
+---@field public entity LuaEntity
+---@field public custom_name boolean
+---@field public disabled boolean
+---@field public bufferless boolean
+---@field public inactivity boolean
+
+---@class (exact) GhostStationGeneral
+---@field public comb LuaEntity
 ---@field public network NetworkName
----@field public stop LuaEntity
----@field public general_io LuaEntity
+
+---@class (exact) GhostStationProvide
+---@field public comb LuaEntity
+---@field public items {[ItemKey]: ProvideItem}
+
+---@class (exact) GhostStationRequest
+---@field public comb LuaEntity
+---@field public items {[ItemKey]: RequestItem}
+
+---@class (exact) Station : GhostStation
+---@field public provide StationProvide?
+---@field public request StationRequest?
 ---@field public total_deliveries integer
 ---@field public hauler HaulerId?
 ---@field public minimum_active_count integer?
 ---@field public bufferless_dispatch true?
----@field public provide StationProvide?
----@field public request StationRequest?
 
----@class (exact) StationProvide
----@field public comb LuaEntity
----@field public items {[ItemKey]: ProvideItem}
+---@class (exact) StationProvide : GhostStationProvide
 ---@field public deliveries {[ItemKey]: HaulerId[]}
 ---@field public hidden_combs LuaEntity[]
 ---@field public counts {[ItemKey]: integer}
 ---@field public modes {[ItemKey]: ItemMode}
 
----@class (exact) StationRequest
----@field public comb LuaEntity
----@field public items {[ItemKey]: RequestItem}
+---@class (exact) StationRequest : GhostStationRequest
 ---@field public deliveries {[ItemKey]: HaulerId[]}
 ---@field public hidden_combs LuaEntity[]
 ---@field public counts {[ItemKey]: integer}
@@ -171,37 +190,36 @@
 
 --------------------------------------------------------------------------------
 
----@class (exact) StationParts
----@field public ids {[uint]: true?}
----@field public stop LuaEntity
----@field public general_io LuaEntity
----@field public provide_io LuaEntity?
----@field public request_io LuaEntity?
-
----@class (exact) PlayerGui.Abstract
----@field public network NetworkName
+---@class (exact) GuiChild
+---@field public dimmer LuaGuiElement
 ---@field public elements {[string]: LuaGuiElement}
+---@field public child GuiChild?
 
----@class (exact) PlayerGui.Network : PlayerGui.Abstract
+---@class (exact) GuiRoot.Abstract
+---@field public elements {[string]: LuaGuiElement}
+---@field public child GuiChild?
+
+---@class (exact) GuiRoot.Network : GuiRoot.Abstract
 ---@field public type "NETWORK"
----@field public class_context GuiTableContext<PlayerGui.Network, ClassName, NetworkClass>
----@field public item_context GuiTableContext<PlayerGui.Network, ItemKey, NetworkItem>
----@field public job_context GuiTableContext<PlayerGui.Network, JobIndex, NetworkJob>
+---@field public network_name NetworkName
+---@field public network Network
+---@field public class_context GuiTableContext<GuiRoot.Network, ClassName, NetworkClass>
+---@field public item_context GuiTableContext<GuiRoot.Network, ItemKey, NetworkItem>
+---@field public job_context GuiTableContext<GuiRoot.Network, JobIndex, NetworkJob>
 ---@field public expanded_class ClassName?
 ---@field public expanded_stations_item ItemKey?
 ---@field public expanded_haulers_item ItemKey?
 ---@field public expanded_job JobIndex?
----@field public popup_elements {[string]: LuaGuiElement}?
 
----@class (exact) PlayerGui.Station : PlayerGui.Abstract
+---@class (exact) GuiRoot.Station : GuiRoot.Abstract
 ---@field public type "STATION"
 ---@field public unit_number uint
----@field public parts StationParts?
+---@field public ghost GhostStation?
 ---@field public station Station?
----@field public provide_context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>?
----@field public request_context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>?
+---@field public provide_context GuiTableContext<GuiRoot.Station, ItemKey, ProvideItem>?
+---@field public request_context GuiTableContext<GuiRoot.Station, ItemKey, RequestItem>?
 
----@class (exact) PlayerGui.Hauler : PlayerGui.Abstract
+---@class (exact) GuiRoot.Hauler : GuiRoot.Abstract
 ---@field public type "HAULER"
 ---@field public train_id uint
 ---@field public train LuaTrain

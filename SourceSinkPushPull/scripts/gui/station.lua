@@ -19,8 +19,8 @@ local gui_station = {}
 
 --- Find all of the entities that would make up a station, even if they are ghosts.
 ---@param entity LuaEntity
----@return StationParts?
-local function get_station_parts(entity)
+---@return GhostStation?, Station?
+local function get_station_ghost(entity)
     local name = entity.name
     if name == "entity-ghost" then name = entity.ghost_name end
 
@@ -29,53 +29,76 @@ local function get_station_parts(entity)
         stop = entity
     else
         local stop_ids = storage.comb_stop_ids[entity.unit_number]
-        if #stop_ids ~= 1 then return nil end
+        if #stop_ids ~= 1 then return end
         stop = storage.entities[stop_ids[1]]
     end
+
+    local station = storage.stations[stop.unit_number]
+    if station then return station, station end
 
     local comb_ids = storage.stop_comb_ids[stop.unit_number]
 
     local combs_by_name = {} ---@type {[string]: LuaEntity?}
 
     for _, comb_id in pairs(comb_ids) do
-        if #storage.comb_stop_ids[comb_id] ~= 1 then return nil end
+        if #storage.comb_stop_ids[comb_id] ~= 1 then return end
 
         local comb = storage.entities[comb_id]
         name = comb.name
         if name == "entity-ghost" then name = comb.ghost_name end
-        if combs_by_name[name] then return nil end
+        if combs_by_name[name] then return end
 
         combs_by_name[name] = comb
     end
 
     local general_io = combs_by_name["sspp-general-io"]
-    if not general_io then return nil end
+    if not general_io then return end
 
     local provide_io = combs_by_name["sspp-provide-io"]
     local request_io = combs_by_name["sspp-request-io"]
-    if not (provide_io or request_io) then return nil end
+    if not (provide_io or request_io) then return end
 
-    local ids = {}
+    local unit_numbers = { [stop.unit_number] = true, [general_io.unit_number] = true }
 
-    ids[stop.unit_number] = true
-    ids[general_io.unit_number] = true
-    if provide_io then ids[provide_io.unit_number] = true end
-    if request_io then ids[request_io.unit_number] = true end
+    if provide_io then unit_numbers[provide_io.unit_number] = true end
+    if request_io then unit_numbers[request_io.unit_number] = true end
 
-    return { ids = ids, stop = stop, general_io = general_io, provide_io = provide_io, request_io = request_io }
+    ---@type GhostStation
+    return {
+        stop = lib.read_station_stop_settings(stop),
+        general = lib.read_station_general_settings(general_io),
+        provide = provide_io and lib.read_station_provide_settings(provide_io),
+        request = request_io and lib.read_station_request_settings(request_io),
+        unit_numbers = unit_numbers,
+    }
 end
 
 --------------------------------------------------------------------------------
 
----@param player_gui PlayerGui.Station
+---@param deliveries {[ItemKey]: HaulerId[]}
+---@param old_stop_name string
+---@param new_stop_name string
+local function update_station_name_in_schedules(deliveries, old_stop_name, new_stop_name)
+    for _, hauler_ids in pairs(deliveries) do
+        for _, hauler_id in pairs(hauler_ids) do
+            local train = storage.haulers[hauler_id].train
+            local schedule = train.schedule --[[@as TrainSchedule]]
+            for _, record in pairs(schedule.records) do
+                if record.station == old_stop_name then record.station = new_stop_name end
+            end
+            train.schedule = schedule
+        end
+    end
+end
+
+---@param root GuiRoot.Station
 ---@param new_stop_name string?
-local function update_station_name(player_gui, new_stop_name)
-    local stop, station = player_gui.parts.stop, player_gui.station
-    local old_stop_name = stop.backer_name --[[@as string]]
+local function update_station_name(root, new_stop_name)
+    local old_stop_name = root.ghost.stop.entity.backer_name ---@cast old_stop_name -nil
 
     if not new_stop_name then
-        if station then
-            local provide, request = station.provide, station.request
+        if root.station then
+            local provide, request = root.station.provide, root.station.request
             new_stop_name = lib.generate_stop_name(provide and provide.items, request and request.items)
         else
             new_stop_name = "[virtual-signal=signal-ghost]"
@@ -83,22 +106,13 @@ local function update_station_name(player_gui, new_stop_name)
     end
 
     if old_stop_name ~= new_stop_name then
-        player_gui.parts.stop.backer_name = new_stop_name
-        if station then
-            for _, provide_or_request in pairs({ station.provide, station.request }) do
-                for _, hauler_ids in pairs(provide_or_request.deliveries) do
-                    for _, hauler_id in pairs(hauler_ids) do
-                        local train = storage.haulers[hauler_id].train
-                        local schedule = train.schedule --[[@as TrainSchedule]]
-                        for _, record in pairs(schedule.records) do
-                            if record.station == old_stop_name then record.station = new_stop_name end
-                        end
-                        train.schedule = schedule
-                    end
-                end
-            end
+        root.ghost.stop.entity.backer_name = new_stop_name
+        if root.station then
+            local provide, request = root.station.provide, root.station.request
+            if provide then update_station_name_in_schedules(provide.deliveries, old_stop_name, new_stop_name) end
+            if request then update_station_name_in_schedules(request.deliveries, old_stop_name, new_stop_name) end
         end
-        player_gui.elements.stop_name_label.caption = new_stop_name
+        root.elements.stop_name_label.caption = new_stop_name
     end
 end
 
@@ -133,11 +147,11 @@ end
 
 ---@generic Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<PlayerGui.Station, ItemKey, Object>
+---@param context GuiTableContext<GuiRoot.Station, ItemKey, Object>
 ---@param player_id PlayerId
 ---@param button LuaGuiElement
 local function try_copy_item_or_fluid_row(methods, context, player_id, button)
-    if not lib.read_stop_flag(context.root.parts.stop, enums.stop_flags.bufferless) and #context.rows < 10 then
+    if not context.root.ghost.stop.bufferless and #context.rows < 10 then
         glib.table_copy_row(methods, context, button)
     else
         game.get_player(player_id).play_sound({ path = "utility/cannot_build" })
@@ -269,7 +283,7 @@ local provide_blank_row_defs = {
 }
 
 function provide_methods.insert_row_blank(context, row_offset, elem_type)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, ProvideItem>
     ---@cast elem_type string
 
     provide_blank_row_defs[2].elem_type = elem_type
@@ -278,7 +292,7 @@ function provide_methods.insert_row_blank(context, row_offset, elem_type)
 end
 
 function provide_methods.insert_row_complete(context, row_offset, item_key, provide_item)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, ProvideItem>
     ---@cast item_key ItemKey
     ---@cast provide_item ProvideItem
 
@@ -295,7 +309,7 @@ function provide_methods.insert_row_complete(context, row_offset, item_key, prov
     cells[1].children[2].sprite = ""
     cells[1].children[2].tooltip = nil
 
-    local network_item = storage.networks[context.root.network].items[item_key]
+    local network_item = storage.networks[context.root.ghost.general.network].items[item_key]
     if network_item then
         cells[3].children[1].children[3].caption = network_item.class
         cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
@@ -308,7 +322,7 @@ function provide_methods.insert_row_complete(context, row_offset, item_key, prov
 end
 
 function provide_methods.insert_row_copy(context, row_offset, src_cells)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, ProvideItem>
 
     local cells = provide_methods.insert_row_blank(context, row_offset, src_cells[2].elem_type)
 
@@ -348,7 +362,7 @@ function provide_methods.filter_object(context, item_key, provide_item)
 end
 
 function provide_methods.on_row_changed(context, cells, item_key, provide_item)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, ProvideItem>
     ---@cast item_key ItemKey?
     ---@cast provide_item ProvideItem?
 
@@ -362,8 +376,7 @@ function provide_methods.on_row_changed(context, cells, item_key, provide_item)
         end
     end
 
-    local network_item = item_key and storage.networks[context.root.network].items[item_key]
-
+    local network_item = item_key and storage.networks[context.root.ghost.general.network].items[item_key]
     if network_item then
         cells[3].children[1].children[3].caption = network_item.class
         cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
@@ -391,30 +404,30 @@ function provide_methods.on_row_changed(context, cells, item_key, provide_item)
 end
 
 function provide_methods.on_object_changed(context, item_key, provide_item)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, ProvideItem>
     ---@cast item_key ItemKey
     ---@cast provide_item ProvideItem?
 
     if not provide_item then
         local station = context.root.station
         if station then
-            lib.set_haulers_to_manual(station.provide.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
-            storage.disabled_items[context.root.network .. ":" .. item_key] = true
+            lib.set_haulers_to_manual(station.provide.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop.entity)
+            storage.disabled_items[station.general.network .. ":" .. item_key] = true
         end
     end
 end
 
 function provide_methods.on_mutation_finished(context)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, ProvideItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, ProvideItem>
 
-    local station, provide_items = context.root.station, context.objects
+    context.root.ghost.provide.items = context.objects
+    lib.write_station_provide_settings(context.root.ghost.provide)
+
+    local station = context.root.station
     if station then
-        station.provide.items = provide_items
-        lib.ensure_hidden_combs(station.provide.comb, station.provide.hidden_combs, provide_items)
-        if not lib.read_stop_flag(station.stop, enums.stop_flags.custom_name) then update_station_name(context.root, nil) end
+        lib.ensure_hidden_combs(station.provide.comb, station.provide.hidden_combs, context.objects)
+        if not station.stop.custom_name then update_station_name(context.root, nil) end
     end
-
-    context.root.parts.provide_io.combinator_description = lib.provide_items_to_combinator_description(provide_items)
 end
 
 --------------------------------------------------------------------------------
@@ -487,7 +500,7 @@ local request_blank_row_defs = {
 }
 
 function request_methods.insert_row_blank(context, row_offset, elem_type)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, RequestItem>
     ---@cast elem_type string
 
     request_blank_row_defs[2].elem_type = elem_type
@@ -496,7 +509,7 @@ function request_methods.insert_row_blank(context, row_offset, elem_type)
 end
 
 function request_methods.insert_row_complete(context, row_offset, item_key, request_item)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, RequestItem>
     ---@cast item_key ItemKey
     ---@cast request_item RequestItem
 
@@ -512,7 +525,7 @@ function request_methods.insert_row_complete(context, row_offset, item_key, requ
     cells[1].children[2].sprite = ""
     cells[1].children[2].tooltip = nil
 
-    local network_item = storage.networks[context.root.network].items[item_key]
+    local network_item = storage.networks[context.root.ghost.general.network].items[item_key]
     if network_item then
         cells[3].children[1].children[3].caption = network_item.class
         cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
@@ -525,7 +538,7 @@ function request_methods.insert_row_complete(context, row_offset, item_key, requ
 end
 
 function request_methods.insert_row_copy(context, row_offset, src_cells)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, RequestItem>
 
     local cells = request_methods.insert_row_blank(context, row_offset, src_cells[2].elem_type)
 
@@ -560,7 +573,7 @@ function request_methods.filter_object(context, item_key, request_item)
 end
 
 function request_methods.on_row_changed(context, cells, item_key, request_item)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, RequestItem>
     ---@cast item_key ItemKey?
     ---@cast request_item RequestItem?
 
@@ -574,8 +587,7 @@ function request_methods.on_row_changed(context, cells, item_key, request_item)
         end
     end
 
-    local network_item = item_key and storage.networks[context.root.network].items[item_key]
-
+    local network_item = item_key and storage.networks[context.root.ghost.general.network].items[item_key]
     if network_item then
         cells[3].children[1].children[3].caption = network_item.class
         cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
@@ -603,37 +615,37 @@ function request_methods.on_row_changed(context, cells, item_key, request_item)
 end
 
 function request_methods.on_object_changed(context, item_key, request_item)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, RequestItem>
     ---@cast item_key ItemKey
     ---@cast request_item RequestItem?
 
     if not request_item then
         local station = context.root.station
         if station then
-            lib.set_haulers_to_manual(station.request.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop)
-            storage.disabled_items[context.root.network .. ":" .. item_key] = true
+            lib.set_haulers_to_manual(station.request.deliveries[item_key], { "sspp-alert.cargo-removed-from-station" }, item_key, station.stop.entity)
+            storage.disabled_items[station.general.network .. ":" .. item_key] = true
         end
     end
 end
 
 function request_methods.on_mutation_finished(context)
-    ---@cast context GuiTableContext<PlayerGui.Station, ItemKey, RequestItem>
+    ---@cast context GuiTableContext<GuiRoot.Station, ItemKey, RequestItem>
 
-    local station, request_items = context.root.station, context.objects
+    context.root.ghost.request.items = context.objects
+    lib.write_station_request_settings(context.root.ghost.request)
+
+    local station = context.root.station
     if station then
-        station.request.items = request_items
-        lib.ensure_hidden_combs(station.request.comb, station.request.hidden_combs, request_items)
-        if not lib.read_stop_flag(station.stop, enums.stop_flags.custom_name) then update_station_name(context.root, nil) end
+        lib.ensure_hidden_combs(station.request.comb, station.request.hidden_combs, context.objects)
+        if not station.stop.custom_name then update_station_name(context.root, nil) end
     end
-
-    context.root.parts.request_io.combinator_description = lib.request_items_to_combinator_description(request_items)
 end
 
 --------------------------------------------------------------------------------
 
 ---@generic Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<PlayerGui.Station, ItemKey, Object>
+---@param context GuiTableContext<GuiRoot.Station, ItemKey, Object>
 ---@param enabled boolean
 local function set_buffer_settings_enabled(methods, context, enabled)
     for _, row in pairs(context.rows) do
@@ -655,14 +667,13 @@ end
 
 ---@generic Object
 ---@param methods GuiTableMethods
----@param context GuiTableContext<PlayerGui.Station, ItemKey, Object>
+---@param context GuiTableContext<GuiRoot.Station, ItemKey, Object>
 ---@param player_id PlayerId
 ---@param elem_type string
 local function try_add_item_or_fluid_row(methods, context, player_id, elem_type)
-    local player_gui = context.root
-    if lib.read_stop_flag(player_gui.parts.stop, enums.stop_flags.bufferless) then
-        if not player_gui.provide_context or #player_gui.provide_context.rows == 0 then
-            if not player_gui.request_context or #player_gui.request_context.rows == 0 then
+    if context.root.ghost.stop.bufferless then
+        if not context.root.provide_context or #context.root.provide_context.rows == 0 then
+            if not context.root.request_context or #context.root.request_context.rows == 0 then
                 glib.table_append_blank_row(methods, context, elem_type)
                 set_buffer_settings_enabled(methods, context, false)
                 return
@@ -693,13 +704,13 @@ end }
 
 --------------------------------------------------------------------------------
 
----@param player_gui PlayerGui.Station
-function gui_station.on_poll_finished(player_gui)
-    local station = player_gui.station
+---@param root GuiRoot.Station
+function gui_station.on_poll_finished(root)
+    local station = root.station
     if not station then return end
     local provide, request = station.provide, station.request
 
-    local elements = player_gui.elements
+    local elements = root.elements
 
     local grid_table = elements.grid_table
     local grid_children = grid_table.children
@@ -708,7 +719,7 @@ function gui_station.on_poll_finished(player_gui)
     local old_length, new_length = #grid_children, 0
 
     if provide then
-        local context = player_gui.provide_context ---@cast context -nil
+        local context = root.provide_context ---@cast context -nil
         local dynamic_index = -1 -- zero based
 
         for item_key, index in pairs(context.indices) do
@@ -749,7 +760,7 @@ function gui_station.on_poll_finished(player_gui)
     end
 
     if request then
-        local context = player_gui.request_context ---@cast context -nil
+        local context = root.request_context ---@cast context -nil
         local dynamic_index = -1 -- zero based
 
         for item_key, index in pairs(context.indices) do
@@ -796,111 +807,95 @@ end
 
 --------------------------------------------------------------------------------
 
-glib.handlers["station_open_network"] = { [events.on_gui_click] = function(event)
-    local player_id = event.player_index
-    local network_name = storage.player_guis[player_id].network
-
-    gui_network.open(player_id, network_name, 2)
-end }
-
 glib.handlers["station_edit_name_toggled"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
 
     if event.element.toggled then
-        player_gui.elements.stop_name_label.visible = false
-        player_gui.elements.stop_name_input.text = player_gui.parts.stop.backer_name
-        player_gui.elements.stop_name_input.visible = true
-        player_gui.elements.stop_name_input.focus()
+        root.elements.stop_name_label.visible = false
+        root.elements.stop_name_input.text = root.ghost.stop.entity.backer_name
+        root.elements.stop_name_input.visible = true
+        root.elements.stop_name_input.focus()
     else
-        player_gui.elements.stop_name_label.caption = player_gui.parts.stop.backer_name
-        player_gui.elements.stop_name_label.visible = true
-        player_gui.elements.stop_name_input.visible = false
+        root.elements.stop_name_label.caption = root.ghost.stop.entity.backer_name
+        root.elements.stop_name_label.visible = true
+        root.elements.stop_name_input.visible = false
     end
 end }
 
 glib.handlers["station_clear_name"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
 
-    lib.write_stop_flag(player_gui.parts.stop, enums.stop_flags.custom_name, false)
+    root.ghost.stop.custom_name = false
+    lib.write_station_stop_settings(root.ghost.stop)
 
-    player_gui.elements.stop_name_label.visible = true
-    player_gui.elements.stop_name_input.visible = false
+    root.elements.stop_name_label.visible = true
+    root.elements.stop_name_input.visible = false
 
-    player_gui.elements.stop_name_edit_toggle.toggled = false
-    player_gui.elements.stop_name_clear_button.enabled = false
+    root.elements.stop_name_edit_toggle.toggled = false
+    root.elements.stop_name_clear_button.enabled = false
 
-    update_station_name(player_gui, nil)
+    update_station_name(root, nil)
 end }
 
 glib.handlers["station_name_changed_or_confirmed"] = {}
 
 glib.handlers["station_name_changed_or_confirmed"][events.on_gui_text_changed] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
 
     local new_stop_name = glib.truncate_input(event.element, 199)
     local has_custom_name = new_stop_name ~= ""
 
-    lib.write_stop_flag(player_gui.parts.stop, enums.stop_flags.custom_name, has_custom_name)
+    root.ghost.stop.custom_name = has_custom_name
+    lib.write_station_stop_settings(root.ghost.stop)
 
-    player_gui.elements.stop_name_clear_button.enabled = has_custom_name
+    root.elements.stop_name_clear_button.enabled = has_custom_name
 
-    update_station_name(player_gui, has_custom_name and new_stop_name or nil)
+    update_station_name(root, has_custom_name and new_stop_name or nil)
 end
 
 glib.handlers["station_name_changed_or_confirmed"][events.on_gui_confirmed] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
 
-    player_gui.elements.stop_name_label.visible = true
-    player_gui.elements.stop_name_input.visible = false
+    root.elements.stop_name_label.visible = true
+    root.elements.stop_name_input.visible = false
 
-    player_gui.elements.stop_name_edit_toggle.toggled = false
+    root.elements.stop_name_edit_toggle.toggled = false
 end
 
-glib.handlers["station_disable_toggled"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
-
-    local toggled = event.element.toggled
-    event.element.tooltip = { toggled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
-    lib.write_stop_flag(stop, enums.stop_flags.disable, toggled)
-end }
+--------------------------------------------------------------------------------
 
 glib.handlers["station_limit_changed"] = { [events.on_gui_value_changed] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
 
-    stop.trains_limit = event.element.slider_value
-    player_gui.elements.limit_value.caption = tostring(event.element.slider_value)
+    root.elements.limit_value.caption = tostring(event.element.slider_value)
+    root.ghost.stop.entity.trains_limit = event.element.slider_value
 end }
 
 glib.handlers["station_bufferless_toggled"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
 
-    local toggled = event.element.toggled
+    local provide_row_count = root.provide_context and #root.provide_context.rows or 0
+    local request_row_count = root.request_context and #root.request_context.rows or 0
 
-    local provide_context, request_context = player_gui.provide_context, player_gui.request_context
-    local provide_row_count = provide_context and #provide_context.rows or 0
-    local request_row_count = request_context and #request_context.rows or 0
-
-    if toggled and provide_row_count + request_row_count > 1 then
+    if event.element.toggled and provide_row_count + request_row_count > 1 then
         event.element.toggled = false
         game.get_player(event.player_index).play_sound({ path = "utility/cannot_build" })
         return
     end
 
-    event.element.tooltip = { toggled and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
-    lib.write_stop_flag(player_gui.parts.stop, enums.stop_flags.bufferless, toggled)
+    event.element.tooltip = { event.element.toggled and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
+    root.ghost.stop.bufferless = event.element.toggled
+    lib.write_station_stop_settings(root.ghost.stop)
 
-    local station = player_gui.station
-
-    if provide_row_count > 0 then ---@cast provide_context -nil
+    if provide_row_count > 0 then
+        local station = root.station
         if station then
             for item_key, hauler_ids in pairs(station.provide.deliveries) do
                 for _, hauler_id in pairs(hauler_ids) do
-                    local network = storage.networks[station.network]
+                    local network = storage.networks[station.general.network]
                     local hauler = storage.haulers[hauler_id]
                     local job = network.jobs[hauler.job] --[[@as NetworkJob]]
-                    if toggled then
+                    if event.element.toggled then
                         lib.list_destroy_or_remove(network.provide_haulers, item_key, hauler_id)
                         lib.list_create_or_append(network.buffer_haulers, item_key, hauler_id)
                         job.type = "PICKUP"
@@ -917,30 +912,79 @@ glib.handlers["station_bufferless_toggled"] = { [events.on_gui_click] = function
                 end
             end
         end
-        set_buffer_settings_enabled(provide_methods, provide_context, not toggled)
+        set_buffer_settings_enabled(provide_methods, root.provide_context, not event.element.toggled)
     end
 
-    if request_row_count > 0 then ---@cast request_context -nil
-        set_buffer_settings_enabled(request_methods, request_context, not toggled)
+    if request_row_count > 0 then
+        set_buffer_settings_enabled(request_methods, root.request_context, not event.element.toggled)
     end
 end }
 
 glib.handlers["station_inactivity_toggled"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Station]]
-    local stop = player_gui.parts.stop --[[@as LuaEntity]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
 
-    local toggled = event.element.toggled
+    event.element.tooltip = { event.element.toggled and "sspp-gui.station-wait-for-inactivity-tooltip" or "sspp-gui.station-depart-immediately-tooltip" }
+    root.ghost.stop.inactivity = event.element.toggled
+    lib.write_station_stop_settings(root.ghost.stop)
+end }
 
-    event.element.tooltip = { toggled and "sspp-gui.station-wait-for-inactivity-tooltip" or "sspp-gui.station-depart-immediately-tooltip" }
-    lib.write_stop_flag(stop, enums.stop_flags.inactivity, toggled)
+glib.handlers["station_disable_toggled"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
+
+    event.element.tooltip = { event.element.toggled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
+    root.ghost.stop.disabled = event.element.toggled
+    lib.write_station_stop_settings(root.ghost.stop)
+end }
+
+--------------------------------------------------------------------------------
+
+glib.handlers["station_network_selection_changed"] = { [events.on_gui_selection_state_changed] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Station]]
+
+    local station = root.station
+    if station then
+        if station.provide then
+            for item_key, _ in pairs(station.provide.items) do
+                lib.set_haulers_to_manual(station.provide.deliveries[item_key], { "sspp-alert.station-network-changed" }, item_key, station.stop.entity)
+                storage.disabled_items[station.general.network .. ":" .. item_key] = true
+            end
+        end
+        if station.request then
+            for item_key, _ in pairs(station.request.items) do
+                lib.set_haulers_to_manual(station.request.deliveries[item_key], { "sspp-alert.station-network-changed" }, item_key, station.stop.entity)
+                storage.disabled_items[station.general.network .. ":" .. item_key] = true
+            end
+        end
+    end
+
+    root.ghost.general.network = glib.get_network_name(event.element.selected_index, root.ghost.stop.entity.surface)
+    lib.write_station_general_settings(root.ghost.general)
+
+    if root.provide_context then
+        glib.table_initialise(provide_methods, root.provide_context, root.provide_context.objects, nil, nil)
+        if root.ghost.stop.bufferless then set_buffer_settings_enabled(provide_methods, root.provide_context, false) end
+    end
+    if root.request_context then
+        glib.table_initialise(request_methods, root.request_context, root.request_context.objects, nil, nil)
+        if root.ghost.stop.bufferless then set_buffer_settings_enabled(request_methods, root.request_context, false) end
+    end
+end }
+
+--------------------------------------------------------------------------------
+
+glib.handlers["station_open_network"] = { [events.on_gui_click] = function(event)
+    local player_id = event.player_index
+    local network_name = storage.player_guis[player_id].ghost.general.network
+
+    gui_network.open(player_id, network_name, 2)
 end }
 
 glib.handlers["station_view_on_map"] = { [events.on_gui_click] = function(event)
     local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
-    local stop = storage.player_guis[event.player_index].parts.stop --[[@as LuaEntity]]
+    local entity = storage.player_guis[event.player_index].ghost.stop.entity
 
     player.opened = nil
-    player.centered_on = stop
+    player.centered_on = entity
 end }
 
 glib.handlers["station_close_window"] = { [events.on_gui_click] = function(event)
@@ -953,32 +997,36 @@ end }
 --------------------------------------------------------------------------------
 
 ---@param player LuaPlayer
----@param parts StationParts
+---@param ghost GhostStation
 ---@return LuaGuiElement window, {[string]: LuaGuiElement} elements
-local function add_gui_complete(player, parts)
-    local custom_name = lib.read_stop_flag(parts.stop, enums.stop_flags.custom_name)
-    local disable = lib.read_stop_flag(parts.stop, enums.stop_flags.disable)
-    local bufferless = lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
-    local inactivity = lib.read_stop_flag(parts.stop, enums.stop_flags.inactivity)
+local function add_gui_complete(player, ghost)
+    local custom_name = ghost.stop.custom_name
+    local disabled = ghost.stop.disabled
+    local bufferless = ghost.stop.bufferless
+    local inactivity = ghost.stop.inactivity
 
-    local disable_tooltip = { disable and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
+    local disabled_tooltip = { disabled and "sspp-gui.station-disabled-tooltip" or "sspp-gui.station-enabled-tooltip" }
     local bufferless_tooltip = { bufferless and "sspp-gui.station-bufferless-tooltip" or "sspp-gui.station-buffered-tooltip" }
     local inactivity_tooltip = { inactivity and "sspp-gui.station-wait-for-inactivity-tooltip" or "sspp-gui.station-depart-immediately-tooltip" }
 
-    local name = parts.stop.backer_name
-    local limit = parts.stop.trains_limit
-    local provide = parts.provide_io ~= nil
-    local request = parts.request_io ~= nil
+    local name = ghost.stop.entity.backer_name
+    local limit = ghost.stop.entity.trains_limit
+    local provide = ghost.provide ~= nil
+    local request = ghost.request ~= nil
+
+    local localised_network_names, network_index = glib.get_localised_network_names(ghost.general.network, ghost.stop.entity.surface)
 
     local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-station", children = {
-                { type = "label", style = "frame_title", caption = { "entity-name.sspp-stop" }, ignored_by_interaction = true },
+                { type = "label", style = "frame_title", caption = { "sspp-gui.sspp-station" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
-                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disable_tooltip, mouse_button_filter = { "left" }, auto_toggle = true, toggled = disable, handler = "station_disable_toggled" },
+                { type = "drop-down", name = "network_selector", style = "sspp_wide_dropdown", items = localised_network_names, selected_index = network_index, handler = "station_network_selection_changed" },
+                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-network-icon", tooltip = { "sspp-gui.open-network" }, mouse_button_filter = { "left" }, handler = "station_open_network" },
+                { type = "empty-widget", style = "empty_widget", ignored_by_interaction = true },
                 { type = "sprite-button", style = "frame_action_button", sprite = "sspp-map-icon", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = "station_view_on_map" },
-                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = "station_open_network" },
-                { type = "empty-widget", style = "empty_widget" },
+                { type = "sprite-button", style = "frame_action_button", sprite = "sspp-disable-icon", tooltip = disabled_tooltip, mouse_button_filter = { "left" }, auto_toggle = true, toggled = disabled, handler = "station_disable_toggled" },
+                { type = "empty-widget", style = "empty_widget", ignored_by_interaction = true },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = "station_close_window" },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
@@ -1077,52 +1125,43 @@ end
 ---@param entity LuaEntity
 function gui_station.open(player_id, entity)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
-    local parts = get_station_parts(entity)
+    local ghost, station = get_station_ghost(entity)
 
     player.opened = nil
 
-    local window, elements
-    if parts then
-        window, elements = add_gui_complete(player, parts)
+    local window, elements, root ---@type LuaGuiElement, {[string]: LuaGuiElement}, GuiRoot.Station
+    if ghost then
+        window, elements = add_gui_complete(player, ghost)
+        root = { type = "STATION", elements = elements, unit_number = entity.unit_number, ghost = ghost, station = station }
+
+        if ghost.provide then
+            root.provide_context = { root = root, table = elements.provide_table }
+            glib.table_initialise(provide_methods, root.provide_context, ghost.provide.items, nil, nil)
+            if ghost.stop.bufferless then set_buffer_settings_enabled(provide_methods, root.provide_context, false) end
+        end
+
+        if ghost.request then
+            root.request_context = { root = root, table = elements.request_table }
+            glib.table_initialise(request_methods, root.request_context, ghost.request.items, nil, nil)
+            if ghost.stop.bufferless then set_buffer_settings_enabled(request_methods, root.request_context, false) end
+        end
     else
         window, elements = add_gui_incomplete(player)
+        root = { type = "STATION", elements = elements, unit_number = entity.unit_number }
     end
 
     window.force_auto_center()
 
-    local station = parts and storage.stations[parts.stop.unit_number] --[[@as Station?]]
-
-    ---@type PlayerGui.Station
-    local player_gui = { type = "STATION", network = entity.surface.name, elements = elements, unit_number = entity.unit_number, parts = parts, station = station }
-    storage.player_guis[player_id] = player_gui
-
-    if parts then
-        local bufferless = lib.read_stop_flag(parts.stop, enums.stop_flags.bufferless)
-
-        if parts.provide_io then
-            local provide_items = station and station.provide.items or lib.combinator_description_to_provide_items(parts.provide_io)
-            player_gui.provide_context = { root = player_gui, table = elements.provide_table }
-            glib.table_initialise(provide_methods, player_gui.provide_context, provide_items, nil, nil)
-            if bufferless then set_buffer_settings_enabled(provide_methods, player_gui.provide_context, false) end
-        end
-
-        if parts.request_io then
-            local request_items = station and station.request.items or lib.combinator_description_to_request_items(parts.request_io)
-            player_gui.request_context = { root = player_gui, table = elements.request_table }
-            glib.table_initialise(request_methods, player_gui.request_context, request_items, nil, nil)
-            if bufferless then set_buffer_settings_enabled(request_methods, player_gui.request_context, false) end
-        end
-    end
-
+    storage.player_guis[player_id] = root
     player.opened = window
 end
 
 ---@param player_id PlayerId
 function gui_station.close(player_id)
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Station]]
-    player_gui.elements["sspp-station"].destroy()
+    local root = storage.player_guis[player_id] --[[@as GuiRoot.Station]]
+    root.elements["sspp-station"].destroy()
 
-    local entity = storage.entities[player_gui.unit_number]
+    local entity = storage.entities[root.unit_number]
 
     if entity.valid and entity.name ~= "entity-ghost" then
         local player = game.get_player(player_id) --[[@as LuaPlayer]]

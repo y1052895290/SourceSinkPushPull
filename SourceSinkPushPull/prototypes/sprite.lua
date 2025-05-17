@@ -29,6 +29,7 @@ return {
     generate_icon_sprite("bufferless"),
     generate_icon_sprite("bypass"),
     generate_icon_sprite("copy"),
+    generate_icon_sprite("create"),
     generate_icon_sprite("delete"),
     generate_icon_sprite("disable"),
     generate_icon_sprite("export"),
@@ -39,7 +40,8 @@ return {
     generate_icon_sprite("move-down"),
     generate_icon_sprite("move-up"),
     generate_icon_sprite("name"),
-    generate_icon_sprite("refresh"),
+    generate_icon_sprite("network"),
+    -- generate_icon_sprite("refresh"),
     generate_icon_sprite("reset"),
     generate_icon_sprite("signal"),
 

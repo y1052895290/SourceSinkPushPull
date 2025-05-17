@@ -7,7 +7,8 @@ local glib = require("__SourceSinkPushPull__.scripts.glib")
 
 local events = defines.events
 
-local s_find, s_lower = string.find, string.lower
+local m_ceil, m_min, m_max = math.ceil, math.min, math.max
+local s_format, s_gmatch, s_match, s_find, s_sub, s_lower = string.format, string.gmatch, string.match, string.find, string.sub, string.lower
 
 local len_or_zero, split_item_key, make_item_icon = lib.len_or_zero, lib.split_item_key, lib.make_item_icon
 local get_stop_name, get_train_item_count = lib.get_stop_name, lib.get_train_item_count
@@ -17,6 +18,8 @@ local cwi, acquire_next_minimap = glib.caption_with_info, glib.acquire_next_mini
 
 ---@class sspp.gui.network
 local gui_network = {}
+
+local root_window_size = { 1280, 728 }
 
 --------------------------------------------------------------------------------
 
@@ -98,29 +101,27 @@ end }
 
 --------------------------------------------------------------------------------
 
----@param player_gui PlayerGui.Network
-local function clear_expanded_object(player_gui)
-    if player_gui.expanded_class then
-        local cells = player_gui.class_context.rows[player_gui.class_context.indices[player_gui.expanded_class]].cells
+---@param root GuiRoot.Network
+local function clear_expanded_object(root)
+    if root.expanded_class then
+        local cells = root.class_context.rows[root.class_context.indices[root.expanded_class]].cells
         if cells then cells[6].toggled = false end
-        player_gui.expanded_class = nil
-    elseif player_gui.expanded_stations_item then
-        local cells = player_gui.item_context.rows[player_gui.item_context.indices[player_gui.expanded_stations_item]].cells
+        root.expanded_class = nil
+    elseif root.expanded_stations_item then
+        local cells = root.item_context.rows[root.item_context.indices[root.expanded_stations_item]].cells
         if cells then cells[5].toggled = false end
-        player_gui.expanded_stations_item = nil
-    elseif player_gui.expanded_haulers_item then
-        local cells = player_gui.item_context.rows[player_gui.item_context.indices[player_gui.expanded_haulers_item]].cells
+        root.expanded_stations_item = nil
+    elseif root.expanded_haulers_item then
+        local cells = root.item_context.rows[root.item_context.indices[root.expanded_haulers_item]].cells
         if cells then cells[7].toggled = false end
-        player_gui.expanded_haulers_item = nil
-    elseif player_gui.expanded_job then
-        local cells = player_gui.job_context.rows[player_gui.job_context.indices[player_gui.expanded_job]].cells
+        root.expanded_haulers_item = nil
+    elseif root.expanded_job then
+        local cells = root.job_context.rows[root.job_context.indices[root.expanded_job]].cells
         if cells then cells[1].children[2].toggled = false end
-        player_gui.expanded_job = nil
-    else
-        return -- nothing to clear
+        root.expanded_job = nil
     end
 
-    local elements = player_gui.elements
+    local elements = root.elements
 
     elements.grid_title.caption = ""
     elements.grid_stations_mode_switch.visible = false
@@ -134,20 +135,20 @@ local function clear_expanded_object(player_gui)
     elements.grid_fuel_toggle.tooltip = ""
     elements.grid_depot_toggle.enabled = false
     elements.grid_depot_toggle.tooltip = ""
-    elements.right_scroll_pane.style = "sspp_right_grid_scroll_pane"
 
+    elements.right_scroll_pane.style = "sspp_right_grid_scroll_pane"
     elements.grid_table.clear()
     elements.info_flow.clear()
 end
 
 glib.handlers["network_class_expand"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
-    clear_expanded_object(player_gui)
+    clear_expanded_object(root)
 
-    local class_name = glib.table_get_key_for_child(class_methods, player_gui.class_context, event.element)
+    local class_name = glib.table_get_key_for_child(class_methods, root.class_context, event.element)
     if class_name then
-        local elements = player_gui.elements
+        local elements = root.elements
 
         elements.grid_title.caption = { "sspp-gui.fmt-class-haulers-title", class_name }
         elements.grid_provide_toggle.enabled = true
@@ -162,20 +163,20 @@ glib.handlers["network_class_expand"] = { [events.on_gui_click] = function(event
         elements.grid_depot_toggle.tooltip = { "sspp-gui.grid-haulers-depot-tooltip" }
 
         event.element.toggled = true
-        player_gui.expanded_class = class_name
+        root.expanded_class = class_name
     else
         game.get_player(event.player_index).play_sound({ path = "utility/cannot_build" })
     end
 end }
 
 glib.handlers["network_item_expand_stations"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
-    clear_expanded_object(player_gui)
+    clear_expanded_object(root)
 
-    local item_key = glib.table_get_key_for_child(item_methods, player_gui.item_context, event.element)
+    local item_key = glib.table_get_key_for_child(item_methods, root.item_context, event.element)
     if item_key then
-        local elements = player_gui.elements
+        local elements = root.elements
         local name, quality = split_item_key(item_key)
 
         elements.grid_title.caption = { quality and "sspp-gui.fmt-item-stations-title" or "sspp-gui.fmt-fluid-stations-title", name, quality }
@@ -186,20 +187,20 @@ glib.handlers["network_item_expand_stations"] = { [events.on_gui_click] = functi
         elements.grid_request_toggle.tooltip = { "sspp-gui.grid-stations-request-tooltip" }
 
         event.element.toggled = true
-        player_gui.expanded_stations_item = item_key
+        root.expanded_stations_item = item_key
     else
         game.get_player(event.player_index).play_sound({ path = "utility/cannot_build" })
     end
 end }
 
 glib.handlers["network_item_expand_haulers"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
-    clear_expanded_object(player_gui)
+    clear_expanded_object(root)
 
-    local item_key = glib.table_get_key_for_child(item_methods, player_gui.item_context, event.element)
+    local item_key = glib.table_get_key_for_child(item_methods, root.item_context, event.element)
     if item_key then
-        local elements = player_gui.elements
+        local elements = root.elements
         local name, quality = split_item_key(item_key)
 
         elements.grid_title.caption = { quality and "sspp-gui.fmt-item-haulers-title" or "sspp-gui.fmt-fluid-haulers-title", name, quality }
@@ -211,21 +212,21 @@ glib.handlers["network_item_expand_haulers"] = { [events.on_gui_click] = functio
         elements.grid_liquidate_toggle.tooltip = { "sspp-gui.grid-haulers-liquidate-tooltip" }
 
         event.element.toggled = true
-        player_gui.expanded_haulers_item = item_key
+        root.expanded_haulers_item = item_key
     else
         game.get_player(event.player_index).play_sound({ path = "utility/cannot_build" })
     end
 end }
 
 glib.handlers["network_job_expand"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
-    clear_expanded_object(player_gui)
+    clear_expanded_object(root)
 
-    local job_index = glib.table_get_key_for_child(job_methods, player_gui.job_context, event.element) ---@cast job_index -nil
+    local job_index = glib.table_get_key_for_child(job_methods, root.job_context, event.element) ---@cast job_index -nil
 
-    local elements = player_gui.elements
-    local job = player_gui.job_context.objects[job_index]
+    local elements = root.elements
+    local job = root.job_context.objects[job_index]
 
     if job.type == "FUEL" then
         elements.grid_title.caption = { "sspp-gui.fmt-job-title", "[virtual-signal=signal-fuel]", job_index }
@@ -236,7 +237,7 @@ glib.handlers["network_job_expand"] = { [events.on_gui_click] = function(event)
     elements.right_scroll_pane.style = "sspp_right_flat_scroll_pane"
 
     event.element.toggled = true
-    player_gui.expanded_job = job_index
+    root.expanded_job = job_index
 end }
 
 --------------------------------------------------------------------------------
@@ -248,10 +249,10 @@ glib.handlers["network_item_query_changed"] = { [events.on_gui_text_changed] = f
     if query_string ~= "" then
         query = {}
 
-        for query_capture in string.gmatch(query_string, "([^&]+)") do
-            local query_substring = s_lower(string.match(query_capture, " *(.-) *$"))
+        for query_capture in s_gmatch(query_string, "([^&]+)") do
+            local query_substring = s_lower(s_match(query_capture, " *(.-) *$"))
             if query_substring ~= "" then
-                if string.sub(query_substring, 1, 1) == "@" then
+                if s_sub(query_substring, 1, 1) == "@" then
                     local dictionary = flib_dictionary_get(event.player_index, "misc")
                     if dictionary then
                         if s_lower(dictionary["item"]) == query_substring then
@@ -288,10 +289,10 @@ glib.handlers["network_job_query_changed"] = { [events.on_gui_text_changed] = fu
     if query_string ~= "" then
         query = {}
 
-        for query_capture in string.gmatch(query_string, "([^&]+)") do
-            local query_substring = s_lower(string.match(query_capture, " *(.-) *$"))
+        for query_capture in s_gmatch(query_string, "([^&]+)") do
+            local query_substring = s_lower(s_match(query_capture, " *(.-) *$"))
             if query_substring ~= "" then
-                if string.sub(query_substring, 1, 1) == "@" then
+                if s_sub(query_substring, 1, 1) == "@" then
                     local dictionary = flib_dictionary_get(event.player_index, "misc")
                     if dictionary then
                         if s_lower(dictionary["fuel"]) == query_substring then
@@ -349,13 +350,13 @@ local class_blank_row_defs = {
 }
 
 function class_methods.insert_row_blank(context, row_offset, args)
-    ---@cast context GuiTableContext<PlayerGui.Network, ClassName, NetworkClass>
+    ---@cast context GuiTableContext<GuiRoot.Network, ClassName, NetworkClass>
 
     return glib.add_elements(context.table, nil, row_offset, class_blank_row_defs)
 end
 
 function class_methods.insert_row_complete(context, row_offset, class_name, class)
-    ---@cast context GuiTableContext<PlayerGui.Network, ClassName, NetworkClass>
+    ---@cast context GuiTableContext<GuiRoot.Network, ClassName, NetworkClass>
     ---@cast class_name ClassName
     ---@cast class NetworkClass
 
@@ -376,7 +377,7 @@ function class_methods.insert_row_complete(context, row_offset, class_name, clas
 end
 
 function class_methods.insert_row_copy(context, row_offset, src_cells)
-    ---@cast context GuiTableContext<PlayerGui.Network, ClassName, NetworkClass>
+    ---@cast context GuiTableContext<GuiRoot.Network, ClassName, NetworkClass>
 
     local cells = class_methods.insert_row_blank(context, row_offset, nil)
 
@@ -426,14 +427,13 @@ function class_methods.on_row_changed(context, cells, class_name, class)
 end
 
 function class_methods.on_object_changed(context, class_name, class)
-    ---@cast context GuiTableContext<PlayerGui.Network, ClassName, NetworkClass>
+    ---@cast context GuiTableContext<GuiRoot.Network, ClassName, NetworkClass>
     ---@cast class_name ClassName
     ---@cast class NetworkClass?
 
     if not class then
-        local player_gui = context.root
-        local network_name = player_gui.network
-        local network = storage.networks[network_name]
+        local root = context.root
+        local network_name, network = root.network_name, root.network
 
         local message = { "sspp-alert.class-not-in-network" }
 
@@ -447,8 +447,8 @@ function class_methods.on_object_changed(context, class_name, class)
 
                 storage.disabled_items[network_name .. ":" .. item_key] = true
 
-                if player_gui.expanded_stations_item == item_key then clear_expanded_object(player_gui) end
-                if player_gui.expanded_haulers_item == item_key then clear_expanded_object(player_gui) end
+                if root.expanded_stations_item == item_key then clear_expanded_object(root) end
+                if root.expanded_haulers_item == item_key then clear_expanded_object(root) end
             end
         end
 
@@ -456,16 +456,14 @@ function class_methods.on_object_changed(context, class_name, class)
         lib.set_haulers_to_manual(network.to_depot_haulers[class_name], message)
         lib.set_haulers_to_manual(network.at_depot_haulers[class_name], message)
 
-        if player_gui.expanded_class == class_name then clear_expanded_object(player_gui) end
+        if root.expanded_class == class_name then clear_expanded_object(root) end
     end
 end
 
 function class_methods.on_mutation_finished(context)
-    ---@cast context GuiTableContext<PlayerGui.Network, ClassName, NetworkClass>
+    ---@cast context GuiTableContext<GuiRoot.Network, ClassName, NetworkClass>
 
-    local network = storage.networks[context.root.network]
-
-    network.classes = context.objects
+    context.root.network.classes = context.objects
 end
 
 --------------------------------------------------------------------------------
@@ -491,7 +489,7 @@ local item_blank_row_defs = {
 }
 
 function item_methods.insert_row_blank(context, row_offset, elem_type)
-    ---@cast context GuiTableContext<PlayerGui.Network, ItemKey, NetworkItem>
+    ---@cast context GuiTableContext<GuiRoot.Network, ItemKey, NetworkItem>
     ---@cast elem_type string
 
     item_blank_row_defs[1].children[3].elem_type = elem_type
@@ -500,7 +498,7 @@ function item_methods.insert_row_blank(context, row_offset, elem_type)
 end
 
 function item_methods.insert_row_complete(context, row_offset, item_key, item)
-    ---@cast context GuiTableContext<PlayerGui.Network, ItemKey, NetworkItem>
+    ---@cast context GuiTableContext<GuiRoot.Network, ItemKey, NetworkItem>
     ---@cast item_key ItemKey
     ---@cast item NetworkItem
 
@@ -522,7 +520,7 @@ function item_methods.insert_row_complete(context, row_offset, item_key, item)
 end
 
 function item_methods.insert_row_copy(context, row_offset, src_cells)
-    ---@cast context GuiTableContext<PlayerGui.Network, ItemKey, NetworkItem>
+    ---@cast context GuiTableContext<GuiRoot.Network, ItemKey, NetworkItem>
 
     local cells = item_methods.insert_row_blank(context, row_offset, src_cells[1].children[3].elem_type)
 
@@ -558,7 +556,7 @@ function item_methods.make_object(context, cells)
 end
 
 function item_methods.filter_object(context, item_key, item)
-    ---@cast context GuiTableContext<PlayerGui.Network, ItemKey, NetworkItem>
+    ---@cast context GuiTableContext<GuiRoot.Network, ItemKey, NetworkItem>
     ---@cast item_key ItemKey
     ---@cast item NetworkItem
 
@@ -593,14 +591,13 @@ function item_methods.on_row_changed(context, cells, item_key, item)
 end
 
 function item_methods.on_object_changed(context, item_key, item)
-    ---@cast context GuiTableContext<PlayerGui.Network, ItemKey, NetworkItem>
+    ---@cast context GuiTableContext<GuiRoot.Network, ItemKey, NetworkItem>
     ---@cast item_key ItemKey
     ---@cast item NetworkItem
 
     if not item then
-        local player_gui = context.root
-        local network_name = player_gui.network
-        local network = storage.networks[network_name]
+        local root = context.root
+        local network_name, network = root.network_name, root.network
 
         local message = { "sspp-alert.cargo-not-in-network" }
 
@@ -612,17 +609,15 @@ function item_methods.on_object_changed(context, item_key, item)
 
         storage.disabled_items[network_name .. ":" .. item_key] = true
 
-        if player_gui.expanded_stations_item == item_key then clear_expanded_object(player_gui) end
-        if player_gui.expanded_haulers_item == item_key then clear_expanded_object(player_gui) end
+        if root.expanded_stations_item == item_key then clear_expanded_object(root) end
+        if root.expanded_haulers_item == item_key then clear_expanded_object(root) end
     end
 end
 
 function item_methods.on_mutation_finished(context)
-    ---@cast context GuiTableContext<PlayerGui.Network, ItemKey, NetworkItem>
+    ---@cast context GuiTableContext<GuiRoot.Network, ItemKey, NetworkItem>
 
-    local network = storage.networks[context.root.network]
-
-    network.items = context.objects
+    context.root.network.items = context.objects
 end
 
 --------------------------------------------------------------------------------
@@ -668,7 +663,7 @@ local function job_update_row_captions(defs_or_cells, job_index, job)
         action_captions[1] = { "sspp-gui.fmt-travel-to-fuel", get_stop_name(fuel_stop) }
         duration_captions[1] = format_duration(depart_tick, arrive_tick or in_progress)
         if arrive_tick then
-            action_captions[2] = { "sspp-gui.transfer-fuel-to-hauler" }
+            action_captions[2] = { "sspp-gui.fmt-transfer-fuel-to-hauler" }
             duration_captions[2] = format_duration(arrive_tick, done_tick or in_progress)
         end
     else
@@ -728,7 +723,7 @@ local function job_update_row_captions(defs_or_cells, job_index, job)
 end
 
 function job_methods.insert_row_complete(context, row_offset, job_index, job)
-    ---@cast context GuiTableContext<PlayerGui.Network, JobIndex, NetworkJob>
+    ---@cast context GuiTableContext<GuiRoot.Network, JobIndex, NetworkJob>
     ---@cast job_index JobIndex
     ---@cast job NetworkJob
 
@@ -752,7 +747,7 @@ function job_methods.insert_row_complete(context, row_offset, job_index, job)
 end
 
 function job_methods.filter_object(context, job_index, job)
-    ---@cast context GuiTableContext<PlayerGui.Network, JobIndex, NetworkJob>
+    ---@cast context GuiTableContext<GuiRoot.Network, JobIndex, NetworkJob>
     ---@cast job_index JobIndex
     ---@cast job NetworkJob
 
@@ -779,7 +774,7 @@ function job_methods.filter_object(context, job_index, job)
 end
 
 function job_methods.on_row_changed(context, cells, job_index, job)
-    ---@cast context GuiTableContext<PlayerGui.Network, JobIndex, NetworkJob>
+    ---@cast context GuiTableContext<GuiRoot.Network, JobIndex, NetworkJob>
     ---@cast job_index JobIndex
     ---@cast job NetworkJob
 
@@ -788,10 +783,9 @@ end
 
 --------------------------------------------------------------------------------
 
----@param player_gui PlayerGui.Network
-function gui_network.on_job_created(player_gui)
-    local context = player_gui.job_context
-    local network = storage.networks[player_gui.network]
+---@param root GuiRoot.Network
+function gui_network.on_job_created(root)
+    local network, context = root.network, root.job_context
     local job_index = network.job_index_counter
 
     glib.table_append_immutable_row(job_methods, context, job_index, network.jobs[job_index])
@@ -805,20 +799,18 @@ function gui_network.on_job_created(player_gui)
     end
 end
 
----@param player_gui PlayerGui.Network
+---@param root GuiRoot.Network
 ---@param job_index JobIndex
-function gui_network.on_job_removed(player_gui, job_index)
-    if player_gui.expanded_job == job_index then
-        clear_expanded_object(player_gui)
-    end
+function gui_network.on_job_removed(root, job_index)
+    if root.expanded_job == job_index then clear_expanded_object(root) end
 
-    glib.table_remove_immutable_row(job_methods, player_gui.job_context, job_index)
+    glib.table_remove_immutable_row(job_methods, root.job_context, job_index)
 end
 
----@param player_gui PlayerGui.Network
+---@param root GuiRoot.Network
 ---@param job_index JobIndex
-function gui_network.on_job_updated(player_gui, job_index)
-    glib.table_modify_immutable_row(job_methods, player_gui.job_context, job_index)
+function gui_network.on_job_updated(root, job_index)
+    glib.table_modify_immutable_row(job_methods, root.job_context, job_index)
 end
 
 --------------------------------------------------------------------------------
@@ -875,12 +867,12 @@ local function add_job_fuel_transfer_progress_footer(info_flow, train)
             local total_slots, total_filled_slots = inventory.count_empty_stacks(), 0.0
             for _, item in pairs(inventory.get_contents()) do
                 local filled_slots = item.count / prototypes.item[item.name].stack_size
-                total_slots, total_filled_slots = (total_slots + math.ceil(filled_slots)), (total_filled_slots + filled_slots)
+                total_slots, total_filled_slots = (total_slots + m_ceil(filled_slots)), (total_filled_slots + filled_slots)
             end
-            min_fullness = math.min(min_fullness, total_filled_slots / total_slots)
+            min_fullness = m_min(min_fullness, total_filled_slots / total_slots)
         end
     end
-    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.fuel-to-transfer" }, string.format("%.0f%%", (1.0 - min_fullness) * 100.0))
+    add_job_label_pusher_label(info_flow, "info_label", { "sspp-gui.fuel-to-transfer" }, s_format("%.0f%%", (1.0 - min_fullness) * 100.0))
 end
 
 ---@param info_flow LuaGuiElement
@@ -899,28 +891,255 @@ end
 
 --------------------------------------------------------------------------------
 
----@param player_gui PlayerGui.Network
-function gui_network.on_poll_finished(player_gui)
-    local network_name = player_gui.network
-    local network = storage.networks[network_name]
-    local jobs = network.jobs
-    local elements = player_gui.elements
+---@param root GuiRoot.Network
+---@param expanded_class_name ClassName
+local function refresh_expanded_class(root, expanded_class_name)
+    local elements, network_name, network_jobs = root.elements, root.network_name, root.network.jobs
 
+    local grid_table = elements.grid_table
+    local grid_children = grid_table.children
+    local old_length, new_length = #grid_children, 0
+
+    local provide_enabled = elements.grid_provide_toggle.toggled
+    local request_enabled = elements.grid_request_toggle.toggled
+    local liquidate_enabled = elements.grid_liquidate_toggle.toggled
+    local fuel_enabled = elements.grid_fuel_toggle.toggled
+    local depot_enabled = elements.grid_depot_toggle.toggled
+
+    for _, hauler in pairs(storage.haulers) do
+        if hauler.network == network_name and hauler.class == expanded_class_name then
+            local state_icon, item_key ---@type string?, ItemKey?
+            local job_index = hauler.job
+            if job_index then
+                local job = network_jobs[job_index]
+                if job.type == "FUEL" then
+                    if fuel_enabled then state_icon = "[img=virtual-signal/signal-fuel]" end
+                else
+                    if job.request_stop then
+                        if request_enabled then item_key, state_icon = job.item, "[img=virtual-signal/down-arrow]" end
+                    else
+                        if provide_enabled then item_key, state_icon = job.item, "[img=virtual-signal/up-arrow]" end
+                    end
+                end
+            else
+                local depot_key = hauler.to_depot or hauler.at_depot
+                if depot_key == "" then
+                    if depot_enabled then state_icon = "[img=virtual-signal/signal-white-flag]" end
+                elseif depot_key then
+                    if liquidate_enabled then item_key, state_icon = depot_key, "[img=virtual-signal/signal-skull]" end
+                end
+                -- TODO: show disabled haulers
+            end
+            if state_icon then
+                new_length = new_length + 1
+                local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
+                minimap.entity = hauler.train.front_stock
+                top.caption = state_icon
+                if item_key then
+                    local name, quality = split_item_key(item_key)
+                    bottom.caption = tostring(get_train_item_count(hauler.train, name, quality)) .. make_item_icon(name, quality)
+                else
+                    bottom.caption = ""
+                end
+            end
+        end
+    end
+
+    for i = old_length, new_length + 1, -1 do grid_children[i].destroy() end
+end
+
+---@param root GuiRoot.Network
+---@param expanded_stations_item_key ItemKey
+local function refresh_expanded_stations_item(root, expanded_stations_item_key)
+    local elements, network_name = root.elements, root.network_name
+
+    local grid_table = elements.grid_table
+    local grid_children = grid_table.children
+    local old_length, new_length = #grid_children, 0
+
+    local provide_enabled = elements.grid_provide_toggle.toggled
+    local request_enabled = elements.grid_request_toggle.toggled
+
+    local item_icon ---@type string?
+    if elements.grid_stations_mode_switch.switch_state == "left" then
+        local name, quality = split_item_key(expanded_stations_item_key)
+        item_icon = make_item_icon(name, quality)
+    end
+
+    for _, station in pairs(storage.stations) do
+        if station.general.network == network_name then
+            local provide = station.provide
+            if provide and provide_enabled and provide.items[expanded_stations_item_key] then
+                new_length = new_length + 1
+                local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
+                local entity = station.stop.entity
+                minimap.entity = entity
+                top.caption = entity.backer_name
+                if item_icon then
+                    bottom.caption = "+" .. tostring(provide.counts[expanded_stations_item_key]) .. item_icon
+                else
+                    bottom.caption = tostring(len_or_zero(provide.deliveries[expanded_stations_item_key])) .. "[img=virtual-signal/up-arrow]"
+                end
+            end
+            local request = station.request
+            if request and request_enabled and request.items[expanded_stations_item_key] then
+                new_length = new_length + 1
+                local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
+                local entity = station.stop.entity
+                minimap.entity = entity
+                top.caption = entity.backer_name
+                if item_icon then
+                    bottom.caption = "-" .. tostring(request.counts[expanded_stations_item_key]) .. item_icon
+                else
+                    bottom.caption = tostring(len_or_zero(request.deliveries[expanded_stations_item_key])) .. "[img=virtual-signal/down-arrow]"
+                end
+            end
+        end
+    end
+
+    for i = old_length, new_length + 1, -1 do grid_children[i].destroy() end
+end
+
+---@param root GuiRoot.Network
+---@param expanded_haulers_item_key ItemKey
+local function refresh_expanded_haulers_item(root, expanded_haulers_item_key)
+    local elements, network_name, network_jobs = root.elements, root.network_name, root.network.jobs
+
+    local grid_table = elements.grid_table
+    local grid_children = grid_table.children
+    local old_length, new_length = #grid_children, 0
+
+    local provide_enabled = elements.grid_provide_toggle.toggled
+    local request_enabled = elements.grid_request_toggle.toggled
+    local liquidate_enabled = elements.grid_liquidate_toggle.toggled
+
+    local name, quality = split_item_key(expanded_haulers_item_key)
+    local item_icon = make_item_icon(name, quality)
+
+    for _, hauler in pairs(storage.haulers) do
+        if hauler.network == network_name then
+            local state_icon ---@type string?
+            local job_index = hauler.job
+            if job_index then
+                local job = network_jobs[job_index]
+                if job.item == expanded_haulers_item_key then
+                    if job.request_stop then
+                        if request_enabled then state_icon = "[img=virtual-signal/down-arrow]" end
+                    else
+                        if provide_enabled then state_icon = "[img=virtual-signal/up-arrow]" end
+                    end
+                end
+            else
+                local depot_key = hauler.to_depot or hauler.at_depot
+                if depot_key == expanded_haulers_item_key then
+                    if liquidate_enabled then state_icon = "[img=virtual-signal/signal-skull]" end
+                end
+            end
+            if state_icon then
+                new_length = new_length + 1
+                local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
+                minimap.entity = hauler.train.front_stock
+                top.caption = state_icon
+                bottom.caption = tostring(get_train_item_count(hauler.train, name, quality)) .. item_icon
+            end
+        end
+    end
+
+    for i = old_length, new_length + 1, -1 do grid_children[i].destroy() end
+end
+
+---@param root GuiRoot.Network
+---@param expanded_job_index JobIndex
+local function refresh_expanded_job(root, expanded_job_index)
+    local grid_table, info_flow = root.elements.grid_table, root.elements.info_flow
+
+    local job = root.network.jobs[expanded_job_index]
+    local hauler = storage.haulers[job.hauler] --[[@as Hauler?]]
+    local in_progress_tick = hauler and hauler.job == expanded_job_index and game.tick or nil
+    local in_progress_train = in_progress_tick and hauler--[[@as Hauler]].train
+
+    grid_table.clear()
+    info_flow.clear()
+
+    add_job_minimap_widgets(grid_table, { "", "[img=item/locomotive] ", { "sspp-gui.hauler" } }, hauler and hauler.train.front_stock)
+    info_flow.add({ type = "line" })
+    add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-started" }, format_time(job.start_tick))
+    info_flow.add({ type = "line" })
+
+    if job.type == "FUEL" then
+        local fuel_stop = job.fuel_stop or (in_progress_train and in_progress_train.path_end_stop)
+
+        local depart_tick, arrive_tick, done_tick = job.start_tick, job.fuel_arrive_tick, job.finish_tick
+        add_job_minimap_widgets(grid_table, { "", "[img=item/train-stop] ", { "sspp-gui.fuel" } }, fuel_stop)
+        add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-fuel", get_stop_name(fuel_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
+        if arrive_tick then
+            add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-transfer-fuel-to-hauler" }, format_duration(arrive_tick, done_tick or in_progress_tick))
+            if in_progress_train then
+                add_job_fuel_transfer_progress_footer(info_flow, in_progress_train)
+            end
+        elseif in_progress_train then
+            add_job_travel_progress_footer(info_flow, in_progress_train)
+        end
+    else
+        local provide_stop, request_stop = job.provide_stop, job.request_stop
+
+        if provide_stop then
+            local depart_tick, arrive_tick, done_tick = job.start_tick, job.provide_arrive_tick, job.provide_done_tick or job.finish_tick
+            add_job_minimap_widgets(grid_table, { "", "[img=item/sspp-provide-io] ", { "sspp-gui.provide" } }, provide_stop)
+            add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-pick-up", get_stop_name(provide_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
+            if arrive_tick then
+                add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-transfer-cargo-to-hauler", job.target_count }, format_duration(arrive_tick, done_tick or in_progress_tick))
+                if in_progress_train and not request_stop then
+                    add_job_cargo_transfer_progress_footer(info_flow, in_progress_train, job.item, job.target_count)
+                end
+            elseif in_progress_train then
+                add_job_travel_progress_footer(info_flow, in_progress_train)
+            end
+        end
+
+        if request_stop then
+            local depart_tick, arrive_tick, done_tick = job.provide_done_tick or job.start_tick, job.request_arrive_tick, job.finish_tick
+            add_job_minimap_widgets(grid_table, { "", "[img=item/sspp-request-io] ", { "sspp-gui.request" } }, request_stop)
+            add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-drop-off", get_stop_name(request_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
+            if arrive_tick then
+                add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-transfer-cargo-to-station", job.loaded_count }, format_duration(arrive_tick, done_tick or in_progress_tick))
+                if in_progress_train then
+                    add_job_cargo_transfer_progress_footer(info_flow, in_progress_train, job.item, nil)
+                end
+            elseif in_progress_train then
+                add_job_travel_progress_footer(info_flow, in_progress_train)
+            end
+        end
+    end
+
+    if not in_progress_tick then
+        info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
+        info_flow.add({ type = "line" })
+        if job.finish_tick then
+            add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-finished" }, format_time(job.finish_tick))
+        else
+            add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-aborted" }, format_time(job.abort_tick))
+        end
+    end
+    info_flow.add({ type = "line" })
+end
+
+--------------------------------------------------------------------------------
+
+---@param root GuiRoot.Network
+function gui_network.on_poll_finished(root)
+    local network = root.network
     local class_hauler_totals = {} ---@type {[ClassName]: integer}
 
     -- update dynamic parts of item rows, and sum totals of active haulers
     do
-        local context = player_gui.item_context
+        local context = root.item_context
         local rows, indices = context.rows, context.indices
 
-        local push_tickets = network.push_tickets
-        local pull_tickets = network.pull_tickets
+        local buffer_haulers, provide_haulers, request_haulers = network.buffer_haulers, network.provide_haulers, network.request_haulers
+        local to_depot_liquidate_haulers, at_depot_liquidate_haulers = network.to_depot_liquidate_haulers, network.at_depot_liquidate_haulers
 
-        local buffer_haulers = network.buffer_haulers
-        local provide_haulers = network.provide_haulers
-        local request_haulers = network.request_haulers
-        local to_depot_liquidate_haulers = network.to_depot_liquidate_haulers
-        local at_depot_liquidate_haulers = network.at_depot_liquidate_haulers
+        local push_tickets, pull_tickets = network.push_tickets, network.pull_tickets
 
         for item_key, item in pairs(context.objects) do
             local class_name = item.class
@@ -930,7 +1149,7 @@ function gui_network.on_poll_finished(player_gui)
             local liquidate_total = len_or_zero(to_depot_liquidate_haulers[item_key]) + len_or_zero(at_depot_liquidate_haulers[item_key])
 
             local push_demand = len_or_zero(push_tickets[item_key])
-            local pull_demand = math.max(0, len_or_zero(pull_tickets[item_key]) - provide_total)
+            local pull_demand = m_max(0, len_or_zero(pull_tickets[item_key]) - provide_total)
 
             -- haulers being used as buffers are not subtracted from pull demand, but they are included in totals
             provide_total = provide_total + len_or_zero(buffer_haulers[item_key])
@@ -947,12 +1166,10 @@ function gui_network.on_poll_finished(player_gui)
 
     -- update dynamic parts of class rows, making use of the totals from above
     do
-        local context = player_gui.class_context
+        local context = root.class_context
         local rows, indices = context.rows, context.indices
 
-        local fuel_haulers = network.fuel_haulers
-        local to_depot_haulers = network.to_depot_haulers
-        local at_depot_haulers = network.at_depot_haulers
+        local fuel_haulers, to_depot_haulers, at_depot_haulers = network.fuel_haulers, network.to_depot_haulers, network.at_depot_haulers
 
         for class_name, class in pairs(context.objects) do
             local cells = rows[indices[class_name]].cells
@@ -971,211 +1188,25 @@ function gui_network.on_poll_finished(player_gui)
         end
     end
 
-    local expanded_job_index = player_gui.expanded_job
-    if expanded_job_index then
-        local grid_table, info_flow = elements.grid_table, elements.info_flow
-
-        local job = network.jobs[expanded_job_index]
-        local hauler = storage.haulers[job.hauler] --[[@as Hauler?]]
-        local job_type = job.type
-        local in_progress_tick = hauler and hauler.job == expanded_job_index and game.tick or nil
-        local in_progress_train = in_progress_tick and hauler--[[@as Hauler]].train
-
-        grid_table.clear()
-        info_flow.clear()
-
-        add_job_minimap_widgets(grid_table, { "", "[img=item/locomotive] ", { "sspp-gui.hauler" } }, hauler and hauler.train.front_stock)
-        info_flow.add({ type = "line" })
-        add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-started" }, format_time(job.start_tick))
-        info_flow.add({ type = "line" })
-
-        if job_type == "FUEL" then
-            local fuel_stop = job.fuel_stop or (in_progress_train and in_progress_train.path_end_stop)
-
-            local depart_tick, arrive_tick, done_tick = job.start_tick, job.fuel_arrive_tick, job.finish_tick
-            add_job_minimap_widgets(grid_table, { "", "[img=item/train-stop] ", { "sspp-gui.fuel" } }, fuel_stop)
-            add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-fuel", get_stop_name(fuel_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
-            if arrive_tick then
-                add_job_label_pusher_label(info_flow, "label", { "sspp-gui.transfer-fuel-to-hauler" }, format_duration(arrive_tick, done_tick or in_progress_tick))
-                if in_progress_train then
-                    add_job_fuel_transfer_progress_footer(info_flow, in_progress_train)
-                end
-            elseif in_progress_train then
-                add_job_travel_progress_footer(info_flow, in_progress_train)
-            end
-        else
-            local provide_stop, request_stop = job.provide_stop, job.request_stop
-
-            if provide_stop then
-                local depart_tick, arrive_tick, done_tick = job.start_tick, job.provide_arrive_tick, job.provide_done_tick or job.finish_tick
-                add_job_minimap_widgets(grid_table, { "", "[img=item/sspp-provide-io] ", { "sspp-gui.provide" } }, provide_stop)
-                add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-pick-up", get_stop_name(provide_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
-                if arrive_tick then
-                    add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-transfer-cargo-to-hauler", job.target_count }, format_duration(arrive_tick, done_tick or in_progress_tick))
-                    if in_progress_train and not request_stop then
-                        add_job_cargo_transfer_progress_footer(info_flow, in_progress_train, job.item, job.target_count)
-                    end
-                elseif in_progress_train then
-                    add_job_travel_progress_footer(info_flow, in_progress_train)
-                end
-            end
-
-            if request_stop then
-                local depart_tick, arrive_tick, done_tick = job.provide_done_tick or job.start_tick, job.request_arrive_tick, job.finish_tick
-                add_job_minimap_widgets(grid_table, { "", "[img=item/sspp-request-io] ", { "sspp-gui.request" } }, request_stop)
-                add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-travel-to-drop-off", get_stop_name(request_stop) }, format_duration(depart_tick, arrive_tick or in_progress_tick))
-                if arrive_tick then
-                    add_job_label_pusher_label(info_flow, "label", { "sspp-gui.fmt-transfer-cargo-to-station", job.loaded_count }, format_duration(arrive_tick, done_tick or in_progress_tick))
-                    if in_progress_train then
-                        add_job_cargo_transfer_progress_footer(info_flow, in_progress_train, job.item, nil)
-                    end
-                elseif in_progress_train then
-                    add_job_travel_progress_footer(info_flow, in_progress_train)
-                end
-            end
-        end
-
-        if not in_progress_tick then
-            info_flow.add({ type = "empty-widget", style = "flib_vertical_pusher" })
-            info_flow.add({ type = "line" })
-            if job.finish_tick then
-                add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-finished" }, format_time(job.finish_tick))
-            else
-                add_job_label_pusher_label(info_flow, "caption_label", { "sspp-gui.job-aborted" }, format_time(job.abort_tick))
-            end
-        end
-        info_flow.add({ type = "line" })
-
-        return -- the rest of this function is only relevant to hauler and station grids
-    end
-
-    local provide_enabled = elements.grid_provide_toggle.toggled
-    local request_enabled = elements.grid_request_toggle.toggled
-    local liquidate_enabled = elements.grid_liquidate_toggle.toggled
-    local fuel_enabled = elements.grid_fuel_toggle.toggled
-    local depot_enabled = elements.grid_depot_toggle.toggled
-
-    local grid_table = elements.grid_table
-    local grid_children = grid_table.children
-
-    -- to prevent having create hundreds of new minimaps every time, we reuse them between polls
-    local old_length, new_length = #grid_children, 0
-
-    local expanded_class_name = player_gui.expanded_class
+    local expanded_class_name = root.expanded_class
     if expanded_class_name then
-        for _, hauler in pairs(storage.haulers) do
-            if hauler.network == network_name and hauler.class == expanded_class_name then
-                local state_icon, item_key ---@type string?, ItemKey?
-                local job_index = hauler.job
-                if job_index then
-                    local job = jobs[job_index]
-                    if job.type == "FUEL" then
-                        if fuel_enabled then state_icon = "[img=virtual-signal/signal-fuel]" end
-                    else
-                        if job.request_stop then
-                            if request_enabled then item_key, state_icon = job.item, "[img=virtual-signal/down-arrow]" end
-                        else
-                            if provide_enabled then item_key, state_icon = job.item, "[img=virtual-signal/up-arrow]" end
-                        end
-                    end
-                else
-                    local depot_key = hauler.to_depot or hauler.at_depot
-                    if depot_key == "" then
-                        if depot_enabled then state_icon = "[img=virtual-signal/signal-white-flag]" end
-                    elseif depot_key then
-                        if liquidate_enabled then item_key, state_icon = depot_key, "[img=virtual-signal/signal-skull]" end
-                    end
-                    -- TODO: show disabled haulers
-                end
-                if state_icon then
-                    new_length = new_length + 1
-                    local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
-                    minimap.entity = hauler.train.front_stock
-                    top.caption = state_icon
-                    if item_key then
-                        local name, quality = split_item_key(item_key)
-                        bottom.caption = tostring(get_train_item_count(hauler.train, name, quality)) .. make_item_icon(name, quality)
-                    else
-                        bottom.caption = ""
-                    end
-                end
-            end
-        end
+        refresh_expanded_class(root, expanded_class_name)
+        return
     end
-
-    local expanded_haulers_item_key = player_gui.expanded_haulers_item
-    if expanded_haulers_item_key then
-        local name, quality = split_item_key(expanded_haulers_item_key)
-        local item_icon = make_item_icon(name, quality)
-        for _, hauler in pairs(storage.haulers) do
-            if hauler.network == network_name then
-                local state_icon ---@type string?
-                local job_index = hauler.job
-                if job_index then
-                    local job = jobs[job_index]
-                    if job.item == expanded_haulers_item_key then
-                        if job.request_stop then
-                            if request_enabled then state_icon = "[img=virtual-signal/down-arrow]" end
-                        else
-                            if provide_enabled then state_icon = "[img=virtual-signal/up-arrow]" end
-                        end
-                    end
-                else
-                    local depot_key = hauler.to_depot or hauler.at_depot
-                    if depot_key == expanded_haulers_item_key then
-                        if liquidate_enabled then state_icon = "[img=virtual-signal/signal-skull]" end
-                    end
-                end
-                if state_icon then
-                    new_length = new_length + 1
-                    local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
-                    minimap.entity = hauler.train.front_stock
-                    top.caption = state_icon
-                    bottom.caption = tostring(get_train_item_count(hauler.train, name, quality)) .. item_icon
-                end
-            end
-        end
-    end
-
-    local expanded_stations_item_key = player_gui.expanded_stations_item
+    local expanded_stations_item_key = root.expanded_stations_item
     if expanded_stations_item_key then
-        local item_icon ---@type string?
-        if elements.grid_stations_mode_switch.switch_state == "left" then
-            local name, quality = split_item_key(expanded_stations_item_key)
-            item_icon = make_item_icon(name, quality)
-        end
-        for _, station in pairs(storage.stations) do
-            if station.network == network_name then
-                local provide = station.provide
-                if provide and provide_enabled and provide.items[expanded_stations_item_key] then
-                    new_length = new_length + 1
-                    local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
-                    minimap.entity = station.stop
-                    top.caption = station.stop.backer_name
-                    if item_icon then
-                        bottom.caption = "+" .. tostring(provide.counts[expanded_stations_item_key]) .. item_icon
-                    else
-                        bottom.caption = tostring(len_or_zero(provide.deliveries[expanded_stations_item_key])) .. "[img=virtual-signal/up-arrow]"
-                    end
-                end
-                local request = station.request
-                if request and request_enabled and request.items[expanded_stations_item_key] then
-                    new_length = new_length + 1
-                    local minimap, top, bottom = acquire_next_minimap(grid_table, grid_children, old_length, new_length)
-                    minimap.entity = station.stop
-                    top.caption = station.stop.backer_name
-                    if item_icon then
-                        bottom.caption = "-" .. tostring(request.counts[expanded_stations_item_key]) .. item_icon
-                    else
-                        bottom.caption = tostring(len_or_zero(request.deliveries[expanded_stations_item_key])) .. "[img=virtual-signal/down-arrow]"
-                    end
-                end
-            end
-        end
+        refresh_expanded_stations_item(root, expanded_stations_item_key)
+        return
     end
-
-    for i = old_length, new_length + 1, -1 do
-        grid_children[i].destroy()
+    local expanded_haulers_item_key = root.expanded_haulers_item
+    if expanded_haulers_item_key then
+        refresh_expanded_haulers_item(root, expanded_haulers_item_key)
+        return
+    end
+    local expanded_job_index = root.expanded_job
+    if expanded_job_index then
+        refresh_expanded_job(root, expanded_job_index)
+        return
     end
 end
 
@@ -1193,30 +1224,19 @@ glib.handlers["network_add_fluid"] = { [events.on_gui_click] = function(event)
     glib.table_append_blank_row(item_methods, storage.player_guis[event.player_index].item_context, "fluid")
 end }
 
-glib.handlers["network_close_window"] = { [events.on_gui_click] = function(event)
-    local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
-    assert(player.opened.name == "sspp-network")
-
-    player.opened = nil
-end }
-
 --------------------------------------------------------------------------------
 
 glib.handlers["network_import_import"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
     do
-        local network = storage.networks[player_gui.network]
-
-        local json = helpers.json_to_table(player_gui.popup_elements.textbox.text) --[[@as table]]
+        local json = helpers.json_to_table(root.child.elements.textbox.text) --[[@as table]]
         if type(json) ~= "table" then goto failure end
 
         local version = json.sspp_network_version
         if version ~= 1 then goto failure end
-
         local classes = json.classes ---@type {[ClassName]: NetworkClass}
         if type(classes) ~= "table" then goto failure end
-
         local items = json.items ---@type {[ItemKey]: NetworkItem}
         if type(items) ~= "table" then goto failure end
 
@@ -1226,10 +1246,8 @@ glib.handlers["network_import_import"] = { [events.on_gui_click] = function(even
 
             local depot_name = class[1]
             if type(depot_name) ~= "string" or depot_name == "" or #depot_name > 199 then goto failure end
-
             local fueler_name = class[2]
             if type(fueler_name) ~= "string" or fueler_name == "" or #fueler_name > 199 then goto failure end
-
             local bypass_depot = class[3]
             if type(bypass_depot) ~= "boolean" then goto failure end
 
@@ -1238,18 +1256,15 @@ glib.handlers["network_import_import"] = { [events.on_gui_click] = function(even
 
         for item_key, item in pairs(items) do
             if type(item_key) ~= "string" then goto failure end
+            if type(item) ~= "table" then goto failure end
 
             if lib.is_item_key_invalid(item_key) then
                 items[item_key] = nil -- not an error, just skip this item
             else
-                if type(item) ~= "table" then goto failure end
-
                 local class = item[1]
                 if type(class) ~= "string" or class == "" or #class > 199 then goto failure end
-
                 local delivery_size = item[2]
                 if type(delivery_size) ~= "number" or delivery_size < 1 then goto failure end
-
                 local delivery_time = item[3]
                 if type(delivery_time) ~= "number" or delivery_time < 1.0 then goto failure end
 
@@ -1260,102 +1275,304 @@ glib.handlers["network_import_import"] = { [events.on_gui_click] = function(even
 
         if next(classes) == nil and next(items) == nil then goto failure end
 
-        clear_expanded_object(player_gui)
+        clear_expanded_object(root)
 
-        for class_name, _ in pairs(network.classes) do
+        for class_name, _ in pairs(root.network.classes) do
             if classes[class_name] then
-                network.classes[class_name] = classes[class_name]
+                root.network.classes[class_name] = classes[class_name]
                 classes[class_name] = nil
             end
         end
 
-        for item_key, _ in pairs(network.items) do
+        for item_key, _ in pairs(root.network.items) do
             if items[item_key] then
-                network.items[item_key] = items[item_key]
+                root.network.items[item_key] = items[item_key]
                 items[item_key] = nil
             end
         end
 
-        for class_name, class in pairs(classes) do network.classes[class_name] = class end
-        for item_key, item in pairs(items) do network.items[item_key] = item end
+        for class_name, class in pairs(classes) do root.network.classes[class_name] = class end
+        for item_key, item in pairs(items) do root.network.items[item_key] = item end
 
-        glib.table_initialise(class_methods, player_gui.class_context, network.classes, nil, nil)
-        glib.table_initialise(item_methods, player_gui.item_context, network.items, nil, nil)
+        glib.table_initialise(class_methods, root.class_context, root.network.classes, nil, nil)
+        glib.table_initialise(item_methods, root.item_context, root.network.items, nil, nil)
 
         return
     end
 
     ::failure::
     game.get_player(event.player_index).play_sound({ path = "utility/cannot_build" })
-    player_gui.popup_elements.textbox.focus()
-    player_gui.popup_elements.textbox.select_all()
+    root.child.elements.textbox.focus()
+    root.child.elements.textbox.select_all()
 end }
 
 glib.handlers["network_export_export"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Network]]
-    local network = storage.networks[player_gui.network]
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
     local classes = {}
-    for class_name, class in pairs(network.classes) do
+    for class_name, class in pairs(root.network.classes) do
         classes[class_name] = { class.depot_name, class.fueler_name, class.bypass_depot }
     end
     local items = {}
-    for item_key, item in pairs(network.items) do
+    for item_key, item in pairs(root.network.items) do
         items[item_key] = { item.class, item.delivery_size, item.delivery_time }
     end
     local json = { sspp_network_version = 1, classes = classes, items = items }
 
-    player_gui.popup_elements.textbox.text = helpers.table_to_json(json)
-    player_gui.popup_elements.textbox.focus()
-    player_gui.popup_elements.textbox.select_all()
+    root.child.elements.textbox.text = helpers.table_to_json(json)
+    root.child.elements.textbox.focus()
+    root.child.elements.textbox.select_all()
 end }
 
---------------------------------------------------------------------------------
+glib.handlers["network_import_open"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
----@param player_id PlayerId
----@param toggle LuaGuiElement
----@param caption string
----@param handler string
-local function import_or_export_toggled(player_id, toggle, caption, handler)
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Network]]
-
-    if player_gui.popup_elements then
-        player_gui.popup_elements["sspp-popup"].destroy()
-        player_gui.popup_elements = nil
-        if not toggle.toggled then return end
-    end
-
-    local window, elements = glib.add_element(game.get_player(player_id).gui.screen, {},
-        { type = "frame", name = "sspp-popup", style = "frame", direction = "vertical", children = {
+    glib.create_child_window(root, root_window_size, "network_import_close",
+        { type = "frame", name = "sspp-network-import", style = "frame", direction = "vertical", children = {
             { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
                 { type = "textfield", name = "textbox", style = "sspp_json_textbox" },
             } },
             { type = "flow", style = "dialog_buttons_horizontal_flow", direction = "horizontal", children = {
-                { type = "button", style = "dialog_button", caption = { caption }, mouse_button_filter = { "left" }, handler = handler },
-                { type = "empty-widget", style = "flib_dialog_footer_drag_handle_no_right", drag_target = "sspp-popup" },
+                { type = "button", style = "dialog_button", caption = { "sspp-gui.import-from-string" }, mouse_button_filter = { "left" }, handler = "network_import_import" },
+                { type = "empty-widget", style = "flib_dialog_footer_drag_handle_no_right", drag_target = "sspp-network-import" },
             } },
         } }
-    ) ---@cast elements -nil
-
-    window.bring_to_front()
-    window.force_auto_center()
-
-    player_gui.popup_elements = elements
-end
-
-glib.handlers["network_import_toggled"] = { [events.on_gui_click] = function(event)
-    local player_id = event.player_index
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Network]]
-    player_gui.elements.export_toggle.toggled = false
-    import_or_export_toggled(player_id, event.element, "sspp-gui.import-from-string", "network_import_import")
-    if player_gui.popup_elements then player_gui.popup_elements.textbox.focus() end
+    )
+    root.child.elements.textbox.focus()
 end }
 
-glib.handlers["network_export_toggled"] = { [events.on_gui_click] = function(event)
-    local player_id = event.player_index
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Network]]
-    player_gui.elements.import_toggle.toggled = false
-    import_or_export_toggled(player_id, event.element, "sspp-gui.export-to-string", "network_export_export")
+glib.handlers["network_export_open"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
+
+    glib.create_child_window(root, root_window_size, "network_export_close",
+        { type = "frame", name = "sspp-network-export", style = "frame", direction = "vertical", children = {
+            { type = "frame", style = "inside_deep_frame", direction = "vertical", children = {
+                { type = "textfield", name = "textbox", style = "sspp_json_textbox" },
+            } },
+            { type = "flow", style = "dialog_buttons_horizontal_flow", direction = "horizontal", children = {
+                { type = "button", style = "dialog_button", caption = { "sspp-gui.export-to-string" }, mouse_button_filter = { "left" }, handler = "network_export_export" },
+                { type = "empty-widget", style = "flib_dialog_footer_drag_handle_no_right", drag_target = "sspp-network-export" },
+            } },
+        } }
+    )
+end }
+
+glib.handlers["network_import_close"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
+    glib.destroy_child_window(root)
+    root.elements.import_toggle.toggled = false
+end }
+
+glib.handlers["network_export_close"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
+    glib.destroy_child_window(root)
+    root.elements.export_toggle.toggled = false
+end }
+
+--------------------------------------------------------------------------------
+
+---@param root GuiRoot.Network
+---@param network_name NetworkName
+local function switch_open_network(root, network_name)
+    clear_expanded_object(root)
+
+    local network = storage.networks[network_name]
+    root.network_name = network_name
+    root.network = network
+
+    local elements = root.elements
+    root.class_context = { root = root, table = elements.class_table }
+    root.item_context = { root = root, table = elements.item_table }
+    root.job_context = { root = root, table = elements.job_table }
+
+    glib.table_initialise(class_methods, root.class_context, network.classes, nil, nil)
+    glib.table_initialise(item_methods, root.item_context, network.items, nil, nil)
+    glib.table_initialise(job_methods, root.job_context, network.jobs, true, 100)
+
+    local custom = network.surface == nil
+    elements.rename_toggle.enabled = custom
+    elements.delete_button.enabled = custom
+end
+
+---@param old_network_name NetworkName
+---@param new_network_name NetworkName?
+local function update_network_stations(old_network_name, new_network_name)
+    for comb_id, comb in pairs(storage.entities) do
+        local name = comb.name
+        if name == "entity-ghost" then name = comb.ghost_name end
+        if name == "sspp-general-io" then
+            local stop_ids, general = storage.comb_stop_ids[comb_id], nil
+            if #stop_ids == 1 then
+                local station = storage.stations[stop_ids[1]]
+                if station then general = station.general end
+            end
+            general = general or lib.read_station_general_settings(comb)
+            if general.network == old_network_name then
+                general.network = new_network_name or comb.surface.name
+                lib.write_station_general_settings(general)
+            end
+        end
+    end
+end
+
+---@param root GuiRoot.Network
+local function try_create_network(root)
+    local new_network_name = root.elements.network_name_input.text
+    if new_network_name == "" or storage.networks[new_network_name] then return end
+
+    storage.networks[new_network_name] = {
+        classes = {},
+        items = {},
+        job_index_counter = 0,
+        jobs = {},
+        buffer_haulers = {},
+        provide_haulers = {},
+        request_haulers = {},
+        fuel_haulers = {},
+        to_depot_haulers = {},
+        at_depot_haulers = {},
+        to_depot_liquidate_haulers = {},
+        at_depot_liquidate_haulers = {},
+        push_tickets = {},
+        provide_tickets = {},
+        pull_tickets = {},
+        request_tickets = {},
+        provide_done_tickets = {},
+        request_done_tickets = {},
+        buffer_tickets = {},
+    }
+
+    local localised_network_names, network_index = glib.get_localised_network_names(new_network_name)
+    root.elements.network_selector.items = localised_network_names
+    root.elements.network_selector.selected_index = network_index
+
+    switch_open_network(root, new_network_name)
+end
+
+---@param root GuiRoot.Network
+local function try_rename_network(root)
+    local new_network_name = root.elements.network_name_input.text
+    if new_network_name == "" or storage.networks[new_network_name] then return end
+
+    local old_network_name = root.network_name
+    local network = root.network
+
+    for _, hauler in pairs(storage.haulers) do
+        if hauler.network == old_network_name then hauler.network = new_network_name end
+    end
+    for item_key, _ in pairs(network.items) do
+        storage.disabled_items[old_network_name .. ":" .. item_key] = true
+    end
+    update_network_stations(old_network_name, new_network_name)
+
+    storage.networks[old_network_name] = nil
+    storage.networks[new_network_name] = network
+
+    local localised_network_names, network_index = glib.get_localised_network_names(new_network_name)
+    root.elements.network_selector.items = localised_network_names
+    root.elements.network_selector.selected_index = network_index
+
+    root.network_name = new_network_name
+end
+
+--------------------------------------------------------------------------------
+
+glib.handlers["network_selection_changed"] = { [events.on_gui_selection_state_changed] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
+    local network_name = glib.get_network_name(event.element.selected_index)
+
+    switch_open_network(root, network_name)
+end }
+
+glib.handlers["network_name_changed_or_confirmed"] = {}
+
+glib.handlers["network_name_changed_or_confirmed"][events.on_gui_text_changed] = function(event)
+    glib.truncate_input(event.element, 99)
+end
+
+glib.handlers["network_name_changed_or_confirmed"][events.on_gui_confirmed] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
+
+    if root.elements.create_toggle.toggled then
+        try_create_network(root)
+        root.elements.create_toggle.toggled = false
+    else
+        try_rename_network(root)
+        root.elements.rename_toggle.toggled = false
+    end
+
+    root.elements.network_selector.visible = true
+    root.elements.network_name_input.visible = false
+end
+
+glib.handlers["network_create_toggled"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
+
+    if event.element.toggled then
+        root.elements.network_selector.visible = false
+        root.elements.network_name_input.text = ""
+        root.elements.network_name_input.visible = true
+        root.elements.network_name_input.focus()
+    else
+        try_create_network(root)
+        root.elements.network_selector.visible = true
+        root.elements.network_name_input.visible = false
+    end
+end }
+
+glib.handlers["network_rename_toggled"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
+
+    if event.element.toggled then
+        root.elements.network_selector.visible = false
+        root.elements.network_name_input.text = root.network_name
+        root.elements.network_name_input.visible = true
+        root.elements.network_name_input.focus()
+    else
+        try_rename_network(root)
+        root.elements.network_selector.visible = true
+        root.elements.network_name_input.visible = false
+    end
+end }
+
+glib.handlers["network_delete"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
+
+    local old_network_name = root.network_name
+    local network = root.network
+
+    for hauler_id, hauler in pairs(storage.haulers) do
+        if hauler.network == old_network_name then
+            local train = hauler.train
+            hauler.status = { message = { "sspp-alert.network-deleted" } }
+            lib.show_train_alert(train, hauler.status.message)
+            train.manual_mode = true
+            storage.haulers[hauler_id] = nil
+        end
+    end
+    for item_key, _ in pairs(network.items) do
+        storage.disabled_items[old_network_name .. ":" .. item_key] = true
+    end
+    update_network_stations(old_network_name, nil)
+
+    storage.networks[old_network_name] = nil
+
+    local surface_network_name = lib.get_network_name_for_surface(game.get_player(event.player_index).surface) or "nauvis"
+
+    local localised_network_names, network_index = glib.get_localised_network_names(surface_network_name)
+    root.elements.network_selector.items = localised_network_names
+    root.elements.network_selector.selected_index = network_index
+
+    switch_open_network(root, surface_network_name)
+end }
+
+--------------------------------------------------------------------------------
+
+glib.handlers["network_close_window"] = { [events.on_gui_click] = function(event)
+    local player = game.get_player(event.player_index) --[[@as LuaPlayer]]
+    assert(player.opened.name == "sspp-network")
+
+    player.opened = nil
 end }
 
 --------------------------------------------------------------------------------
@@ -1365,25 +1582,25 @@ end }
 ---@param tab_index integer
 function gui_network.open(player_id, network_name, tab_index)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
-    local network = storage.networks[network_name]
 
     player.opened = nil
 
-    local localised_name = network_name ---@type LocalisedString
-    if network.surface.planet then
-        localised_name = network.surface.planet.prototype.localised_name
-    elseif network.surface.localised_name then
-        localised_name = network.surface.localised_name
-    end
+    local localised_network_names, network_index = glib.get_localised_network_names(network_name)
 
-    local window, elements = glib.add_element(player.gui.screen, {}, (
+    local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-network", style = "frame", direction = "vertical", children = {
             { type = "flow", style = "frame_header_flow", direction = "horizontal", drag_target = "sspp-network", children = {
-                { type = "label", style = "frame_title", caption = { "sspp-gui.network-for-surface", localised_name }, ignored_by_interaction = true },
+                { type = "label", style = "frame_title", caption = { "sspp-gui.sspp-network" }, ignored_by_interaction = true },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", ignored_by_interaction = true },
-                { type = "sprite-button", name = "import_toggle", style = "frame_action_button", sprite = "sspp-import-icon", tooltip = { "sspp-gui.import-from-string" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = "network_import_toggled" },
-                { type = "sprite-button", name = "export_toggle", style = "frame_action_button", sprite = "sspp-export-icon", tooltip = { "sspp-gui.export-to-string" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = "network_export_toggled" },
-                { type = "empty-widget", style = "empty_widget" },
+                { type = "drop-down", name = "network_selector", style = "sspp_wide_dropdown", items = localised_network_names, selected_index = network_index, handler = "network_selection_changed" },
+                { type = "textfield", name = "network_name_input", style = "sspp_wide_name_textbox", icon_selector = true, visible = false, handler = "network_name_changed_or_confirmed" },
+                { type = "sprite-button", name = "create_toggle", style = "frame_action_button", sprite = "sspp-create-icon", tooltip = { "sspp-gui.create-custom-network" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = "network_create_toggled" },
+                { type = "sprite-button", name = "rename_toggle", style = "frame_action_button", sprite = "sspp-name-icon", tooltip = { "sspp-gui.rename-custom-network" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = "network_rename_toggled" },
+                { type = "sprite-button", name = "delete_button", style = "frame_action_button", sprite = "sspp-delete-icon", tooltip = { "sspp-gui.delete-custom-network" }, mouse_button_filter = { "left" }, handler = "network_delete" },
+                { type = "empty-widget", style = "empty_widget", ignored_by_interaction = true },
+                { type = "sprite-button", name = "import_toggle", style = "frame_action_button", sprite = "sspp-import-icon", tooltip = { "sspp-gui.import-from-string" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = "network_import_open" },
+                { type = "sprite-button", name = "export_toggle", style = "frame_action_button", sprite = "sspp-export-icon", tooltip = { "sspp-gui.export-to-string" }, mouse_button_filter = { "left" }, auto_toggle = true, handler = "network_export_open" },
+                { type = "empty-widget", style = "empty_widget", ignored_by_interaction = true },
                 { type = "sprite-button", style = "close_button", sprite = "utility/close", mouse_button_filter = { "left" }, handler = "network_close_window" },
             } },
             { type = "flow", style = "inset_frame_container_horizontal_flow", direction = "horizontal", children = {
@@ -1464,36 +1681,29 @@ function gui_network.open(player_id, network_name, tab_index)
                 } },
             } },
         } }
-    )) ---@cast elements -nil
+    ) ---@cast elements -nil
 
     elements.tabbed_pane.selected_tab_index = tab_index
     window.force_auto_center()
 
-    ---@type PlayerGui.Network
-    local player_gui = {
-        type = "NETWORK", network = network_name, elements = elements,
-        class_context = nil, item_context = nil, job_context = nil, ---@diagnostic disable-line: assign-type-mismatch
+    ---@type GuiRoot.Network
+    local root = {
+        type = "NETWORK", elements = elements,
+        network_name = nil, network = nil, class_context = nil, item_context = nil, job_context = nil, ---@diagnostic disable-line: assign-type-mismatch
     }
 
-    storage.player_guis[player_id] = player_gui
+    switch_open_network(root, network_name)
 
-    player_gui.class_context = { root = player_gui, table = elements.class_table }
-    player_gui.item_context = { root = player_gui, table = elements.item_table }
-    player_gui.job_context = { root = player_gui, table = elements.job_table }
-
-    glib.table_initialise(class_methods, player_gui.class_context, network.classes, nil, nil)
-    glib.table_initialise(item_methods, player_gui.item_context, network.items, nil, nil)
-    glib.table_initialise(job_methods, player_gui.job_context, network.jobs, true, 100)
-
+    storage.player_guis[player_id] = root
     player.opened = window
 end
 
 ---@param player_id PlayerId
 function gui_network.close(player_id)
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Network]]
+    local root = storage.player_guis[player_id] --[[@as GuiRoot.Network]]
 
-    player_gui.elements["sspp-network"].destroy()
-    if player_gui.popup_elements then player_gui.popup_elements["sspp-popup"].destroy() end
+    root.elements["sspp-network"].destroy()
+    if root.child then glib.destroy_child_window(root) end
 
     storage.player_guis[player_id] = nil
 end

@@ -197,13 +197,30 @@ local migrations = {
                 for item_key, _ in pairs(station.provide.items) do
                     local _, quality = string.match(item_key, "(.-):(.+)")
                     if not quality then
-                        lib.write_stop_flag(station.stop, enums.stop_flags.inactivity, true)
+                        local cb = station.stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+                        local condition = cb.logistic_condition
+                        condition.constant = bit32.bor(condition.constant or 0, enums.stop_flags.inactivity)
+                        cb.logistic_condition = condition
                     end
                 end
             end
         end
     end,
     ["0.4.6"] = function()
+        for _, station in pairs(storage.stations) do
+            if not station.unit_numbers then
+                station.stop = lib.read_stop_settings(station.stop)
+                station.general = lib.read_general_settings(station.general_io)
+                station.unit_numbers = {}
+                station.unit_numbers[station.stop.entity.unit_number] = true
+                station.unit_numbers[station.general.comb.unit_number] = true
+                if station.provide then station.unit_numbers[station.provide.comb.unit_number] = true end
+                if station.request then station.unit_numbers[station.request.comb.unit_number] = true end
+                station.general_io = nil
+                lib.write_stop_settings(station.stop)
+                lib.write_general_settings(station.general)
+            end
+        end
         for network_name, network in pairs(storage.networks) do
             if network.surface and network.surface.name ~= lib.get_network_name_for_surface(network.surface) then
                 storage.networks[network_name] = nil

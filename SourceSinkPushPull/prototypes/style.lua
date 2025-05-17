@@ -10,6 +10,34 @@ styles.sspp_stretchable_subheader_frame = { ---@type data.FrameStyleSpecificatio
     horizontally_stretchable = "on",
 }
 
+styles.sspp_hauler_frame = { ---@type data.FrameStyleSpecification
+    type = "frame_style",
+    parent = "frame",
+    width = 244,
+    height = 108,
+    padding = 4,
+}
+
+styles.sspp_thin_shallow_frame = { ---@type data.FrameStyleSpecification
+    type = "frame_style",
+    parent = "shallow_frame",
+    vertical_flow_style = {
+        type = "vertical_flow_style",
+        vertical_spacing = 8,
+    },
+    horizontal_flow_style = {
+        type = "horizontal_flow_style",
+        horizontal_spacing = 8,
+    },
+}
+
+styles.sspp_dimmer_frame = { ---@type data.FrameStyleSpecification
+    type = "frame_style",
+    graphical_set = { position = { 8, 8 }, size = 1, opacity = 0.6 },
+}
+
+--------------------------------------------------------------------------------
+
 styles.sspp_subheader_caption_textbox = { ---@type data.TextBoxStyleSpecification
     type = "textbox_style",
     parent = "textbox",
@@ -71,19 +99,6 @@ styles.sspp_right_grid_scroll_pane = { ---@type data.ScrollPaneStyleSpecificatio
     type = "scroll_pane_style",
     parent = "sspp_right_flat_scroll_pane",
     background_graphical_set = deep_slot_background_tiling(144, 144),
-}
-
-styles.sspp_thin_shallow_frame = { ---@type data.FrameStyleSpecification
-    type = "frame_style",
-    parent = "shallow_frame",
-    vertical_flow_style = {
-        type = "vertical_flow_style",
-        vertical_spacing = 8,
-    },
-    horizontal_flow_style = {
-        type = "horizontal_flow_style",
-        horizontal_spacing = 8,
-    },
 }
 
 --------------------------------------------------------------------------------
@@ -364,6 +379,26 @@ styles.sspp_number_textbox = { ---@type data.TextBoxStyleSpecification
     horizontal_align = "right",
 }
 
+styles.sspp_wide_dropdown = { ---@type data.DropDownStyleSpecification
+    type = "dropdown_style",
+    parent = "dropdown",
+    top_padding = 0,
+    bottom_padding = 0,
+    left_padding = 3,
+    right_padding = 2,
+    width = 120,
+    list_box_style = {
+        type = "list_box_style",
+        item_style = {
+            type = "button_style",
+            parent = "list_box_item",
+            left_padding = 3,
+            right_padding = 2,
+        },
+        scroll_pane_style = styles.dropdown.list_box_style.scroll_pane_style,
+    },
+}
+
 styles.sspp_wide_name_textbox = { ---@type data.TextBoxStyleSpecification
     type = "textbox_style",
     parent = "textbox",
@@ -455,12 +490,4 @@ styles.sspp_frame_tool_button = { ---@type data.ButtonStyleSpecification
     height = 24,
     right_padding = 6,
     left_padding = 6,
-}
-
-styles.sspp_hauler_frame = { ---@type data.FrameStyleSpecification
-    type = "frame_style",
-    parent = "frame",
-    width = 244,
-    height = 108,
-    padding = 4,
 }

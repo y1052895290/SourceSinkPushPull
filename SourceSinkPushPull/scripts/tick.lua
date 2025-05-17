@@ -7,7 +7,7 @@ local gui = require("__SourceSinkPushPull__.scripts.gui")
 local main = require("__SourceSinkPushPull__.scripts.main")
 local enums = require("__SourceSinkPushPull__.scripts.enums")
 
-local e_train_colors, e_stop_flags = enums.train_colors, enums.stop_flags
+local e_train_colors = enums.train_colors
 
 local s_match = string.match
 local m_random, m_min, m_max, m_floor = math.random, math.min, math.max, math.floor
@@ -16,8 +16,7 @@ local len_or_zero, enumerate_spoil_results = lib.len_or_zero, lib.enumerate_spoi
 local list_create_or_append, list_create_or_extend = lib.list_create_or_append, lib.list_create_or_extend
 local list_destroy_or_remove, list_remove_all = lib.list_destroy_or_remove, lib.list_remove_all
 local compute_storage_needed, compute_buffer = lib.compute_storage_needed, lib.compute_buffer
-local read_stop_flag, get_train_item_count = lib.read_stop_flag, lib.get_train_item_count
-local send_train_to_station, assign_job_index = lib.send_train_to_station, lib.assign_job_index
+local get_train_item_count, send_train_to_station, assign_job_index = lib.get_train_item_count, lib.send_train_to_station, lib.assign_job_index
 
 local send_hauler_to_fuel_or_depot = main.hauler.send_to_fuel_or_depot
 
@@ -230,13 +229,15 @@ local function tick_poll()
     end
 
     local station = storage.stations[station_id]
-    local network = storage.networks[station.network]
+    local stop, general, provide, request = station.stop, station.general, station.provide, station.request
 
+    local network = storage.networks[general.network]
     local network_items, network_classes = network.items, network.classes
 
-    local stop = station.stop
-    local enabled = not read_stop_flag(stop, e_stop_flags.disable)
-    local buffered = not read_stop_flag(stop, e_stop_flags.bufferless)
+    local enabled = not stop.disabled
+    local buffered = not stop.bufferless
+
+    local trains_limit = stop.entity.trains_limit
 
     -- check the active hauler if we have one, then create a done ticket
 
@@ -272,14 +273,12 @@ local function tick_poll()
 
     -- poll counts and modes, then create supply (provide/request) and demand (push/pull) tickets
 
-    local provide, request = station.provide, station.request
-
     if provide then
         local provide_items, provide_deliveries = provide.items, provide.deliveries
 
         local provide_counts ---@type {[ItemKey]: integer}
         if buffered then
-            provide_counts = poll_item_counts_buffered(network_items, provide_items, station.general_io)
+            provide_counts = poll_item_counts_buffered(network_items, provide_items, general.comb)
         else
             provide_counts = poll_item_counts_bufferless(network_items, provide_items, provide_deliveries)
         end
@@ -325,7 +324,7 @@ local function tick_poll()
                             end
                         end
                     else
-                        local want_deliveries = stop.trains_limit - station.total_deliveries
+                        local want_deliveries = trains_limit - station.total_deliveries
                         if want_deliveries > 0 then
                             list_create_or_extend(network.buffer_tickets, item_key, station_id, want_deliveries)
                         end
@@ -342,9 +341,9 @@ local function tick_poll()
 
         local request_counts ---@type {[ItemKey]: integer}
         if buffered then
-            request_counts = poll_item_counts_buffered(network_items, request_items, station.general_io, true)
+            request_counts = poll_item_counts_buffered(network_items, request_items, general.comb, true)
         else
-            request_counts = poll_item_counts_bufferless(network_items, request_items, request_deliveries, stop.trains_limit)
+            request_counts = poll_item_counts_bufferless(network_items, request_items, request_deliveries, trains_limit)
         end
         local request_modes = poll_item_modes(network_items, request_items, request.comb)
 
@@ -381,7 +380,7 @@ local function tick_poll()
                             end
                         end
                     else
-                        local want_deliveries = stop.trains_limit - station.total_deliveries
+                        local want_deliveries = trains_limit - station.total_deliveries
                         if want_deliveries > 0 then
                             if mode > 3 then
                                 list_create_or_extend(network.pull_tickets, item_key, station_id, want_deliveries)
@@ -528,7 +527,7 @@ end
 ---@param item_key ItemKey
 ---@return ItemMode, number
 local function get_done_mode_and_score(station, item_key)
-    local limit = station.stop.trains_limit
+    local limit = station.stop.entity.trains_limit
     local score = 1.0 - (limit - station.total_deliveries) / limit -- fullness
     return 1, score -- mode is not relevant here
 end
@@ -537,7 +536,7 @@ end
 ---@param item_key ItemKey
 ---@return ItemMode, number
 local function get_request_mode_and_score(station, item_key)
-    local limit = station.stop.trains_limit
+    local limit = station.stop.entity.trains_limit
     local score = (limit - station.total_deliveries) / limit -- emptyness
     return station.request.modes[item_key], score
 end
@@ -547,10 +546,9 @@ end
 ---@return ItemMode, number
 local function get_provide_mode_and_score(station, item_key)
     local stop = station.stop
-    local limit = stop.trains_limit
+    local limit = stop.entity.trains_limit
     local score = (limit - station.total_deliveries) / limit -- emptyness
-    -- TODO: this is a significant bottleneck! stations should cache their flags
-    if read_stop_flag(stop, e_stop_flags.bufferless) then score = 1.0 - score end -- fullness
+    if stop.bufferless then score = 1.0 - score end -- fullness
     return station.provide.modes[item_key], score
 end
 
@@ -558,7 +556,7 @@ end
 ---@param item_key ItemKey
 ---@return ItemMode, number
 local function get_buffer_mode_and_score(station, item_key)
-    local limit = station.stop.trains_limit
+    local limit = station.stop.entity.trains_limit
     local score = (limit - station.total_deliveries) / limit -- emptyness
     return station.provide.modes[item_key], score
 end
@@ -668,7 +666,7 @@ local function tick_liquidate()
     list_create_or_append(request_station.request.deliveries, item_key, hauler_id)
     request_station.total_deliveries = request_station.total_deliveries + 1
 
-    local request_stop = request_station.stop
+    local request_stop = request_station.stop.entity
     send_train_to_station(hauler.train, e_train_colors.request, request_stop)
 
     assign_job_index(network, hauler, { type = "DROPOFF", hauler = hauler_id, start_tick = game.tick, item = item_key, request_stop = request_stop })
@@ -720,7 +718,7 @@ local function tick_provide_done()
     local hauler_id = provide_station.hauler --[[@as HaulerId]]
     local hauler = storage.haulers[hauler_id]
 
-    local bufferless = read_stop_flag(provide_station.stop, e_stop_flags.bufferless)
+    local bufferless = provide_station.stop.bufferless
 
     if bufferless then
         list_destroy_or_remove(network.buffer_haulers, item_key, hauler_id)
@@ -736,7 +734,7 @@ local function tick_provide_done()
     list_create_or_append(request_station.request.deliveries, item_key, hauler_id)
     request_station.total_deliveries = request_station.total_deliveries + 1
 
-    local request_stop = request_station.stop
+    local request_stop = request_station.stop.entity
     send_train_to_station(hauler.train, e_train_colors.request, request_stop)
 
     if bufferless then
@@ -804,7 +802,7 @@ local function tick_dispatch()
     end
     local provide_station = storage.stations[provide_station_id]
 
-    if read_stop_flag(provide_station.stop, e_stop_flags.bufferless) then
+    if provide_station.stop.bufferless then
         provide_station.bufferless_dispatch = true -- create a provide_done ticket in the next cycle
         return false
     end
@@ -823,7 +821,7 @@ local function tick_dispatch()
     list_create_or_append(provide_station.provide.deliveries, item_key, hauler_id)
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
-    local provide_stop = provide_station.stop
+    local provide_stop = provide_station.stop.entity
     send_train_to_station(hauler.train, e_train_colors.provide, provide_stop)
 
     assign_job_index(network, hauler, { type = "COMBINED", hauler = hauler_id, start_tick = game.tick, item = item_key, provide_stop = provide_stop })
@@ -873,7 +871,7 @@ local function tick_buffer()
     list_create_or_append(provide_station.provide.deliveries, item_key, hauler_id)
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
-    local provide_stop = provide_station.stop
+    local provide_stop = provide_station.stop.entity
     send_train_to_station(hauler.train, e_train_colors.provide, provide_stop)
 
     assign_job_index(network, hauler, { type = "PICKUP", hauler = hauler_id, start_tick = game.tick, item = item_key, provide_stop = provide_stop })

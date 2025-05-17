@@ -1,5 +1,7 @@
 -- SSPP by jagoly
 
+local lib = require("__SourceSinkPushPull__.scripts.lib")
+
 ---@class sspp.glib
 local glib = {}
 
@@ -721,6 +723,42 @@ end
 
 --------------------------------------------------------------------------------
 
+---@param parent GuiRoot|GuiChild
+---@param parent_size int[]
+---@param dimmer_handler string
+---@param def GuiElementDef
+function glib.create_child_window(parent, parent_size, dimmer_handler, def)
+    assert(not parent.child)
+
+    local _, parent_window = next(parent.elements) ---@cast parent_window -nil
+    local screen = parent_window.gui.screen
+
+    local dimmer = screen.add({type = "frame", style = "sspp_dimmer_frame", tags = format_handler(dimmer_handler)})
+    dimmer.style.size = parent_size
+    dimmer.location = parent_window.location
+    dimmer.bring_to_front()
+
+    local window, elements = add_element(screen, {}, def) ---@cast elements -nil
+    window.force_auto_center()
+    window.bring_to_front()
+
+    parent.child = { dimmer = dimmer, elements = elements }
+end
+
+---@param parent GuiRoot|GuiChild
+function glib.destroy_child_window(parent)
+    local child = parent.child ---@cast child -nil
+    assert(not child.child)
+
+    local _, window = next(child.elements) ---@cast window -nil
+    window.destroy()
+    child.dimmer.destroy()
+
+    parent.child = nil
+end
+
+--------------------------------------------------------------------------------
+
 glib.handlers["lib_open_parent_entity"] = { [defines.events.on_gui_click] = function(event)
     local entity = event.element.parent.entity
     if entity and entity.valid then
@@ -750,6 +788,83 @@ function glib.acquire_next_minimap(grid_table, grid_children, old_length, new_le
     local minimap_children = minimap.children
 
     return minimap, minimap_children[2], minimap_children[3]
+end
+
+--------------------------------------------------------------------------------
+
+---@param active_network_name NetworkName
+---@param surface LuaSurface?
+---@return LocalisedString[] localised_network_names, integer active_network_index
+function glib.get_localised_network_names(active_network_name, surface)
+    local localised_network_names = {} ---@type LocalisedString[]
+    local network_count, network_index = 0, 0
+
+    if surface then
+        local network_name = lib.get_network_name_for_surface(surface)
+        if network_name then
+            network_count = network_count + 1
+            if surface.planet then
+                localised_network_names[network_count] = surface.planet.prototype.localised_name
+            else
+                localised_network_names[network_count] = surface.localised_name or network_name
+            end
+            if network_name == active_network_name then network_index = network_count end
+        end
+    else
+        for network_name, network in pairs(storage.networks) do
+            local network_surface = network.surface
+            if network_surface then
+                network_count = network_count + 1
+                if network_surface.planet then
+                    localised_network_names[network_count] = network_surface.planet.prototype.localised_name
+                else
+                    localised_network_names[network_count] = network_surface.localised_name or network_name
+                end
+                if network_name == active_network_name then network_index = network_count end
+            end
+        end
+    end
+
+    for network_name, network in pairs(storage.networks) do
+        if not network.surface then
+            network_count = network_count + 1
+            localised_network_names[network_count] = network_name
+            if network_name == active_network_name then network_index = network_count end
+        end
+    end
+
+    return localised_network_names, network_index
+end
+
+---@param active_network_index integer
+---@param surface LuaSurface?
+---@return NetworkName network_name
+function glib.get_network_name(active_network_index, surface)
+    local network_count = 0
+
+    if surface then
+        local network_name = lib.get_network_name_for_surface(surface)
+        if network_name then
+            network_count = network_count + 1
+            if network_count == active_network_index then return network_name end
+        end
+    else
+        for network_name, network in pairs(storage.networks) do
+            if network.surface then
+                network_count = network_count + 1
+                if network_count == active_network_index then return network_name end
+            end
+        end
+    end
+
+    for network_name, network in pairs(storage.networks) do
+        if not network.surface then
+            network_count = network_count + 1
+            if network_count == active_network_index then return network_name end
+        end
+    end
+
+    error()
 end
 
 --------------------------------------------------------------------------------

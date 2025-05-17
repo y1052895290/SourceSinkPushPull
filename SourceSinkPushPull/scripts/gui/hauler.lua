@@ -12,157 +12,136 @@ local gui_hauler = {}
 
 --------------------------------------------------------------------------------
 
----@param player_gui PlayerGui.Hauler
-function gui_hauler.on_status_changed(player_gui)
-    local elements = player_gui.elements
-    local status = storage.haulers[player_gui.train_id].status
+---@param network Network
+---@param active_class_index integer
+---@return ClassName class_name
+local function get_class_name(network, active_class_index)
+    local class_count = 0
 
-    elements.status_label.caption = status.message
-    if status.item then
-        local name, quality = lib.split_item_key(status.item)
-        if quality then
-            elements.item_button.elem_value = { name = name, quality = quality, type = "item" }
-        else
-            elements.item_button.elem_value = { name = name, type = "fluid" }
-        end
-    else
-        elements.item_button.elem_value = nil
+    for class_name, class in pairs(network.classes) do
+        class_count = class_count + 1
+        if class_count == active_class_index then return class_name end
     end
-    elements.stop_button.enabled = status.stop ~= nil
+
+    error()
 end
 
----@param player_gui PlayerGui.Hauler
-function gui_hauler.on_manual_mode_changed(player_gui)
-    player_gui.elements.class_textbox.enabled = player_gui.train.manual_mode
-    player_gui.elements.class_auto_assign_button.enabled = player_gui.train.manual_mode
+---@param network Network
+---@param active_class_name ClassName
+---@return ClassName[] class_names, integer active_class_index
+local function get_class_names(network, active_class_name)
+    local class_names = {} ---@type ClassName[]
+    local class_count, class_index = 0, 0
+
+    for class_name, class in pairs(network.classes) do
+        class_count = class_count + 1
+        class_names[class_count] = class_name
+        if class_name == active_class_name then class_index = class_count end
+    end
+
+    return class_names, class_index
 end
 
 --------------------------------------------------------------------------------
 
+---@param root GuiRoot.Hauler
+local function clear_status_widgets(root)
+    local elements = root.elements
+    elements.status_message_label.caption = { "sspp-gui.not-configured" }
+    elements.status_stop_button.visible = false
+    elements.status_item_button.elem_value = nil
+end
+
+---@param root GuiRoot.Hauler
+function gui_hauler.on_status_changed(root)
+    local elements = root.elements
+    local status = storage.haulers[root.train_id].status
+
+    elements.status_message_label.caption = status.message
+    elements.status_stop_button.visible = status.stop ~= nil
+    if status.item then
+        local name, quality = lib.split_item_key(status.item)
+        if quality then
+            elements.status_item_button.elem_value = { name = name, quality = quality, type = "item" }
+        else
+            elements.status_item_button.elem_value = { name = name, type = "fluid" }
+        end
+    else
+        elements.status_item_button.elem_value = nil
+    end
+end
+
+---@param root GuiRoot.Hauler
+function gui_hauler.on_manual_mode_changed(root)
+    root.elements.network_selector.enabled = root.train.manual_mode
+    root.elements.class_selector.enabled = root.train.manual_mode
+    root.elements.class_clear_button.enabled = root.train.manual_mode and root.elements.class_selector.selected_index > 0
+end
+
+--------------------------------------------------------------------------------
+
+glib.handlers["hauler_network_selection_changed"] = { [events.on_gui_selection_state_changed] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Hauler]]
+
+    local network_name = glib.get_network_name(event.element.selected_index, root.train.front_stock.surface)
+    local network = storage.networks[network_name]
+
+    local class_names, class_index = get_class_names(network, "")
+    root.elements.class_selector.items = class_names
+    root.elements.class_selector.selected_index = class_index
+
+    if storage.haulers[root.train_id] then
+        clear_status_widgets(root)
+        storage.haulers[root.train_id] = nil
+    end
+
+    root.elements.open_network_button.enabled = true
+end }
+
+glib.handlers["hauler_class_selection_changed"] = { [events.on_gui_selection_state_changed] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Hauler]]
+
+    local network_name = glib.get_network_name(root.elements.network_selector.selected_index, root.train.front_stock.surface)
+    local network = storage.networks[network_name]
+
+    local class_name = get_class_name(network, root.elements.class_selector.selected_index)
+
+    local hauler = storage.haulers[root.train_id]
+    if hauler then
+        hauler.class = class_name
+        hauler.status = { message = { "sspp-gui.not-configured" } }
+    else
+        storage.haulers[root.train_id] = { train = root.train, network = network_name, class = class_name, status = { message = { "sspp-gui.not-configured" } } }
+        root.elements.class_clear_button.enabled = true
+    end
+
+    gui_hauler.on_status_changed(root)
+end }
+
+glib.handlers["hauler_class_clear"] = { [events.on_gui_click] = function(event)
+    local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Hauler]]
+
+    root.elements.class_selector.selected_index = 0
+    root.elements.class_clear_button.enabled = false
+
+    clear_status_widgets(root)
+    storage.haulers[root.train_id] = nil
+end }
+
 glib.handlers["hauler_open_network"] = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
-    local network_name = storage.player_guis[player_id].network
+    local root = storage.player_guis[player_id] --[[@as GuiRoot.Hauler]]
 
+    local network_name = glib.get_network_name(root.elements.network_selector.selected_index, root.train.front_stock.surface)
     gui_network.open(player_id, network_name, 1)
 end }
 
 glib.handlers["hauler_view_on_map"] = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
-    local player_gui = storage.player_guis[player_id] --[[@as PlayerGui.Hauler]]
+    local root = storage.player_guis[player_id] --[[@as GuiRoot.Hauler]]
 
-    local hauler = storage.haulers[player_gui.train_id]
-    if hauler and hauler.status.stop and hauler.status.stop.valid then
-        game.get_player(player_id).centered_on = hauler.status.stop
-    end
-end }
-
-glib.handlers["hauler_class_changed"] = { [events.on_gui_text_changed] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Hauler]]
-    local train_id, train = player_gui.train_id, player_gui.train
-
-    -- disabling textboxes doesn't disable the icon selector, so hope that the user doesn't do that
-    -- assert(train.manual_mode, "class name changed when not manual")
-    -- update: a user did this, guess I should handle it properly until the api bug gets fixed
-    if not train.manual_mode then
-        local hauler = storage.haulers[train_id]
-        event.element.text = hauler and hauler.class or ""
-        return
-    end
-
-    local class_name = glib.truncate_input(event.element, 199)
-
-    local hauler = storage.haulers[train_id]
-    if hauler then
-        if class_name ~= "" then
-            hauler.class = class_name
-        else
-            storage.haulers[train_id] = nil
-        end
-    elseif class_name ~= "" then
-        storage.haulers[train_id] = {
-            train = train,
-            network = player_gui.network,
-            class = class_name,
-            status = { message = { "sspp-gui.not-configured" } },
-        }
-    end
-end }
-
----@param carriage LuaEntity
-local function map_carriage_name(carriage)
-    -- TODO: Adjust names of carriages that should be treated as identical. For example, the
-    -- locomotives from Multiple Unit Train Control should map to the same strings as the
-    -- entities that they are derived from.
-    return carriage.name
-end
-
-glib.handlers["hauler_class_auto_assign"] = { [events.on_gui_click] = function(event)
-    local player_gui = storage.player_guis[event.player_index] --[[@as PlayerGui.Hauler]]
-    local network_name = player_gui.network
-    local train_id, train = player_gui.train_id, player_gui.train
-
-    local train_carriage_names, train_length = {}, 0 ---@type string[], integer
-    for _, carriage in pairs(train.carriages) do
-        train_length = train_length + 1
-        train_carriage_names[train_length] = map_carriage_name(carriage)
-    end
-
-    local matching_class ---@type ClassName?
-    local classes_with_haulers = {} ---@type {[ClassName]: true?}
-
-    -- first, try to find a class that already has an identical train
-    for hauler_id, hauler in pairs(storage.haulers) do
-        if hauler.network == network_name and hauler_id ~= train_id then
-            local class_name = hauler.class
-            if class_name == matching_class then goto continue end
-
-            local carriages = hauler.train.carriages
-            local length = #carriages
-
-            if length == train_length then
-                for i = 1, length do
-                    if map_carriage_name(carriages[i]) ~= train_carriage_names[i] then goto continue end
-                end
-                if matching_class then
-                    lib.show_train_alert(train, { "sspp-alert.auto-assign-multiple-classes" })
-                    return
-                end
-                matching_class = class_name
-            end
-
-            classes_with_haulers[class_name] = true
-        end
-
-        ::continue::
-    end
-
-    -- second, try to find a newly added class with no trains
-    if not matching_class then
-        for class_name, _ in pairs(storage.networks[network_name].classes) do
-            if not classes_with_haulers[class_name] then
-                if matching_class then
-                    lib.show_train_alert(train, { "sspp-alert.auto-assign-multiple-classes" })
-                    return
-                end
-                matching_class = class_name
-            end
-        end
-    end
-
-    if not matching_class then
-        lib.show_train_alert(train, { "sspp-alert.auto-assign-no-class" })
-        return
-    end
-
-    storage.haulers[train_id] = {
-        train = train,
-        network = network_name,
-        class = matching_class,
-        status = { message = { "sspp-gui.not-configured" } },
-    }
-    player_gui.elements.class_textbox.text = matching_class
-
-    train.manual_mode = false
+    local hauler = storage.haulers[root.train_id]
+    if hauler and hauler.status.stop and hauler.status.stop.valid then game.get_player(player_id).centered_on = hauler.status.stop end
 end }
 
 --------------------------------------------------------------------------------
@@ -172,32 +151,42 @@ end }
 function gui_hauler.open(player_id, train)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
 
-    local network_name = train.front_stock.surface.name
+    -- mods assigning player.opened to another locomotive won't generate a close event
+    if player.gui.screen["sspp-hauler"] then gui_hauler.close(player_id) end
+
+    local hauler = storage.haulers[train.id]
+    local surface = train.front_stock.surface
     local manual_mode = train.manual_mode
 
-    -- mods assigning player.opened to another locomotive won't generate a close event
-    if player.gui.screen["sspp-hauler"] then
-        gui_hauler.close(player_id)
+    local network_name = hauler and hauler.network or lib.get_network_name_for_surface(surface)
+    local localised_network_names, network_index = glib.get_localised_network_names(network_name or "", surface)
+
+    local class_names, class_index
+    if network_name then
+        class_names, class_index = get_class_names(storage.networks[network_name], hauler and hauler.class or "")
+    else
+        class_names, class_index = {}, 0
     end
 
     local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-hauler", style = "sspp_hauler_frame", direction = "vertical", children = {
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
-                { type = "label", style = "frame_title", caption = { "sspp-gui.sspp" } },
+                { type = "label", style = "bold_label", caption = { "sspp-gui.network" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "button", style = "sspp_frame_tool_button", caption = { "sspp-gui.network" }, tooltip = { "shortcut-name.sspp" }, mouse_button_filter = { "left" }, handler = "hauler_open_network" },
-            } },
-            { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
-                { type = "label", name = "status_label", style = "label" },
-                { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "choose-elem-button", name = "item_button", style = "sspp_compact_slot_button", elem_type = "signal", elem_mods = { locked = true } },
-                { type = "sprite-button", name = "stop_button", style = "sspp_compact_slot_button", sprite = "item/sspp-stop", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = "hauler_view_on_map" },
+                { type = "drop-down", name = "network_selector", style = "sspp_wide_dropdown", items = localised_network_names, selected_index = network_index, enabled = manual_mode, handler = "hauler_network_selection_changed" },
+                { type = "sprite-button", name = "open_network_button", style = "sspp_compact_sprite_button", sprite = "sspp-network-icon", tooltip = { "sspp-gui.open-network" }, mouse_button_filter = { "left" }, enabled = network_name ~= nil, handler = "hauler_open_network" },
             } },
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = { "sspp-gui.class" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
-                { type = "textfield", name = "class_textbox", style = "sspp_wide_name_textbox", icon_selector = true, enabled = manual_mode, handler = "hauler_class_changed" },
-                { type = "sprite-button", name = "class_auto_assign_button", style = "sspp_compact_slot_button", sprite = "sspp-refresh-icon", tooltip = { "sspp-gui.hauler-auto-assign-tooltip" }, mouse_button_filter = { "left" }, enabled = manual_mode, handler = "hauler_class_auto_assign" },
+                { type = "drop-down", name = "class_selector", style = "sspp_wide_dropdown", items = class_names, selected_index = class_index, enabled = manual_mode, handler = "hauler_class_selection_changed" },
+                { type = "sprite-button", name = "class_clear_button", style = "sspp_compact_sprite_button", sprite = "sspp-reset-icon", tooltip = { "sspp-gui.remove-from-class" }, mouse_button_filter = { "left" }, enabled = manual_mode and class_index > 0, handler = "hauler_class_clear" },
+            } },
+            { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
+                { type = "label", name = "status_message_label", style = "label" },
+                { type = "empty-widget", style = "flib_horizontal_pusher" },
+                { type = "sprite-button", name = "status_stop_button", style = "sspp_compact_slot_button", sprite = "item/sspp-stop", tooltip = { "sspp-gui.view-on-map" }, mouse_button_filter = { "left" }, handler = "hauler_view_on_map" },
+                { type = "choose-elem-button", name = "status_item_button", style = "sspp_compact_slot_button", elem_type = "signal", elem_mods = { locked = true } },
             } },
         } }
     ) ---@cast elements -nil
@@ -205,17 +194,16 @@ function gui_hauler.open(player_id, train)
     local resolution, scale = player.display_resolution, player.display_scale
     window.location = { x = resolution.width - (244 + 12) * scale, y = resolution.height - (108 + 12) * scale }
 
-    local player_gui = { type = "HAULER", network = network_name, elements = elements, train_id = train.id, train = train } ---@type PlayerGui.Hauler
-    storage.player_guis[player_id] = player_gui
+    ---@type GuiRoot.Hauler
+    local root = { type = "HAULER", elements = elements, train_id = train.id, train = train }
 
-    local hauler = storage.haulers[train.id]
     if hauler then
-        elements.class_textbox.text = hauler.class
-        gui_hauler.on_status_changed(player_gui)
+        gui_hauler.on_status_changed(root)
     else
-        elements.status_label.caption = { "sspp-gui.not-configured" }
-        elements.stop_button.enabled = false
+        clear_status_widgets(root)
     end
+
+    storage.player_guis[player_id] = root
 end
 
 ---@param player_id PlayerId

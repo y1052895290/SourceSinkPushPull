@@ -72,7 +72,7 @@ end
 function gui.on_job_created(network_name)
     for _, player_gui in pairs(storage.player_guis) do
         if player_gui.type == "NETWORK" then
-            if player_gui.network == network_name then
+            if player_gui.network_name == network_name then
                 gui_network.on_job_created(player_gui)
             end
         end
@@ -84,7 +84,7 @@ end
 function gui.on_job_removed(network_name, job_index)
     for _, player_gui in pairs(storage.player_guis) do
         if player_gui.type == "NETWORK" then
-            if player_gui.network == network_name then
+            if player_gui.network_name == network_name then
                 gui_network.on_job_removed(player_gui, job_index)
             end
         end
@@ -96,7 +96,7 @@ end
 function gui.on_job_updated(network_name, job_index)
     for _, player_gui in pairs(storage.player_guis) do
         if player_gui.type == "NETWORK" then
-            if player_gui.network == network_name then
+            if player_gui.network_name == network_name then
                 gui_network.on_job_updated(player_gui, job_index)
             end
         end
@@ -131,7 +131,7 @@ end
 function gui.on_part_broken(unit_number)
     for player_id, player_gui in pairs(storage.player_guis) do
         if player_gui.type == "STATION" then
-            if player_gui.unit_number == unit_number or player_gui.parts and player_gui.parts.ids[unit_number] then
+            if player_gui.unit_number == unit_number or player_gui.ghost and player_gui.ghost.unit_numbers[unit_number] then
                 gui_station.close(player_id)
             end
         end

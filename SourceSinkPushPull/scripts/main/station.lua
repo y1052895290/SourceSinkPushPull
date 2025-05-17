@@ -2,9 +2,6 @@
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
-local enums = require("__SourceSinkPushPull__.scripts.enums")
-
-local e_stop_flags = enums.stop_flags
 
 ---@class sspp.main.station
 local main_station = {}
@@ -77,50 +74,47 @@ local function try_create_station(stop, combs)
     local request_io = combs_by_name["sspp-request-io"]
     if not (provide_io or request_io) then return end
 
-    local station = { network = stop.surface.name, stop = stop, general_io = general_io, total_deliveries = 0 } ---@type Station
+    local unit_numbers = { [stop.unit_number] = true, [general_io.unit_number] = true }
 
+    local station_stop = lib.read_station_stop_settings(stop)
+    local station_general = lib.read_station_general_settings(general_io)
+
+    local station_provide = nil
     if provide_io then
+        unit_numbers[provide_io.unit_number] = true
+
         local stop_connector = stop.get_wire_connector(defines.wire_connector_id.circuit_red, true)
         local io_connector = provide_io.get_wire_connector(defines.wire_connector_id.combinator_input_red, true)
         stop_connector.connect_to(io_connector, true)
 
-        station.provide = {
-            comb = provide_io, items = lib.combinator_description_to_provide_items(provide_io),
-            deliveries = {}, hidden_combs = {}, counts = {}, modes = {},
-        }
+        station_provide = lib.read_station_provide_settings(provide_io) ---@cast station_provide StationProvide
+        station_provide.deliveries, station_provide.hidden_combs, station_provide.counts, station_provide.modes = {}, {}, {}, {}
 
-        lib.ensure_hidden_combs(provide_io, station.provide.hidden_combs, station.provide.items)
+        lib.ensure_hidden_combs(provide_io, station_provide.hidden_combs, station_provide.items)
     end
 
+    local station_request = nil
     if request_io then
+        unit_numbers[request_io.unit_number] = true
+
         local stop_connector = stop.get_wire_connector(defines.wire_connector_id.circuit_green, true)
         local io_connector = request_io.get_wire_connector(defines.wire_connector_id.combinator_input_green, true)
         stop_connector.connect_to(io_connector, true)
 
-        station.request = {
-            comb = request_io, items = lib.combinator_description_to_request_items(request_io),
-            deliveries = {}, hidden_combs = {}, counts = {}, modes = {},
-        }
+        station_request = lib.read_station_request_settings(request_io) ---@cast station_request StationRequest
+        station_request.deliveries, station_request.hidden_combs, station_request.counts, station_request.modes = {}, {}, {}, {}
 
-        lib.ensure_hidden_combs(request_io, station.request.hidden_combs, station.request.items)
+        lib.ensure_hidden_combs(request_io, station_request.hidden_combs, station_request.items)
     end
 
-    if not lib.read_stop_flag(stop, e_stop_flags.custom_name) then
-        local provide, request = station.provide, station.request
-        stop.backer_name = lib.generate_stop_name(provide and provide.items, request and request.items)
+    if not station_stop.custom_name then
+        stop.backer_name = lib.generate_stop_name(station_provide and station_provide.items, station_request and station_request.items)
     end
 
-    storage.stations[station_id] = station
-end
-
----@param network_name NetworkName
----@param items {[ItemKey]: StationItem}
----@param deliveries {[ItemKey]: HaulerId[]}
-local function disable_items_and_haulers(network_name, items, deliveries)
-    for item_key, _ in pairs(items) do
-        storage.disabled_items[network_name .. ":" .. item_key] = true
-        lib.set_haulers_to_manual(deliveries[item_key], { "sspp-alert.station-broken" })
-    end
+    storage.stations[station_id] = {
+        stop = station_stop, general = station_general, provide = station_provide, request = station_request,
+        unit_numbers = unit_numbers, total_deliveries = 0,
+    }
 end
 
 ---@param stop LuaEntity
@@ -129,37 +123,39 @@ local function try_destroy_station(stop)
 
     local station_id = stop.unit_number --[[@as StationId]]
     local station = storage.stations[station_id]
-    if station then
-        lib.list_remove_if_exists(storage.poll_stations, station_id)
+    if not station then return end
 
-        if station.provide then
-            disable_items_and_haulers(station.network, station.provide.items, station.provide.deliveries)
-            lib.destroy_hidden_combs(station.provide.hidden_combs)
+    lib.list_remove_if_exists(storage.poll_stations, station_id)
+
+    if station.provide then
+        for item_key, _ in pairs(station.provide.items) do
+            storage.disabled_items[station.general.network .. ":" .. item_key] = true
+            lib.set_haulers_to_manual(station.provide.deliveries[item_key], { "sspp-alert.station-broken" })
         end
-
-        if station.request then
-            disable_items_and_haulers(station.network, station.request.items, station.request.deliveries)
-            lib.destroy_hidden_combs(station.request.hidden_combs)
-        end
-
-        storage.stations[station_id] = nil
+        lib.destroy_hidden_combs(station.provide.hidden_combs)
     end
 
-    if not lib.read_stop_flag(stop, e_stop_flags.custom_name) then
-        stop.backer_name = "[virtual-signal=signal-ghost]"
+    if station.request then
+        for item_key, _ in pairs(station.request.items) do
+            storage.disabled_items[station.general.network .. ":" .. item_key] = true
+            lib.set_haulers_to_manual(station.request.deliveries[item_key], { "sspp-alert.station-broken" })
+        end
+        lib.destroy_hidden_combs(station.request.hidden_combs)
     end
+
+    if not station.stop.custom_name then stop.backer_name = "[virtual-signal=signal-ghost]" end
+
+    storage.stations[station_id] = nil
 end
 
 --------------------------------------------------------------------------------
 
 ---@param stop LuaEntity
 function main_station.on_stop_built(stop)
-    if stop.trains_limit > 10 or stop.trains_limit < 1 then
-        stop.trains_limit = mod_settings.default_train_limit
-    end
-    if not lib.read_stop_flag(stop, e_stop_flags.custom_name) then
-        stop.backer_name = "[virtual-signal=signal-ghost]"
-    end
+    local station_stop = lib.read_station_stop_settings(stop)
+    lib.write_station_stop_settings(station_stop)
+    if stop.trains_limit > 10 or stop.trains_limit < 1 then stop.trains_limit = mod_settings.default_train_limit end
+    if not station_stop.custom_name then stop.backer_name = "[virtual-signal=signal-ghost]" end
 
     local stop_cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     stop_cb.read_from_train = true
@@ -188,12 +184,12 @@ function main_station.on_comb_built(comb)
     if name == "entity-ghost" then name = comb.ghost_name end
 
     if name == "sspp-general-io" then
-        comb.combinator_description = "{}" -- TODO
+        lib.write_station_general_settings(lib.read_station_general_settings(comb))
     elseif name == "sspp-provide-io" then
-        comb.combinator_description = lib.provide_items_to_combinator_description(lib.combinator_description_to_provide_items(comb))
+        lib.write_station_provide_settings(lib.read_station_provide_settings(comb))
         lib.clear_control_behavior(comb)
     elseif name == "sspp-request-io" then
-        comb.combinator_description = lib.request_items_to_combinator_description(lib.combinator_description_to_request_items(comb))
+        lib.write_station_request_settings(lib.read_station_request_settings(comb))
         lib.clear_control_behavior(comb)
     end
 
