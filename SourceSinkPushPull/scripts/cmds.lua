@@ -101,7 +101,7 @@ function cmds.sspp_update_granularity(command)
             end
             if station_updated then
                 updated_station_count = updated_station_count + 1
-                station.provide.comb.combinator_description = lib.provide_items_to_combinator_description(station.provide.items)
+                lib.write_station_provide_settings(station.provide)
             end
         end
     end
