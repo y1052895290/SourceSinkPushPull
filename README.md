@@ -1,6 +1,6 @@
 # <img src="SourceSinkPushPull/thumbnail.png" align="left" width=72px> Source-Sink-Push-Pull <br> Opinionated Logistics Train Mod
 
-Thread on the official Factorio Discord: https://discord.com/channels/139677590393716737/1329785565863874610
+[Thread on the official Factorio Discord](https://discord.com/channels/139677590393716737/1329785565863874610)
 
 A logistics train mod that aims to be as pleasant to use as possible, even when knee-deep in byproducts. Compared to similar mods, SSPP places a much greater emphasis on ease of use. The goal of SSPP is to make setting up hundreds of stations in byproduct-heavy overhauls like Py or Seablock nearly effortless. It aims to make many "advanced" use cases that require complex circuitry in other mods into reliable core features.
 
