@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.6
+Date: 2025-05-19
+  Features:
+    - You can now create additional custom networks separate from the default per-surface ones.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.5
 Date: 2025-05-07
   Features:
