@@ -280,6 +280,7 @@ function main.populate_mod_settings()
         [enums.train_colors.request] = get_rgb_setting("sspp-request-color"),
         [enums.train_colors.liquidate] = get_rgb_setting("sspp-liquidate-color"),
     }
+    mod_settings.round_to_stack_size = settings.global["sspp-round-to-stack-size"].value --[[@as boolean]]
     mod_settings.default_train_limit = settings.global["sspp-default-train-limit"].value --[[@as integer]]
     mod_settings.item_inactivity_ticks = settings.global["sspp-item-inactivity-ticks"].value --[[@as integer]]
     mod_settings.fluid_inactivity_ticks = settings.global["sspp-fluid-inactivity-ticks"].value --[[@as integer]]

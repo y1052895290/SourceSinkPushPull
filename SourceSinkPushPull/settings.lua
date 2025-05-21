@@ -49,11 +49,19 @@ data:extend({
         setting_type = "runtime-global",
         default_value = { 0, 0, 255 },
     },
+    ---@type data.ModBoolSettingPrototype
+    {
+        type = "bool-setting",
+        name = "sspp-round-to-stack-size",
+        order = "ca",
+        setting_type = "runtime-global",
+        default_value = true,
+    },
     ---@type data.ModIntSettingPrototype
     {
         type = "int-setting",
         name = "sspp-default-train-limit",
-        order = "ca",
+        order = "cb",
         setting_type = "runtime-global",
         default_value = 10,
         minimum_value = 1,
@@ -63,7 +71,7 @@ data:extend({
     {
         type = "int-setting",
         name = "sspp-item-inactivity-ticks",
-        order = "cb",
+        order = "cc",
         setting_type = "runtime-global",
         default_value = 60,
         minimum_value = 30,
@@ -73,7 +81,7 @@ data:extend({
     {
         type = "int-setting",
         name = "sspp-fluid-inactivity-ticks",
-        order = "cc",
+        order = "cd",
         setting_type = "runtime-global",
         default_value = 60,
         minimum_value = 30,

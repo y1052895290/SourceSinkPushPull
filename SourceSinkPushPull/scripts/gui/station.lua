@@ -145,6 +145,24 @@ local function set_active_mode_button(flow, mode)
     end
 end
 
+---@param storage_needed_label LuaGuiElement
+---@param threshold_label LuaGuiElement
+---@param network_item NetworkItem
+---@param station_item StationItem
+local function refresh_storage_needed_and_threshold_labels(storage_needed_label, threshold_label, network_item, station_item)
+    local quality, storage_needed = network_item.quality, lib.compute_storage_needed(network_item, station_item)
+    if quality then
+        storage_needed_label.caption = { "sspp-gui.fmt-slots", math.ceil(storage_needed / prototypes.item[network_item.name].stack_size) }
+    else
+        storage_needed_label.caption = { "sspp-gui.fmt-units", storage_needed }
+    end
+    if station_item.mode > 3 then
+        threshold_label.caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size + lib.compute_buffer(network_item, station_item) }
+    else
+        threshold_label.caption = { "sspp-gui.never" }
+    end
+end
+
 ---@generic Object
 ---@param methods GuiTableMethods
 ---@param context GuiTableContext<GuiRoot.Station, ItemKey, Object>
@@ -275,6 +293,11 @@ local provide_blank_row_defs = {
             { type = "label", style = "label" },
         } },
         { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.push-threshold" }), tooltip = { "sspp-gui.provide-push-threshold-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
             { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-surplus" }), tooltip = { "sspp-gui.provide-current-surplus-tooltip" } },
             { type = "empty-widget", style = "flib_horizontal_pusher" },
             { type = "label", style = "label" },
@@ -315,7 +338,7 @@ function provide_methods.insert_row_complete(context, row_offset, item_key, prov
         cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
         cells[3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
 
-        cells[5].children[1].children[3].caption = { quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units", lib.compute_storage_needed(network_item, provide_item) / (quality and prototypes.item[name].stack_size or 1) }
+        refresh_storage_needed_and_threshold_labels(cells[5].children[1].children[3], cells[5].children[2].children[3], network_item, provide_item)
     end
 
     return cells
@@ -396,7 +419,7 @@ function provide_methods.on_row_changed(context, cells, item_key, provide_item)
     end
 
     if network_item and provide_item then
-        cells[5].children[1].children[3].caption = { quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units", lib.compute_storage_needed(network_item, provide_item) / (quality and prototypes.item[name].stack_size or 1) }
+        refresh_storage_needed_and_threshold_labels(cells[5].children[1].children[3], cells[5].children[2].children[3], network_item, provide_item)
     else
         cells[5].children[1].children[3].caption = ""
         cells[5].children[2].children[3].caption = ""
@@ -492,6 +515,11 @@ local request_blank_row_defs = {
             { type = "label", style = "label" },
         } },
         { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
+            { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.pull-threshold" }), tooltip = { "sspp-gui.request-pull-threshold-tooltip" } },
+            { type = "empty-widget", style = "flib_horizontal_pusher" },
+            { type = "label", style = "label" },
+        } },
+        { type = "flow", style = "sspp_station_property_flow", direction = "horizontal", children = {
             { type = "label", style = "bold_label", caption = cwi({ "sspp-gui.current-deficit" }), tooltip = { "sspp-gui.request-current-deficit-tooltip" } },
             { type = "empty-widget", style = "flib_horizontal_pusher" },
             { type = "label", style = "label" },
@@ -531,7 +559,7 @@ function request_methods.insert_row_complete(context, row_offset, item_key, requ
         cells[3].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", network_item.delivery_size }
         cells[3].children[3].children[3].caption = { "sspp-gui.fmt-seconds", network_item.delivery_time }
 
-        cells[5].children[1].children[3].caption = { quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units", lib.compute_storage_needed(network_item, request_item) / (quality and prototypes.item[name].stack_size or 1) }
+        refresh_storage_needed_and_threshold_labels(cells[5].children[1].children[3], cells[5].children[2].children[3], network_item, request_item)
     end
 
     return cells
@@ -607,7 +635,7 @@ function request_methods.on_row_changed(context, cells, item_key, request_item)
     end
 
     if network_item and request_item then
-        cells[5].children[1].children[3].caption = { quality and "sspp-gui.fmt-slots" or "sspp-gui.fmt-units", lib.compute_storage_needed(network_item, request_item) / (quality and prototypes.item[name].stack_size or 1) }
+        refresh_storage_needed_and_threshold_labels(cells[5].children[1].children[3], cells[5].children[2].children[3], network_item, request_item)
     else
         cells[5].children[1].children[3].caption = ""
         cells[5].children[2].children[3].caption = ""
@@ -740,7 +768,7 @@ function gui_station.on_poll_finished(root)
             local provide_count = provide.counts[item_key]
             if provide_count then
                 local _, quality = split_item_key(item_key)
-                cells[5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", provide_count }
+                cells[5].children[3].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", provide_count }
             end
         end
 
@@ -781,7 +809,7 @@ function gui_station.on_poll_finished(root)
             local request_count = request.counts[item_key]
             if request_count then
                 local _, quality = split_item_key(item_key)
-                cells[5].children[2].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", request_count }
+                cells[5].children[3].children[3].caption = { quality and "sspp-gui.fmt-items" or "sspp-gui.fmt-units", request_count }
             end
         end
 

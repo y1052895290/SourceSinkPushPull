@@ -455,22 +455,37 @@ styles.sspp_minimap_button = { ---@type data.ButtonStyleSpecification
     default_graphical_set = {},
 }
 
-styles.sspp_minimap_top_label = { ---@type data.LabelStyleSpecification
-    type = "label_style",
-    parent = "semibold_label",
+styles.sspp_minimap_top_left_flow = { ---@type data.VerticalFlowStyleSpecification
+    type = "vertical_flow_style",
+    vertical_spacing = 0,
     size = 128,
-    padding = 4,
     horizontal_align = "left",
     vertical_align = "top",
 }
 
-styles.sspp_minimap_bottom_label = { ---@type data.LabelStyleSpecification
-    type = "label_style",
-    parent = "semibold_label",
+styles.sspp_minimap_bottom_right_flow = { ---@type data.VerticalFlowStyleSpecification
+    type = "vertical_flow_style",
+    vertical_spacing = 0,
     size = 128,
-    padding = 4,
     horizontal_align = "right",
     vertical_align = "bottom",
+}
+
+styles.sspp_minimap_label_frame = { ---@type data.FrameStyleSpecification
+    type = "frame_style",
+    header_flow_style = {
+        type = "horizontal_flow_style",
+    },
+    title_style = {
+        type = "label_style",
+        parent = "semibold_label",
+        padding = 4,
+    },
+    use_header_filler = false,
+    padding = 0,
+    -- background_blur is buggy and uses garbage data for the vertical pass
+    -- graphical_set = { position = { 42, 8 }, size = 1, opacity = 0.2, background_blur = true, background_blur_sigma = 2.0 },
+    graphical_set = { position = { 42, 8 }, size = 1, opacity = 0.5 },
 }
 
 styles.sspp_minimap_subtitle_label = { ---@type data.LabelStyleSpecification

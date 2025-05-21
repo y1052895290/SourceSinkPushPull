@@ -778,8 +778,12 @@ function glib.acquire_next_minimap(grid_table, grid_children, old_length, new_le
         local minimap = inner_frame.add({ type = "minimap", style = "sspp_minimap", zoom = 1.0 })
 
         minimap.add({ type = "button", style = "sspp_minimap_button", tags = format_handler("lib_open_parent_entity") })
-        local top = minimap.add({ type = "label", style = "sspp_minimap_top_label", ignored_by_interaction = true })
-        local bottom = minimap.add({ type = "label", style = "sspp_minimap_bottom_label", ignored_by_interaction = true })
+
+        local top_flow = minimap.add({ type = "flow", style = "sspp_minimap_top_left_flow", direction = "vertical", ignored_by_interaction = true })
+        local bottom_flow = minimap.add({ type = "flow", style = "sspp_minimap_bottom_right_flow", direction = "vertical", ignored_by_interaction = true })
+
+        local top = top_flow.add({ type = "frame", style = "sspp_minimap_label_frame", direction = "horizontal", ignored_by_interaction = true })
+        local bottom = bottom_flow.add({ type = "frame", style = "sspp_minimap_label_frame", direction = "horizontal", ignored_by_interaction = true })
 
         return minimap, top, bottom
     end
@@ -787,7 +791,7 @@ function glib.acquire_next_minimap(grid_table, grid_children, old_length, new_le
     local minimap = grid_children[new_length].children[1].children[1]
     local minimap_children = minimap.children
 
-    return minimap, minimap_children[2], minimap_children[3]
+    return minimap, minimap_children[2].children[1], minimap_children[3].children[1]
 end
 
 --------------------------------------------------------------------------------

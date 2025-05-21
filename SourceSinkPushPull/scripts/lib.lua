@@ -202,8 +202,10 @@ lib.enumerate_spoil_results = enumerate_spoil_results
 function lib.compute_storage_needed(network_item, station_item)
     local delivery_size, delivery_time = network_item.delivery_size, network_item.delivery_time
     local throughput, latency = station_item.throughput, station_item.latency
-    local round = 100.0 -- for fluids
-    if network_item.quality then round = prototypes.item[network_item.name].stack_size end
+    local round = 1.0
+    if mod_settings.round_to_stack_size then
+        if network_item.quality then round = prototypes.item[network_item.name].stack_size else round = 100.0 end
+    end
     local result = m_max(delivery_size, throughput * delivery_time)
     local buffer = m_max(round, throughput * latency)
     result = m_ceil(result / round) * round
@@ -218,8 +220,10 @@ end
 ---@return integer
 function lib.compute_buffer(network_item, station_item)
     local throughput, latency = station_item.throughput, station_item.latency
-    local round = 100.0 -- for fluids
-    if network_item.quality then round = prototypes.item[network_item.name].stack_size end
+    local round = 1.0
+    if mod_settings.round_to_stack_size then
+        if network_item.quality then round = prototypes.item[network_item.name].stack_size else round = 100.0 end
+    end
     local buffer = m_max(round, throughput * latency)
     buffer = m_ceil(buffer / round) * round
     return buffer

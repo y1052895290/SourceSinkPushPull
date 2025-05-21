@@ -35,6 +35,7 @@
 ---@class (exact) SourceSinkPushPull.ModSettings
 ---@field public auto_paint_trains boolean?
 ---@field public train_colors {[TrainColor]: Color}?
+---@field public round_to_stack_size boolean?
 ---@field public default_train_limit integer?
 ---@field public item_inactivity_ticks integer?
 ---@field public fluid_inactivity_ticks integer?
