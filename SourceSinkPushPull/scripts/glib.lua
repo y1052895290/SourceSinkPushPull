@@ -136,6 +136,22 @@ end
 ---@param input LuaGuiElement
 ---@param max_length integer
 ---@return string
+function glib.truncate_numeric_input(input, max_length)
+    local text = input.text
+    if string.sub(text, 1, 1) == "." then
+        text = "0" .. text
+        input.text = text
+    end
+    if #text > max_length then
+        text = string.sub(text, 1, max_length)
+        input.text = text
+    end
+    return text
+end
+
+---@param input LuaGuiElement
+---@param max_length integer
+---@return string
 function glib.truncate_input(input, max_length)
     local text = input.text
     local length = #text

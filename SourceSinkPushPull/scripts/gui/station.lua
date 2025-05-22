@@ -209,10 +209,12 @@ glib.handlers["station_request_elem_changed"] = { [events.on_gui_elem_changed] =
 end }
 
 glib.handlers["station_provide_text_changed"] = { [events.on_gui_text_changed] = function(event)
+    glib.truncate_numeric_input(event.element, 6)
     glib.table_modify_mutable_row(provide_methods, storage.player_guis[event.player_index].provide_context, event.element)
 end }
 
 glib.handlers["station_request_text_changed"] = { [events.on_gui_text_changed] = function(event)
+    glib.truncate_numeric_input(event.element, 6)
     glib.table_modify_mutable_row(request_methods, storage.player_guis[event.player_index].request_context, event.element)
 end }
 
