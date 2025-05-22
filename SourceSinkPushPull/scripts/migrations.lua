@@ -238,6 +238,11 @@ local function on_configuration_changed(data)
 
     flib_migration.on_config_changed(data, migrations)
 
+    -- close all opened sspp guis
+    for player_id, _ in pairs(storage.player_guis) do
+        game.get_player(player_id).opened = nil
+    end
+
     local is_item_key_invalid = lib.is_item_key_invalid
 
     -- remove invalid items and associated jobs from networks
