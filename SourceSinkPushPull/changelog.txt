@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.7
+Date: 2025-05-22
+  Features:
+    - Added a mod setting to disable rounding targets and thresholds up to item stack sizes.
+    - Added Push/Pull threshold information to the Station GUI.
+  Changes:
+    - Improved readability of minimap overlay text.
+    - Update Russian localisation.
+  Bugfixes:
+    - Fix potential crashes when updating the mod while a GUI is open.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.6
 Date: 2025-05-19
   Features:
