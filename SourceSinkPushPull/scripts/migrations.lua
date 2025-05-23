@@ -2,7 +2,6 @@
 
 local flib_migration = require("__flib__.migration")
 
-local enums = require("__SourceSinkPushPull__.scripts.enums")
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local cmds = require("__SourceSinkPushPull__.scripts.cmds")
 
@@ -199,7 +198,7 @@ local migrations = {
                     if not quality then
                         local cb = station.stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
                         local condition = cb.logistic_condition
-                        condition.constant = bit32.bor(condition.constant or 0, enums.stop_flags.inactivity)
+                        condition.constant = bit32.bor(condition.constant or 0, 8)
                         cb.logistic_condition = condition
                     end
                 end

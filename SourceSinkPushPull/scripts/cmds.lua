@@ -111,10 +111,8 @@ end
 
 --------------------------------------------------------------------------------
 
-function cmds.register_commands()
-    commands.add_command("sspp-reboot", { "sspp-console.reboot-help" }, cmds.sspp_reboot)
-    commands.add_command("sspp-update-granularity", { "sspp-console.update-granularity-help" }, cmds.sspp_update_granularity)
-end
+commands.add_command("sspp-reboot", { "sspp-console.reboot-help" }, cmds.sspp_reboot)
+commands.add_command("sspp-update-granularity", { "sspp-console.update-granularity-help" }, cmds.sspp_update_granularity)
 
 --------------------------------------------------------------------------------
 

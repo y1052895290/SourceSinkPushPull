@@ -2,7 +2,6 @@
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
-local enums = require("__SourceSinkPushPull__.scripts.enums")
 
 local main_station = require("__SourceSinkPushPull__.scripts.main.station")
 local main_hauler = require("__SourceSinkPushPull__.scripts.main.hauler")
@@ -263,37 +262,6 @@ end
 
 --------------------------------------------------------------------------------
 
----@param name string
----@return Color
-local function get_rgb_setting(name)
-    local rgba = settings.global[name].value --[[@as Color]]
-    local a = rgba.a
-    return { r = rgba.r * a, g = rgba.g * a, b = rgba.b * a, a = 1.0 }
-end
-
-function main.populate_mod_settings()
-    mod_settings.auto_paint_trains = settings.global["sspp-auto-paint-trains"].value --[[@as boolean]]
-    mod_settings.train_colors = {
-        [enums.train_colors.depot] = get_rgb_setting("sspp-depot-color"),
-        [enums.train_colors.fuel] = get_rgb_setting("sspp-fuel-color"),
-        [enums.train_colors.provide] = get_rgb_setting("sspp-provide-color"),
-        [enums.train_colors.request] = get_rgb_setting("sspp-request-color"),
-        [enums.train_colors.liquidate] = get_rgb_setting("sspp-liquidate-color"),
-    }
-    mod_settings.round_to_stack_size = settings.global["sspp-round-to-stack-size"].value --[[@as boolean]]
-    mod_settings.default_train_limit = settings.global["sspp-default-train-limit"].value --[[@as integer]]
-    mod_settings.item_inactivity_ticks = settings.global["sspp-item-inactivity-ticks"].value --[[@as integer]]
-    mod_settings.fluid_inactivity_ticks = settings.global["sspp-fluid-inactivity-ticks"].value --[[@as integer]]
-    mod_settings.stations_per_tick = settings.global["sspp-stations-per-tick"].value --[[@as integer]]
-end
-
----@param event EventData.on_runtime_mod_setting_changed
-local function on_runtime_mod_setting_changed(event)
-    main.populate_mod_settings()
-end
-
---------------------------------------------------------------------------------
-
 local function on_init()
     storage.tick_state = "INITIAL"
     storage.entities = {}
@@ -321,66 +289,67 @@ end
 
 --------------------------------------------------------------------------------
 
-function main.register_event_handlers()
-    local filter_built = {
-        { filter = "name", name = "sspp-stop" },
-        { filter = "name", name = "sspp-general-io" },
-        { filter = "name", name = "sspp-provide-io" },
-        { filter = "name", name = "sspp-request-io" },
-        { filter = "ghost_name", name = "sspp-stop" },
-        { filter = "ghost_name", name = "sspp-general-io" },
-        { filter = "ghost_name", name = "sspp-provide-io" },
-        { filter = "ghost_name", name = "sspp-request-io" },
-        { filter = "type", type = "straight-rail" },
-    }
-    local filter_broken = {
-        { filter = "name", name = "sspp-stop" },
-        { filter = "name", name = "sspp-general-io" },
-        { filter = "name", name = "sspp-provide-io" },
-        { filter = "name", name = "sspp-request-io" },
-        { filter = "ghost_name", name = "sspp-stop" },
-        { filter = "ghost_name", name = "sspp-general-io" },
-        { filter = "ghost_name", name = "sspp-provide-io" },
-        { filter = "ghost_name", name = "sspp-request-io" },
-        { filter = "type", type = "straight-rail" },
-        { filter = "rolling-stock" },
-    }
-    local filter_ghost_broken = {
-        { filter = "name", name = "sspp-stop" },
-        { filter = "name", name = "sspp-general-io" },
-        { filter = "name", name = "sspp-provide-io" },
-        { filter = "name", name = "sspp-request-io" },
-    }
+---@type LuaScriptRaisedBuiltEventFilter[]
+local filter_built = {
+    { filter = "name", name = "sspp-stop" },
+    { filter = "name", name = "sspp-general-io" },
+    { filter = "name", name = "sspp-provide-io" },
+    { filter = "name", name = "sspp-request-io" },
+    { filter = "ghost_name", name = "sspp-stop",  },
+    { filter = "ghost_name", name = "sspp-general-io" },
+    { filter = "ghost_name", name = "sspp-provide-io" },
+    { filter = "ghost_name", name = "sspp-request-io" },
+    { filter = "type", type = "straight-rail" },
+}
 
-    script.on_event(defines.events.on_built_entity, on_entity_built, filter_built)
-    script.on_event(defines.events.on_entity_cloned, on_entity_built, filter_built)
-    script.on_event(defines.events.on_robot_built_entity, on_entity_built, filter_built)
-    script.on_event(defines.events.script_raised_built, on_entity_built, filter_built)
-    script.on_event(defines.events.script_raised_revive, on_entity_built, filter_built)
+---@type LuaScriptRaisedDestroyEventFilter[]
+local filter_broken = {
+    { filter = "name", name = "sspp-stop" },
+    { filter = "name", name = "sspp-general-io" },
+    { filter = "name", name = "sspp-provide-io" },
+    { filter = "name", name = "sspp-request-io" },
+    { filter = "ghost_name", name = "sspp-stop" },
+    { filter = "ghost_name", name = "sspp-general-io" },
+    { filter = "ghost_name", name = "sspp-provide-io" },
+    { filter = "ghost_name", name = "sspp-request-io" },
+    { filter = "type", type = "straight-rail" },
+    { filter = "rolling-stock" },
+}
 
-    script.on_event(defines.events.on_entity_died, on_entity_broken, filter_broken)
-    script.on_event(defines.events.on_pre_player_mined_item, on_entity_broken, filter_broken)
-    script.on_event(defines.events.on_robot_mined_entity, on_entity_broken, filter_broken)
-    script.on_event(defines.events.script_raised_destroy, on_entity_broken, filter_broken)
-    script.on_event(defines.events.on_pre_ghost_deconstructed, on_entity_broken, filter_ghost_broken)
+---@type LuaScriptRaisedDestroyEventFilter[]
+local filter_ghost_broken = {
+    { filter = "name", name = "sspp-stop" },
+    { filter = "name", name = "sspp-general-io" },
+    { filter = "name", name = "sspp-provide-io" },
+    { filter = "name", name = "sspp-request-io" },
+}
 
-    script.on_event(defines.events.on_player_rotated_entity, on_entity_rotated)
+script.on_event(defines.events.on_built_entity, on_entity_built, filter_built)
+script.on_event(defines.events.on_entity_cloned, on_entity_built, filter_built)
+script.on_event(defines.events.on_robot_built_entity, on_entity_built, filter_built)
+script.on_event(defines.events.script_raised_built, on_entity_built, filter_built)
+script.on_event(defines.events.script_raised_revive, on_entity_built, filter_built)
 
-    script.on_event(defines.events.on_train_changed_state, on_train_changed_state)
-    script.on_event(defines.events.on_train_created, on_train_created)
-    script.on_event(defines.events.on_train_schedule_changed, on_train_schedule_changed)
+script.on_event(defines.events.on_entity_died, on_entity_broken, filter_broken)
+script.on_event(defines.events.on_pre_player_mined_item, on_entity_broken, filter_broken)
+script.on_event(defines.events.on_robot_mined_entity, on_entity_broken, filter_broken)
+script.on_event(defines.events.script_raised_destroy, on_entity_broken, filter_broken)
+script.on_event(defines.events.on_pre_ghost_deconstructed, on_entity_broken, filter_ghost_broken)
 
-    script.on_event(defines.events.on_surface_created, on_surface_created)
-    script.on_event(defines.events.on_surface_imported, on_surface_created)
-    script.on_event(defines.events.on_pre_surface_cleared, on_surface_cleared)
-    script.on_event(defines.events.on_pre_surface_deleted, on_surface_deleted)
-    script.on_event(defines.events.on_surface_renamed, on_surface_renamed)
+script.on_event(defines.events.on_player_rotated_entity, on_entity_rotated)
 
-    script.on_event(defines.events.on_runtime_mod_setting_changed, on_runtime_mod_setting_changed)
+script.on_event(defines.events.on_train_changed_state, on_train_changed_state)
+script.on_event(defines.events.on_train_created, on_train_created)
+script.on_event(defines.events.on_train_schedule_changed, on_train_schedule_changed)
 
-    script.on_init(on_init)
-    script.on_load(on_load)
-end
+script.on_event(defines.events.on_surface_created, on_surface_created)
+script.on_event(defines.events.on_surface_imported, on_surface_created)
+script.on_event(defines.events.on_pre_surface_cleared, on_surface_cleared)
+script.on_event(defines.events.on_pre_surface_deleted, on_surface_deleted)
+script.on_event(defines.events.on_surface_renamed, on_surface_renamed)
+
+script.on_init(on_init)
+script.on_load(on_load)
 
 --------------------------------------------------------------------------------
 

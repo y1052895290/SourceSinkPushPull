@@ -1,5 +1,7 @@
 -- SSPP by jagoly
 
+---@meta
+
 --------------------------------------------------------------------------------
 
 ---@alias NetworkName string
@@ -31,15 +33,6 @@
 ---@field public dispatch_items NetworkItemKey[]
 ---@field public buffer_items NetworkItemKey[]
 ---@field public disabled_items {[NetworkItemKey]: true?}
-
----@class (exact) SourceSinkPushPull.ModSettings
----@field public auto_paint_trains boolean?
----@field public train_colors {[TrainColor]: Color}?
----@field public round_to_stack_size boolean?
----@field public default_train_limit integer?
----@field public item_inactivity_ticks integer?
----@field public fluid_inactivity_ticks integer?
----@field public stations_per_tick integer?
 
 --------------------------------------------------------------------------------
 
@@ -244,6 +237,3 @@
 
 ---@type SourceSinkPushPull.Storage
 storage = storage
-
----@type SourceSinkPushPull.ModSettings
-mod_settings = {}

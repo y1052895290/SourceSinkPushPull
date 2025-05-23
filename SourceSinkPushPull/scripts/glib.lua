@@ -889,20 +889,18 @@ end
 
 --------------------------------------------------------------------------------
 
-function glib.register_event_handlers()
-    script.on_event(defines.events.on_gui_checked_state_changed, on_element_event)
-    script.on_event(defines.events.on_gui_click, on_element_event)
-    script.on_event(defines.events.on_gui_confirmed, on_element_event)
-    script.on_event(defines.events.on_gui_elem_changed, on_element_event)
-    script.on_event(defines.events.on_gui_hover, on_element_event)
-    script.on_event(defines.events.on_gui_leave, on_element_event)
-    script.on_event(defines.events.on_gui_location_changed, on_element_event)
-    script.on_event(defines.events.on_gui_selected_tab_changed, on_element_event)
-    script.on_event(defines.events.on_gui_selection_state_changed, on_element_event)
-    script.on_event(defines.events.on_gui_switch_state_changed, on_element_event)
-    script.on_event(defines.events.on_gui_text_changed, on_element_event)
-    script.on_event(defines.events.on_gui_value_changed, on_element_event)
-end
+script.on_event(defines.events.on_gui_checked_state_changed, on_element_event)
+script.on_event(defines.events.on_gui_click, on_element_event)
+script.on_event(defines.events.on_gui_confirmed, on_element_event)
+script.on_event(defines.events.on_gui_elem_changed, on_element_event)
+script.on_event(defines.events.on_gui_hover, on_element_event)
+script.on_event(defines.events.on_gui_leave, on_element_event)
+script.on_event(defines.events.on_gui_location_changed, on_element_event)
+script.on_event(defines.events.on_gui_selected_tab_changed, on_element_event)
+script.on_event(defines.events.on_gui_selection_state_changed, on_element_event)
+script.on_event(defines.events.on_gui_switch_state_changed, on_element_event)
+script.on_event(defines.events.on_gui_text_changed, on_element_event)
+script.on_event(defines.events.on_gui_value_changed, on_element_event)
 
 --------------------------------------------------------------------------------
 

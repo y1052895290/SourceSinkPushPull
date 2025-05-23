@@ -2,9 +2,7 @@
 
 local flib_dictionary = require("__flib__.dictionary")
 
-local enums = require("__SourceSinkPushPull__.scripts.enums")
-
-local e_stop_flags = enums.stop_flags
+local config = require("__SourceSinkPushPull__.scripts.config")
 
 local m_max, m_ceil, m_floor = math.max, math.ceil, math.floor
 local b_test = bit32.btest
@@ -203,7 +201,7 @@ function lib.compute_storage_needed(network_item, station_item)
     local delivery_size, delivery_time = network_item.delivery_size, network_item.delivery_time
     local throughput, latency = station_item.throughput, station_item.latency
     local round = 1.0
-    if mod_settings.round_to_stack_size then
+    if config.round_to_stack_size then
         if network_item.quality then round = prototypes.item[network_item.name].stack_size else round = 100.0 end
     end
     local result = m_max(delivery_size, throughput * delivery_time)
@@ -221,7 +219,7 @@ end
 function lib.compute_buffer(network_item, station_item)
     local throughput, latency = station_item.throughput, station_item.latency
     local round = 1.0
-    if mod_settings.round_to_stack_size then
+    if config.round_to_stack_size then
         if network_item.quality then round = prototypes.item[network_item.name].stack_size else round = 100.0 end
     end
     local buffer = m_max(round, throughput * latency)
@@ -355,10 +353,10 @@ function lib.read_station_stop_settings(entity)
     ---@type GhostStationStop
     return {
         entity = entity,
-        custom_name = b_test(constant, e_stop_flags.custom_name),
-        disabled = b_test(constant, e_stop_flags.disabled),
-        bufferless = b_test(constant, e_stop_flags.bufferless),
-        inactivity = b_test(constant, e_stop_flags.inactivity),
+        custom_name = b_test(constant, 1),
+        disabled = b_test(constant, 2),
+        bufferless = b_test(constant, 4),
+        inactivity = b_test(constant, 8),
     }
 end
 
@@ -435,10 +433,10 @@ end
 ---@param stop GhostStationStop
 function lib.write_station_stop_settings(stop)
     local constant = 0
-    if stop.custom_name then constant = constant + e_stop_flags.custom_name end
-    if stop.disabled then constant = constant + e_stop_flags.disabled end
-    if stop.bufferless then constant = constant + e_stop_flags.bufferless end
-    if stop.inactivity then constant = constant + e_stop_flags.inactivity end
+    if stop.custom_name then constant = constant + 1 end
+    if stop.disabled then constant = constant + 2 end
+    if stop.bufferless then constant = constant + 4 end
+    if stop.inactivity then constant = constant + 8 end
     local cb = stop.entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     cb.logistic_condition = { constant = constant } ---@diagnostic disable-line: missing-fields
 end
@@ -486,10 +484,10 @@ function lib.get_train_item_count(train, name, quality)
 end
 
 ---@param train LuaTrain
----@param color_id TrainColor
+---@param color_id TrainColorId
 local function set_train_color(train, color_id)
-    if mod_settings.auto_paint_trains then
-        local color = mod_settings.train_colors[color_id]
+    if config.auto_paint_trains then
+        local color = config.train_colors[color_id]
         for _, carriage in pairs(train.carriages) do
             if carriage.type == "locomotive" then
                 carriage.copy_color_from_train_stop = false
@@ -500,7 +498,7 @@ local function set_train_color(train, color_id)
 end
 
 ---@param train LuaTrain
----@param color_id TrainColor
+---@param color_id TrainColorId
 ---@param stop LuaEntity
 function lib.send_train_to_station(train, color_id, stop)
     set_train_color(train, color_id)
@@ -508,7 +506,7 @@ function lib.send_train_to_station(train, color_id, stop)
 end
 
 ---@param train LuaTrain
----@param color_id TrainColor
+---@param color_id TrainColorId
 ---@param stop_name string
 function lib.send_train_to_named_stop(train, color_id, stop_name)
     set_train_color(train, color_id)

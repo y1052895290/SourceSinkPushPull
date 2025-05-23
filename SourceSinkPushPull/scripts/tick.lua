@@ -2,12 +2,10 @@
 
 local flib_dictionary_on_tick = require("__flib__.dictionary").on_tick
 
+local config = require("__SourceSinkPushPull__.scripts.config")
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
 local main = require("__SourceSinkPushPull__.scripts.main")
-local enums = require("__SourceSinkPushPull__.scripts.enums")
-
-local e_train_colors = enums.train_colors
 
 local s_match = string.match
 local m_random, m_min, m_max, m_floor = math.random, math.min, math.max, math.floor
@@ -667,7 +665,7 @@ local function tick_liquidate()
     request_station.total_deliveries = request_station.total_deliveries + 1
 
     local request_stop = request_station.stop.entity
-    send_train_to_station(hauler.train, e_train_colors.request, request_stop)
+    send_train_to_station(hauler.train, "REQUEST", request_stop)
 
     assign_job_index(network, hauler, { type = "DROPOFF", hauler = hauler_id, start_tick = game.tick, item = item_key, request_stop = request_stop })
     gui.on_job_created(network_name)
@@ -735,7 +733,7 @@ local function tick_provide_done()
     request_station.total_deliveries = request_station.total_deliveries + 1
 
     local request_stop = request_station.stop.entity
-    send_train_to_station(hauler.train, e_train_colors.request, request_stop)
+    send_train_to_station(hauler.train, "REQUEST", request_stop)
 
     if bufferless then
         assign_job_index(network, hauler, { type = "DROPOFF", hauler = hauler_id, start_tick = game.tick, item = item_key, request_stop = request_stop })
@@ -822,7 +820,7 @@ local function tick_dispatch()
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
     local provide_stop = provide_station.stop.entity
-    send_train_to_station(hauler.train, e_train_colors.provide, provide_stop)
+    send_train_to_station(hauler.train, "PROVIDE", provide_stop)
 
     assign_job_index(network, hauler, { type = "COMBINED", hauler = hauler_id, start_tick = game.tick, item = item_key, provide_stop = provide_stop })
     gui.on_job_created(network_name)
@@ -872,7 +870,7 @@ local function tick_buffer()
     provide_station.total_deliveries = provide_station.total_deliveries + 1
 
     local provide_stop = provide_station.stop.entity
-    send_train_to_station(hauler.train, e_train_colors.provide, provide_stop)
+    send_train_to_station(hauler.train, "PROVIDE", provide_stop)
 
     assign_job_index(network, hauler, { type = "PICKUP", hauler = hauler_id, start_tick = game.tick, item = item_key, provide_stop = provide_stop })
     gui.on_job_created(network_name)
@@ -911,7 +909,7 @@ local function on_tick()
     local tick_state = storage.tick_state
 
     if tick_state == "POLL" then
-        for _ = 1, mod_settings.stations_per_tick do
+        for _ = 1, config.stations_per_tick do
             if tick_poll() then
                 -- TODO: profile to work out if this should be split over 3 ticks or more
                 purge_old_inactive_jobs()

@@ -2,7 +2,6 @@
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local glib = require("__SourceSinkPushPull__.scripts.glib")
-local enums = require("__SourceSinkPushPull__.scripts.enums")
 
 local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
 

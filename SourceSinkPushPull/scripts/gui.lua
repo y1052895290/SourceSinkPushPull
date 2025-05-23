@@ -1,7 +1,6 @@
 -- SSPP by jagoly
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
-local glib = require("__SourceSinkPushPull__.scripts.glib")
 
 local gui_network = require("__SourceSinkPushPull__.scripts.gui.network")
 local gui_station = require("__SourceSinkPushPull__.scripts.gui.station")
@@ -156,13 +155,9 @@ end
 
 --------------------------------------------------------------------------------
 
-function gui.register_event_handlers()
-    script.on_event(defines.events.on_gui_opened, on_gui_opened)
-    script.on_event(defines.events.on_gui_closed, on_gui_closed)
-    script.on_event(defines.events.on_lua_shortcut, on_lua_shortcut)
-
-    glib.register_event_handlers()
-end
+script.on_event(defines.events.on_gui_opened, on_gui_opened)
+script.on_event(defines.events.on_gui_closed, on_gui_closed)
+script.on_event(defines.events.on_lua_shortcut, on_lua_shortcut)
 
 --------------------------------------------------------------------------------
 

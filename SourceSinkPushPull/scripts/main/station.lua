@@ -1,5 +1,6 @@
 -- SSPP by jagoly
 
+local config = require("__SourceSinkPushPull__.scripts.config")
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
 
@@ -154,7 +155,7 @@ end
 function main_station.on_stop_built(stop)
     local station_stop = lib.read_station_stop_settings(stop)
     lib.write_station_stop_settings(station_stop)
-    if stop.trains_limit > 10 or stop.trains_limit < 1 then stop.trains_limit = mod_settings.default_train_limit end
+    if stop.trains_limit > 10 or stop.trains_limit < 1 then stop.trains_limit = config.default_train_limit end
     if not station_stop.custom_name then stop.backer_name = "[virtual-signal=signal-ghost]" end
 
     local stop_cb = stop.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]

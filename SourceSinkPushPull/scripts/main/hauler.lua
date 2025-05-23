@@ -1,10 +1,8 @@
 -- SSPP by jagoly
 
+local config = require("__SourceSinkPushPull__.scripts.config")
 local lib = require("__SourceSinkPushPull__.scripts.lib")
 local gui = require("__SourceSinkPushPull__.scripts.gui")
-local enums = require("__SourceSinkPushPull__.scripts.enums")
-
-local e_train_colors = enums.train_colors
 
 local list_create_or_append, list_destroy_or_remove = lib.list_create_or_append, lib.list_destroy_or_remove
 local set_control_behavior, enumerate_spoil_results = lib.set_control_behavior, lib.enumerate_spoil_results
@@ -157,20 +155,20 @@ function main_hauler.on_arrived_at_provide_station(hauler, job)
         signal = { name = name, quality = quality, type = "item" }
         wait_conditions = { { type = "item_count", condition = { first_signal = signal, comparator = ">=", constant = constant } } }
         if station.stop.inactivity then
-            wait_conditions[2] = { compare_type = "and", type = "inactivity", ticks = mod_settings.item_inactivity_ticks }
+            wait_conditions[2] = { compare_type = "and", type = "inactivity", ticks = config.item_inactivity_ticks }
         end
         for i, result_name in enumerate_spoil_results(name) do
             local spoil_signal = { name = result_name, quality = quality, type = "item" }
             local length = #wait_conditions
             wait_conditions[length + 1] = { compare_type = "or", type = "item_count", condition = { first_signal = spoil_signal, comparator = ">", constant = 0 } }
-            wait_conditions[length + 2] = { compare_type = "and", type = "inactivity", ticks = mod_settings.item_inactivity_ticks }
+            wait_conditions[length + 2] = { compare_type = "and", type = "inactivity", ticks = config.item_inactivity_ticks }
             set_control_behavior(provide.hidden_combs[i], 0, "-", spoil_signal, signal)
         end
     else
         signal = { name = name, type = "fluid" }
         wait_conditions = { { type = "fluid_count", condition = { first_signal = signal, comparator = ">=", constant = constant } } }
         if station.stop.inactivity then
-            wait_conditions[2] = { compare_type = "and", type = "inactivity", ticks = mod_settings.fluid_inactivity_ticks }
+            wait_conditions[2] = { compare_type = "and", type = "inactivity", ticks = config.fluid_inactivity_ticks }
         end
     end
     set_control_behavior(provide.comb, constant, "-", signal)
@@ -296,7 +294,7 @@ function main_hauler.send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
                 local prototype = loco.prototype
                 if prototype.burner_prototype.effectivity * energy < prototype.get_max_energy_usage(loco.quality) * maximum_burn_ticks then
                     list_create_or_append(network.fuel_haulers, class_name, hauler_id)
-                    send_train_to_named_stop(train, e_train_colors.fuel, class.fueler_name)
+                    send_train_to_named_stop(train, "FUEL", class.fueler_name)
                     assign_job_index(network, hauler, { type = "FUEL", hauler = hauler_id, start_tick = game.tick })
                     on_job_created(network_name)
                     hauler.status = { message = { "sspp-alert.getting-fuel" } }
@@ -322,7 +320,7 @@ function main_hauler.send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
                 train.manual_mode = true
             else
                 list_create_or_append(network.to_depot_liquidate_haulers, item_key, hauler_id)
-                send_train_to_named_stop(train, e_train_colors.liquidate, class.depot_name)
+                send_train_to_named_stop(train, "LIQUIDATE", class.depot_name)
                 hauler.to_depot = item_key
                 hauler.status = { message = { class.bypass_depot and "sspp-alert.waiting-for-request" or "sspp-alert.going-to-depot" }, item = item_key }
                 on_status_changed(hauler_id)
@@ -332,7 +330,7 @@ function main_hauler.send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
     end
 
     list_create_or_append(network.to_depot_haulers, class_name, hauler_id)
-    send_train_to_named_stop(train, e_train_colors.depot, class.depot_name)
+    send_train_to_named_stop(train, "DEPOT", class.depot_name)
     hauler.to_depot = ""
     hauler.status = { message = { class.bypass_depot and "sspp-alert.ready-for-dispatch" or "sspp-alert.going-to-depot" } }
     on_status_changed(hauler_id)
