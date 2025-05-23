@@ -285,21 +285,16 @@ function main_hauler.send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
     local hauler_id = train.id
 
     if check_fuel then
-        local maximum_delivery_time = 150.0 -- TODO: calculate properly
-        local energy_per_second = 5000000.0 / 3.0 -- TODO: calculate properly
-
-        -- TODO: could be less, this assumes constant burning
-        local energy_threshold = energy_per_second * maximum_delivery_time
-
-        for _, locos in pairs(train.locomotives) do
-            for _, loco in pairs(locos) do
-                ---@cast loco LuaEntity
-                local burner = assert(loco.burner, "TODO: electric trains")
+        local maximum_burn_ticks = 150.0 * 60.0 -- TODO: should be some fraction of the maximum delivery time of items in this class
+        for _, loco in pairs(train.carriages) do
+            local burner = loco.burner
+            if burner then
                 local energy = burner.remaining_burning_fuel
                 for _, item_with_count in pairs(burner.inventory.get_contents()) do
                     energy = energy + prototypes.item[item_with_count.name].fuel_value * item_with_count.count
                 end
-                if energy < energy_threshold then
+                local prototype = loco.prototype
+                if prototype.burner_prototype.effectivity * energy < prototype.get_max_energy_usage(loco.quality) * maximum_burn_ticks then
                     list_create_or_append(network.fuel_haulers, class_name, hauler_id)
                     send_train_to_named_stop(train, e_train_colors.fuel, class.fueler_name)
                     assign_job_index(network, hauler, { type = "FUEL", hauler = hauler_id, start_tick = game.tick })
@@ -315,7 +310,6 @@ function main_hauler.send_to_fuel_or_depot(hauler, check_fuel, check_cargo)
     if check_cargo then
         local train_items, train_fluids = train.get_contents(), train.get_fluid_contents()
         local train_item, train_fluid = train_items[1], next(train_fluids)
-
         local item_key = train_fluid or (train_item and (train_item.name .. ":" .. (train_item.quality or "normal")))
         if item_key then
             if train_items[2] or next(train_fluids, train_fluid) or (train_item and train_fluid) then
