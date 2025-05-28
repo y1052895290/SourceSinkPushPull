@@ -102,22 +102,32 @@ end }
 --------------------------------------------------------------------------------
 
 ---@param root GuiRoot.Network
-local function clear_expanded_object(root)
+---@param untoggle boolean
+---@param cells LuaGuiElement[]?
+local function clear_expanded_object(root, untoggle, cells)
     if root.expanded_class then
-        local cells = root.class_context.rows[root.class_context.indices[root.expanded_class]].cells
-        if cells then cells[6].toggled = false end
+        if untoggle then
+            cells = cells or root.class_context.rows[root.class_context.indices[root.expanded_class]].cells
+            if cells then cells[6].toggled = false end
+        end
         root.expanded_class = nil
     elseif root.expanded_stations_item then
-        local cells = root.item_context.rows[root.item_context.indices[root.expanded_stations_item]].cells
-        if cells then cells[5].toggled = false end
+        if untoggle then
+            cells = cells or root.item_context.rows[root.item_context.indices[root.expanded_stations_item]].cells
+            if cells then cells[5].toggled = false end
+        end
         root.expanded_stations_item = nil
     elseif root.expanded_haulers_item then
-        local cells = root.item_context.rows[root.item_context.indices[root.expanded_haulers_item]].cells
-        if cells then cells[7].toggled = false end
+        if untoggle then
+            cells = cells or root.item_context.rows[root.item_context.indices[root.expanded_haulers_item]].cells
+            if cells then cells[7].toggled = false end
+        end
         root.expanded_haulers_item = nil
     elseif root.expanded_job then
-        local cells = root.job_context.rows[root.job_context.indices[root.expanded_job]].cells
-        if cells then cells[1].children[2].toggled = false end
+        if untoggle then
+            cells = root.job_context.rows[root.job_context.indices[root.expanded_job]].cells
+            if cells then cells[1].children[2].toggled = false end
+        end
         root.expanded_job = nil
     end
 
@@ -144,7 +154,7 @@ end
 glib.handlers["network_class_expand"] = { [events.on_gui_click] = function(event)
     local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
-    clear_expanded_object(root)
+    clear_expanded_object(root, true)
 
     local class_name = glib.table_get_key_for_child(class_methods, root.class_context, event.element)
     if class_name then
@@ -172,7 +182,7 @@ end }
 glib.handlers["network_item_expand_stations"] = { [events.on_gui_click] = function(event)
     local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
-    clear_expanded_object(root)
+    clear_expanded_object(root, true)
 
     local item_key = glib.table_get_key_for_child(item_methods, root.item_context, event.element)
     if item_key then
@@ -196,7 +206,7 @@ end }
 glib.handlers["network_item_expand_haulers"] = { [events.on_gui_click] = function(event)
     local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
-    clear_expanded_object(root)
+    clear_expanded_object(root, true)
 
     local item_key = glib.table_get_key_for_child(item_methods, root.item_context, event.element)
     if item_key then
@@ -221,7 +231,7 @@ end }
 glib.handlers["network_job_expand"] = { [events.on_gui_click] = function(event)
     local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
-    clear_expanded_object(root)
+    clear_expanded_object(root, true)
 
     local job_index = glib.table_get_key_for_child(job_methods, root.job_context, event.element) ---@cast job_index -nil
 
@@ -424,6 +434,8 @@ function class_methods.on_row_changed(context, cells, class_name, class)
         cells[1].children[4].tooltip = { "sspp-gui.invalid-values-tooltip" }
         cells[7].caption = ""
     end
+
+    if cells[6].toggled then clear_expanded_object(context.root, true, cells) end
 end
 
 function class_methods.on_object_changed(context, class_name, class)
@@ -447,16 +459,13 @@ function class_methods.on_object_changed(context, class_name, class)
 
                 storage.disabled_items[network_name .. ":" .. item_key] = true
 
-                if root.expanded_stations_item == item_key then clear_expanded_object(root) end
-                if root.expanded_haulers_item == item_key then clear_expanded_object(root) end
+                if root.expanded_stations_item == item_key or root.expanded_haulers_item == item_key then clear_expanded_object(root, true) end
             end
         end
 
         lib.set_haulers_to_manual(network.fuel_haulers[class_name], message)
         lib.set_haulers_to_manual(network.to_depot_haulers[class_name], message)
         lib.set_haulers_to_manual(network.at_depot_haulers[class_name], message)
-
-        if root.expanded_class == class_name then clear_expanded_object(root) end
     end
 end
 
@@ -588,6 +597,8 @@ function item_methods.on_row_changed(context, cells, item_key, item)
         cells[6].caption = ""
         cells[8].caption = ""
     end
+
+    if cells[5].toggled or cells[7].toggled then clear_expanded_object(context.root, true, cells) end
 end
 
 function item_methods.on_object_changed(context, item_key, item)
@@ -608,9 +619,6 @@ function item_methods.on_object_changed(context, item_key, item)
         lib.set_haulers_to_manual(network.at_depot_liquidate_haulers[item_key], message, item_key)
 
         storage.disabled_items[network_name .. ":" .. item_key] = true
-
-        if root.expanded_stations_item == item_key then clear_expanded_object(root) end
-        if root.expanded_haulers_item == item_key then clear_expanded_object(root) end
     end
 end
 
@@ -802,7 +810,7 @@ end
 ---@param root GuiRoot.Network
 ---@param job_index JobIndex
 function gui_network.on_job_removed(root, job_index)
-    if root.expanded_job == job_index then clear_expanded_object(root) end
+    if root.expanded_job == job_index then clear_expanded_object(root, false) end
 
     glib.table_remove_immutable_row(job_methods, root.job_context, job_index)
 end
@@ -1275,7 +1283,7 @@ glib.handlers["network_import_import"] = { [events.on_gui_click] = function(even
 
         if next(classes) == nil and next(items) == nil then goto failure end
 
-        clear_expanded_object(root)
+        clear_expanded_object(root, true)
 
         for class_name, _ in pairs(root.network.classes) do
             if classes[class_name] then
@@ -1374,7 +1382,7 @@ end }
 ---@param root GuiRoot.Network
 ---@param network_name NetworkName
 local function switch_open_network(root, network_name)
-    clear_expanded_object(root)
+    clear_expanded_object(root, false)
 
     local network = storage.networks[network_name]
     root.network_name = network_name
