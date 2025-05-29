@@ -3,6 +3,7 @@
 local flib_migration = require("__flib__.migration")
 
 local lib = require("__SourceSinkPushPull__.scripts.lib")
+local main = require("__SourceSinkPushPull__.scripts.main")
 local cmds = require("__SourceSinkPushPull__.scripts.cmds")
 
 --------------------------------------------------------------------------------
@@ -226,7 +227,7 @@ local migrations = {
                 assert(next(network.classes) == nil, "why did you do this ☹️")
             end
         end
-    end
+    end,
 }
 
 --------------------------------------------------------------------------------
@@ -284,6 +285,9 @@ local function on_configuration_changed(data)
     ::reboot::
     cmds.sspp_reboot({ name = "sspp-reboot", tick = game.tick })
     ::skip_reboot::
+
+    -- ensure that networks exist for supported surfaces
+    for _, surface in pairs(game.surfaces) do main.surface_init_network(surface) end
 
     storage.tick_state = "INITIAL"
 end

@@ -106,7 +106,7 @@ end
 function gui.on_manual_mode_changed(hauler_id)
     for _, player_gui in pairs(storage.player_guis) do
         if player_gui.type == "HAULER" then
-            if player_gui.train_id == hauler_id then
+            if player_gui.train_id == hauler_id and player_gui.train then
                 gui_hauler.on_manual_mode_changed(player_gui)
             end
         end
@@ -117,7 +117,7 @@ end
 function gui.on_status_changed(hauler_id)
     for _, player_gui in pairs(storage.player_guis) do
         if player_gui.type == "HAULER" then
-            if player_gui.train_id == hauler_id then
+            if player_gui.train_id == hauler_id and player_gui.train then
                 gui_hauler.on_status_changed(player_gui)
             end
         end
@@ -144,7 +144,8 @@ function gui.on_train_broken(old_train_id, new_train)
         if player_gui.type == "HAULER" then
             if player_gui.train_id == old_train_id then
                 if new_train then
-                    player_gui.train_id, player_gui.train = new_train.id, new_train
+                    player_gui.train_id = new_train.id
+                    if player_gui.train then player_gui.train = new_train end
                 else
                     gui_hauler.close(player_id)
                 end

@@ -813,35 +813,23 @@ end
 --------------------------------------------------------------------------------
 
 ---@param active_network_name NetworkName
----@param surface LuaSurface?
+---@param surface_name NetworkName?
+---@param include_other_surfaces boolean
 ---@return LocalisedString[] localised_network_names, integer active_network_index
-function glib.get_localised_network_names(active_network_name, surface)
+function glib.get_localised_network_names(active_network_name, surface_name, include_other_surfaces)
     local localised_network_names = {} ---@type LocalisedString[]
     local network_count, network_index = 0, 0
 
-    if surface then
-        local network_name = lib.get_network_name_for_surface(surface)
-        if network_name then
+    for network_name, network in pairs(storage.networks) do
+        local other_surface = network.surface
+        if other_surface and (network_name == surface_name or (include_other_surfaces and not lib.is_supported_lab_surface(other_surface))) then
             network_count = network_count + 1
-            if surface.planet then
-                localised_network_names[network_count] = surface.planet.prototype.localised_name
+            if other_surface.planet then
+                localised_network_names[network_count] = other_surface.planet.prototype.localised_name
             else
-                localised_network_names[network_count] = surface.localised_name or network_name
+                localised_network_names[network_count] = other_surface.localised_name or { "sspp-gui.lab-surface" }
             end
             if network_name == active_network_name then network_index = network_count end
-        end
-    else
-        for network_name, network in pairs(storage.networks) do
-            local network_surface = network.surface
-            if network_surface then
-                network_count = network_count + 1
-                if network_surface.planet then
-                    localised_network_names[network_count] = network_surface.planet.prototype.localised_name
-                else
-                    localised_network_names[network_count] = network_surface.localised_name or network_name
-                end
-                if network_name == active_network_name then network_index = network_count end
-            end
         end
     end
 
@@ -857,23 +845,17 @@ function glib.get_localised_network_names(active_network_name, surface)
 end
 
 ---@param active_network_index integer
----@param surface LuaSurface?
+---@param surface_name NetworkName
+---@param include_other_surfaces boolean
 ---@return NetworkName network_name
-function glib.get_network_name(active_network_index, surface)
+function glib.get_network_name(active_network_index, surface_name, include_other_surfaces)
     local network_count = 0
 
-    if surface then
-        local network_name = lib.get_network_name_for_surface(surface)
-        if network_name then
+    for network_name, network in pairs(storage.networks) do
+        local other_surface = network.surface
+        if other_surface and (network_name == surface_name or (include_other_surfaces and not lib.is_supported_lab_surface(other_surface))) then
             network_count = network_count + 1
             if network_count == active_network_index then return network_name end
-        end
-    else
-        for network_name, network in pairs(storage.networks) do
-            if network.surface then
-                network_count = network_count + 1
-                if network_count == active_network_index then return network_name end
-            end
         end
     end
 

@@ -195,6 +195,7 @@
 
 ---@class (exact) GuiRoot.Network : GuiRoot.Abstract
 ---@field public type "NETWORK"
+---@field public default_network_name NetworkName
 ---@field public network_name NetworkName
 ---@field public network Network
 ---@field public class_context GuiTableContext<GuiRoot.Network, ClassName, NetworkClass>
@@ -216,7 +217,7 @@
 ---@class (exact) GuiRoot.Hauler : GuiRoot.Abstract
 ---@field public type "HAULER"
 ---@field public train_id uint
----@field public train LuaTrain
+---@field public train LuaTrain?
 
 --------------------------------------------------------------------------------
 

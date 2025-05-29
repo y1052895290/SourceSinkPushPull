@@ -40,7 +40,7 @@ local function on_entity_built(event)
             player.play_sound({ path = "utility/cannot_build" })
             player.create_local_flying_text({ create_at_cursor = true, text = { "sspp-gui.unsupported-surface" }})
         end
-        if player and not (player.cursor_record or player.cursor_stack.name == "blueprint") then
+        if player then
             player.mine_entity(entity, true)
         else
             entity.destroy({ raise_destroy = true })
@@ -185,9 +185,10 @@ end
 --------------------------------------------------------------------------------
 
 ---@param surface LuaSurface
-local function init_network_for_surface(surface)
+function main.surface_init_network(surface)
     local network_name = lib.get_network_name_for_surface(surface)
     if not network_name then return end
+    if storage.networks[network_name] then return end
 
     storage.networks[network_name] = {
         surface = surface,
@@ -214,7 +215,7 @@ local function init_network_for_surface(surface)
 end
 
 ---@param surface LuaSurface
-local function break_all_surface_entities(surface)
+function main.surface_break_all_entities(surface)
     for _, entity in pairs(surface.find_entities()) do
         if entity.valid then
             local name = entity.name
@@ -235,19 +236,19 @@ end
 ---@param event EventData.on_surface_created|EventData.on_surface_imported
 local function on_surface_created(event)
     local surface = assert(game.get_surface(event.surface_index))
-    init_network_for_surface(surface)
+    main.surface_init_network(surface)
 end
 
 ---@param event EventData.on_pre_surface_cleared
 local function on_surface_cleared(event)
     local surface = assert(game.get_surface(event.surface_index))
-    break_all_surface_entities(surface)
+    main.surface_break_all_entities(surface)
 end
 
 ---@param event EventData.on_pre_surface_deleted
 local function on_surface_deleted(event)
     local surface = assert(game.get_surface(event.surface_index))
-    break_all_surface_entities(surface)
+    main.surface_break_all_entities(surface)
 
     local network_name = lib.get_network_name_for_surface(surface)
     if network_name then
@@ -278,7 +279,7 @@ local function on_init()
     storage.dispatch_items = {}
     storage.buffer_items = {}
     storage.disabled_items = {}
-    for _, surface in pairs(game.surfaces) do init_network_for_surface(surface) end
+    for _, surface in pairs(game.surfaces) do main.surface_init_network(surface) end
 
     lib.refresh_dictionaries()
 end

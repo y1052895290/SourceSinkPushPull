@@ -1450,7 +1450,7 @@ local function try_create_network(root)
         buffer_tickets = {},
     }
 
-    local localised_network_names, network_index = glib.get_localised_network_names(new_network_name)
+    local localised_network_names, network_index = glib.get_localised_network_names(new_network_name, root.default_network_name, true)
     root.elements.network_selector.items = localised_network_names
     root.elements.network_selector.selected_index = network_index
 
@@ -1476,7 +1476,7 @@ local function try_rename_network(root)
     storage.networks[old_network_name] = nil
     storage.networks[new_network_name] = network
 
-    local localised_network_names, network_index = glib.get_localised_network_names(new_network_name)
+    local localised_network_names, network_index = glib.get_localised_network_names(new_network_name, root.default_network_name, true)
     root.elements.network_selector.items = localised_network_names
     root.elements.network_selector.selected_index = network_index
 
@@ -1487,7 +1487,7 @@ end
 
 glib.handlers["network_selection_changed"] = { [events.on_gui_selection_state_changed] = function(event)
     local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
-    local network_name = glib.get_network_name(event.element.selected_index)
+    local network_name = glib.get_network_name(event.element.selected_index, root.default_network_name, true)
 
     switch_open_network(root, network_name)
 end }
@@ -1547,6 +1547,7 @@ glib.handlers["network_delete"] = { [events.on_gui_click] = function(event)
     local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Network]]
 
     local old_network_name = root.network_name
+    local default_network_name = root.default_network_name
     local network = root.network
 
     for hauler_id, hauler in pairs(storage.haulers) do
@@ -1565,13 +1566,11 @@ glib.handlers["network_delete"] = { [events.on_gui_click] = function(event)
 
     storage.networks[old_network_name] = nil
 
-    local surface_network_name = lib.get_network_name_for_surface(game.get_player(event.player_index).surface) or "nauvis"
-
-    local localised_network_names, network_index = glib.get_localised_network_names(surface_network_name)
+    local localised_network_names, network_index = glib.get_localised_network_names(default_network_name, default_network_name, true)
     root.elements.network_selector.items = localised_network_names
     root.elements.network_selector.selected_index = network_index
 
-    switch_open_network(root, surface_network_name)
+    switch_open_network(root, default_network_name)
 end }
 
 --------------------------------------------------------------------------------
@@ -1590,10 +1589,11 @@ end }
 ---@param tab_index integer
 function gui_network.open(player_id, network_name, tab_index)
     local player = game.get_player(player_id) --[[@as LuaPlayer]]
+    local surface_name = lib.get_network_name_for_surface(player.surface) or "nauvis"
 
     player.opened = nil
 
-    local localised_network_names, network_index = glib.get_localised_network_names(network_name)
+    local localised_network_names, network_index = glib.get_localised_network_names(network_name, surface_name, true)
 
     local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-network", style = "frame", direction = "vertical", children = {
@@ -1696,7 +1696,7 @@ function gui_network.open(player_id, network_name, tab_index)
 
     ---@type GuiRoot.Network
     local root = {
-        type = "NETWORK", elements = elements,
+        type = "NETWORK", elements = elements, default_network_name = surface_name,
         network_name = nil, network = nil, class_context = nil, item_context = nil, job_context = nil, ---@diagnostic disable-line: assign-type-mismatch
     }
 

@@ -83,7 +83,7 @@ end
 glib.handlers["hauler_network_selection_changed"] = { [events.on_gui_selection_state_changed] = function(event)
     local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Hauler]]
 
-    local network_name = glib.get_network_name(event.element.selected_index, root.train.front_stock.surface)
+    local network_name = glib.get_network_name(event.element.selected_index, root.train.front_stock.surface.name, false)
     local network = storage.networks[network_name]
 
     local class_names, class_index = get_class_names(network, "")
@@ -94,14 +94,12 @@ glib.handlers["hauler_network_selection_changed"] = { [events.on_gui_selection_s
         clear_status_widgets(root)
         storage.haulers[root.train_id] = nil
     end
-
-    root.elements.open_network_button.enabled = true
 end }
 
 glib.handlers["hauler_class_selection_changed"] = { [events.on_gui_selection_state_changed] = function(event)
     local root = storage.player_guis[event.player_index] --[[@as GuiRoot.Hauler]]
 
-    local network_name = glib.get_network_name(root.elements.network_selector.selected_index, root.train.front_stock.surface)
+    local network_name = glib.get_network_name(root.elements.network_selector.selected_index, root.train.front_stock.surface.name, false)
     local network = storage.networks[network_name]
 
     local class_name = get_class_name(network, root.elements.class_selector.selected_index)
@@ -132,7 +130,7 @@ glib.handlers["hauler_open_network"] = { [events.on_gui_click] = function(event)
     local player_id = event.player_index
     local root = storage.player_guis[player_id] --[[@as GuiRoot.Hauler]]
 
-    local network_name = glib.get_network_name(root.elements.network_selector.selected_index, root.train.front_stock.surface)
+    local network_name = glib.get_network_name(root.elements.network_selector.selected_index, root.train.front_stock.surface.name, false)
     gui_network.open(player_id, network_name, 1)
 end }
 
@@ -146,27 +144,18 @@ end }
 
 --------------------------------------------------------------------------------
 
----@param player_id PlayerId
+---@param player LuaPlayer
 ---@param train LuaTrain
-function gui_hauler.open(player_id, train)
-    local player = game.get_player(player_id) --[[@as LuaPlayer]]
-
-    -- mods assigning player.opened to another locomotive won't generate a close event
-    if player.gui.screen["sspp-hauler"] then gui_hauler.close(player_id) end
-
-    local hauler = storage.haulers[train.id]
-    local surface = train.front_stock.surface
+---@param surface_name NetworkName
+---@param hauler Hauler?
+---@return LuaGuiElement window, {[string]: LuaGuiElement} elements
+local function add_gui_supported(player, train, surface_name, hauler)
     local manual_mode = train.manual_mode
 
-    local network_name = hauler and hauler.network or lib.get_network_name_for_surface(surface)
-    local localised_network_names, network_index = glib.get_localised_network_names(network_name or "", surface)
+    local network_name = hauler and hauler.network or surface_name
+    local localised_network_names, network_index = glib.get_localised_network_names(network_name, surface_name, false)
 
-    local class_names, class_index
-    if network_name then
-        class_names, class_index = get_class_names(storage.networks[network_name], hauler and hauler.class or "")
-    else
-        class_names, class_index = {}, 0
-    end
+    local class_names, class_index = get_class_names(storage.networks[network_name], hauler and hauler.class or "")
 
     local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-hauler", style = "sspp_hauler_frame", direction = "vertical", children = {
@@ -174,7 +163,7 @@ function gui_hauler.open(player_id, train)
                 { type = "label", style = "bold_label", caption = { "sspp-gui.network" } },
                 { type = "empty-widget", style = "flib_horizontal_pusher" },
                 { type = "drop-down", name = "network_selector", style = "sspp_wide_dropdown", items = localised_network_names, selected_index = network_index, enabled = manual_mode, handler = "hauler_network_selection_changed" },
-                { type = "sprite-button", name = "open_network_button", style = "sspp_compact_sprite_button", sprite = "sspp-network-icon", tooltip = { "sspp-gui.open-network" }, mouse_button_filter = { "left" }, enabled = network_name ~= nil, handler = "hauler_open_network" },
+                { type = "sprite-button", style = "sspp_compact_sprite_button", sprite = "sspp-network-icon", tooltip = { "sspp-gui.open-network" }, mouse_button_filter = { "left" }, handler = "hauler_open_network" },
             } },
             { type = "flow", style = "flib_indicator_flow", direction = "horizontal", children = {
                 { type = "label", style = "bold_label", caption = { "sspp-gui.class" } },
@@ -191,17 +180,51 @@ function gui_hauler.open(player_id, train)
         } }
     ) ---@cast elements -nil
 
+    return window, elements
+end
+
+---@param player LuaPlayer
+---@return LuaGuiElement window, {[string]: LuaGuiElement} elements
+local function add_gui_unsupported(player)
+    local window, elements = glib.add_element(player.gui.screen, {},
+        { type = "frame", name = "sspp-hauler", style = "sspp_hauler_frame", direction = "vertical", children = {
+            { type = "label", style = "info_label", caption = { "sspp-gui.unsupported-surface-message" } },
+        } }
+    ) ---@cast elements -nil
+
+    return window, elements
+end
+
+--------------------------------------------------------------------------------
+
+---@param player_id PlayerId
+---@param train LuaTrain
+function gui_hauler.open(player_id, train)
+    local player = game.get_player(player_id) --[[@as LuaPlayer]]
+    local surface_name = lib.get_network_name_for_surface(train.front_stock.surface)
+
+    -- mods assigning player.opened to another locomotive won't generate a close event
+    if player.gui.screen["sspp-hauler"] then gui_hauler.close(player_id) end
+
+    local window, elements, root ---@type LuaGuiElement, {[string]: LuaGuiElement}, GuiRoot.Hauler
+    if surface_name then
+        local hauler = storage.haulers[train.id]
+
+        window, elements = add_gui_supported(player, train, surface_name, hauler)
+        root = { type = "HAULER", elements = elements, train_id = train.id, train = train }
+
+        if hauler then
+            gui_hauler.on_status_changed(root)
+        else
+            clear_status_widgets(root)
+        end
+    else
+        window, elements = add_gui_unsupported(player)
+        root = { type = "HAULER", elements = elements, train_id = train.id }
+    end
+
     local resolution, scale = player.display_resolution, player.display_scale
     window.location = { x = resolution.width - (244 + 12) * scale, y = resolution.height - (108 + 12) * scale }
-
-    ---@type GuiRoot.Hauler
-    local root = { type = "HAULER", elements = elements, train_id = train.id, train = train }
-
-    if hauler then
-        gui_hauler.on_status_changed(root)
-    else
-        clear_status_widgets(root)
-    end
 
     storage.player_guis[player_id] = root
 end

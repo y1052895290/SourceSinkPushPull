@@ -986,7 +986,7 @@ glib.handlers["station_network_selection_changed"] = { [events.on_gui_selection_
         end
     end
 
-    root.ghost.general.network = glib.get_network_name(event.element.selected_index, root.ghost.stop.entity.surface)
+    root.ghost.general.network = glib.get_network_name(event.element.selected_index, root.ghost.stop.entity.surface.name, false)
     lib.write_station_general_settings(root.ghost.general)
 
     if root.provide_context then
@@ -1043,7 +1043,7 @@ local function add_gui_complete(player, ghost)
     local provide = ghost.provide ~= nil
     local request = ghost.request ~= nil
 
-    local localised_network_names, network_index = glib.get_localised_network_names(ghost.general.network, ghost.stop.entity.surface)
+    local localised_network_names, network_index = glib.get_localised_network_names(ghost.general.network, ghost.stop.entity.surface.name, false)
 
     local window, elements = glib.add_element(player.gui.screen, {},
         { type = "frame", name = "sspp-station", style = "frame", direction = "vertical", children = {

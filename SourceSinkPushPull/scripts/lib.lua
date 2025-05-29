@@ -6,7 +6,7 @@ local config = require("__SourceSinkPushPull__.scripts.config")
 
 local m_max, m_ceil, m_floor = math.max, math.ceil, math.floor
 local b_test = bit32.btest
-local s_match, s_gmatch, s_format = string.match, string.gmatch, string.format
+local s_sub, s_match, s_gmatch, s_format = string.sub, string.match, string.gmatch, string.format
 
 ---@class sspp.lib
 local lib = {}
@@ -609,12 +609,20 @@ end
 --------------------------------------------------------------------------------
 
 ---@param surface LuaSurface
+---@return boolean
+function lib.is_supported_lab_surface(surface)
+    local name = surface.name
+    if s_sub(name, 1, 15) == "EE_TESTSURFACE_" then return true end
+    if s_sub(name, 1, 9) == "bpsb-lab-" then return true end
+    return false
+end
+
+---@param surface LuaSurface
 ---@return NetworkName?
 function lib.get_network_name_for_surface(surface)
     local name = surface.name
     if surface.planet then return name end
-    if name == "__sspp_test" then return name end
-    -- TODO: mod surfaces which lack associated planets will have to be allowed individually
+    if lib.is_supported_lab_surface(surface) then return name end
     return nil
 end
 
