@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.9
+Date: 2025-05-29
+  Changes:
+    - SSPP can now be used on the lab surfaces from Editor Extensions and Blueprint Sandboxes.
+  Bugfixes:
+    - Fix crash when trying to place an SSPP entity using the editor brush on an unsupported surface.
+    - Fix crash when invalidating a network Class/Item/Fluid row while it is expanded (minimaps).
+---------------------------------------------------------------------------------------------------
 Version: 0.4.8
 Date: 2025-05-23
   Changes:
